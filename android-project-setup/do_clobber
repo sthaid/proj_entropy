@@ -1,0 +1,4 @@
+#!/bin/bash
+
+rm -rf bin gen libs obj
+rm -f local.properties

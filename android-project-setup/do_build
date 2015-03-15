@@ -1,0 +1,17 @@
+#!/bin/bash
+
+ndk-build
+if [ $? -ne 0 ]
+then
+  echo NDK-BUILD FAILED
+  exit
+fi
+
+ant debug -q
+if [ $? -ne 0 ]
+then
+  echo ANT DEBUG FAILED
+  exit
+fi
+
+echo SUCCESS

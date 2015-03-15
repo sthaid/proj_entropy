@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# this script must be run from the directory containing the source code,
+# for example: "./android-project-setup/script"
+
+# the android-project and tmp directories must not already exist
+if [ -d android-project -o -d tmp ]
+then
+  echo "error: android-project or tmp directories already exist, delete them and try again"
+  exit
+fi
+
+# make the tmp directory and get the SDL tar files
+mkdir tmp
+cd tmp
+wget http://www.libsdl.org/release/SDL2-2.0.3.tar.gz
+wget https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.12.tar.gz
+wget http://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.0.tar.gz
+
+# extract the template android-project and move it, and 
+# remove the SDL2-2.0.3 directory
+tar -xf SDL2-2.0.3.tar.gz SDL2-2.0.3/android-project
+mv SDL2-2.0.3/android-project ..
+rmdir SDL2-2.0.3
+
+# move the tar files to the android-project/jni directory
+mv *.gz ../android-project/jni
+
+# delete the tmp dir
+cd ..
+rmdir tmp
+
+# expand the SDL tar files
+cd android-project/jni
+tar -xf SDL2-2.0.3.tar.gz
+tar -xf SDL2_mixer-2.0.0.tar.gz
+tar -xf SDL2_ttf-2.0.12.tar.gz
+
+# change to android-project directory
+cd ..
+
+# update AndroidManifest.xml
+# - remove minSdkVersion
+sed -i.orig \
+    -e "s/android:minSdkVersion=\"[0-9]*\" //" \
+    AndroidManifest.xml
+
+# update jni/Application.mk
+sed -i.orig \
+    -e "$ aAPP_PLATFORM := android-12" \
+    -e "/APP_ABI :=/ cAPP_ABI := armeabi" \
+    jni/Application.mk
+  
+# update src/org/libsdl/app/SDLActivity.java
+sed -i.orig \
+    -e "/SDL2_mixer/ c\        System.loadLibrary(\"SDL2_mixer\");" \
+    -e "/SDL2_ttf/ c\        System.loadLibrary(\"SDL2_ttf\");" \
+     src/org/libsdl/app/SDLActivity.java 
+
+# populate jni/src 
+ln -s ../../../entropy.c      jni/src
+ln -s ../../../util.c         jni/src
+ln -s ../../../util.h         jni/src
+ln -s ../../../button_sound.h jni/src
+
+# replace jni/src/Android.mk
+cp jni/src/Android.mk jni/src/Android.mk.orig
+cp ../android-project-setup/jni_src_Android.mk jni/src/Android.mk
+
+# remove support from SDL2_mixer, otherwise more libraries are needed
+sed -i.orig \
+    -e "/^SUPPORT_MOD_MODPLUG/ s/true/false/" \
+    -e "/^SUPPORT_MOD_MIKMOD/ s/true/false/" \
+    -e "/^SUPPORT_MP3_SMPEG/ s/true/false/" \
+    -e "/^SUPPORT_OGG/ s/true/false/" \
+    jni/SDL2_mixer-2.0.0/Android.mk
+
+# copy in script files
+cp ../android-project-setup/do_* .
+
+# change program name
+# - create src/org//sthaid/app/Entropy.java
+# - edit AndroidManifest.xml
+# - edit build.xml
+mkdir -p src/org/sthaid/app
+cp ../android-project-setup/Entropy.java src/org/sthaid/app
+sed -i.orig \
+    -e "/package=/ s/org.libsdl.app/org.sthaid.app/" \
+    -e "/android:name=\"SDLActivity\"/ s/SDLActivity/Entropy/" \
+    AndroidManifest.xml
+sed -i.orig \
+    -e "/project name=\"SDLActivity\"/ s/SDLActivity/Entropy/" \
+    build.xml
+
+# change launcher icon
+rm -rf res/drawable-*
+mkdir res/drawable
+cp ../android-project-setup/ic_launcher.png res/drawable
+
+# change launcher icon name
+sed -i \
+    -e "/name=\"app_name\"/ s/SDL App/Entropy/" \
+    res/values/strings.xml
+
+# update project
+android update project --target 1 --path .
