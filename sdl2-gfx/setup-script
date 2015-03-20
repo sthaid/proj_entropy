@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# verify args
+if [ "$1" != "" -a "$1" != clean ]
+then
+  echo "usage:"
+  echo " $ setup"
+  echo " $ setup clean"
+  exit
+fi
+
+# process clearn request
+if [ "$1" = clean ]
+then
+  echo "Cleaning ..."
+  rm -rf include src SDL2_gfx-1.0.1
+  exit
+fi
+
+# make sure directory is cleaned before proceeding
+if [ `echo *` != "setup-script" ]
+then
+  echo "ERROR can not proceed with setup unless directory has been cleaned"
+  exit
+fi
+
+# get the source
+VERSION=1.0.1
+wget http://www.ferzkopp.net/Software/SDL2_gfx/SDL2_gfx-$VERSION.tar.gz
+
+# extract 
+tar xf SDL2_gfx-$VERSION.tar.gz
+rm SDL2_gfx-$VERSION.tar.gz
+
+# copy to src and include dirs, and fix permissions
+mkdir src include
+cp SDL2_gfx-$VERSION/*.c src
+cp SDL2_gfx-$VERSION/*.h include
+chmod 644 src/*.c include/*.h

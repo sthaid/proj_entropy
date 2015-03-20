@@ -1,5 +1,7 @@
 #include "util.h"
 
+#include <SDL2_gfxPrimitives.h>
+
 //
 // CONFIG Support
 //
@@ -13,20 +15,20 @@
 
 char          config_path[PATH_MAX];
 const int32_t config_version = 1;
-config_t      config[] = { { "debug",     "N"         },
+config_t      config[] = { { "debug",     "Y"         },
                            { "",          ""          } };
-
-//
-// defines
-//
-
-#define EVENT_ONE  1  //xxx
 
 #ifndef ANDROID
     #define GET_CONFIG_DIR() getenv("HOME")
 #else
     #define GET_CONFIG_DIR() SDL_AndroidGetInternalStoragePath();
 #endif
+
+//
+// defines
+//
+
+#define EVENT_ONE  1  //xxx
 
 //
 // typedefs
@@ -51,7 +53,7 @@ int32_t  force_field         = FORCE_FIELD_OFF;
 //
 
 void init(char * progname);
-void terminate(void);
+void terminate(char * progname);
 void main_loop(void);
 
 // -----------------  MAIN  ----------------------------------------------
@@ -64,11 +66,11 @@ int32_t main(int32_t argc, char **argv)
     // processing
     while (!sdl_quit_event) {
         main_loop();
-        usleep(10000);
+        //usleep(10000);
     }
 
     // done
-    terminate();
+    terminate(argv[0]);
     return 0;
 }
 
@@ -104,8 +106,9 @@ void init(char *progname)
     sdl_init();
 }
 
-void terminate(void)
+void terminate(char * progname)
 {
+    INFO("TERMINATING %s\n", progname);
     sdl_terminate();
 }
 
@@ -136,6 +139,33 @@ void main_loop(void)
     sprintf(str, "width=%d height=%d min=%d",
         sdl_win_width, sdl_win_height, sdl_win_minimized);
     sdl_render_text_font0(&ctlpane, 5, 0, str, SDL_EVENT_NONE);
+
+
+#if 0
+    uint32_t color = SDL_MapRGB(SDL_PIXELFORMAT_RGB24, 200, 200, 200);
+    filledCircleColor(sdl_renderer, 100, 100, 75, color);
+#endif
+
+    #define MAX_X 10000
+    #define MAX_Y 10000
+
+    int dir;
+    static int dx[8] = {   0, 71, 100,  71,    0, -71, -100, -71 };
+    static int dy[8] = { 100, 71,   0, -71, -100, -71,    0,  71 };
+    static int x = MAX_X / 2;
+    static int y = MAX_Y / 2;
+
+    dir = random() % 8;
+    x = x + dx[dir];
+    y = y + dy[dir];
+    if (x < 0 || x > MAX_X)  {
+        x = x - 2 * dx[dir];
+    }
+    if (y < 0 || y > MAX_X)  {
+        y = y - 2 * dy[dir];
+    }
+
+   filledCircleRGBA(sdl_renderer, x*sdl_win_width/MAX_X, y*sdl_win_height/MAX_Y, 10, 255, 255, 255, 255);
 
     // present the display
     SDL_RenderPresent(sdl_renderer);

@@ -4,10 +4,12 @@
 // -----------------  SDL SUPPORT  ---------------------------------------
 
 // window init
-#define SDL_WIN_WIDTH_INITIAL  1000
-#define SDL_WIN_HEIGHT_INITIAL 900
+//XXX #define SDL_WIN_WIDTH_INITIAL  1000
+//XXX #define SDL_WIN_HEIGHT_INITIAL 900
+#define SDL_WIN_WIDTH_INITIAL  400  
+#define SDL_WIN_HEIGHT_INITIAL 640
 #ifndef ANDROID 
-#define SDL_FLAGS SDL_WINDOW_RESIZABLE
+#define SDL_FLAGS SDL_WINDOW_RESIZABLE //XXX ?
 #else
 #define SDL_FLAGS SDL_WINDOW_FULLSCREEN
 #endif
@@ -645,8 +647,6 @@ void printmsg(char *fmt, ...)
 }
 
 #else
-
-#include <SDL.h>
 
 void logmsg_init(char * file_name)
 {

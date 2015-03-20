@@ -1,12 +1,33 @@
 #!/bin/bash
 
-# this script must be run from the directory containing the source code,
-# for example: "./android-project-setup/script"
+# this script:
+# - must be run from the android-project directory, and
+# - when setting up, the directory must be clean
 
-# the android-project and tmp directories must not already exist
-if [ -d android-project -o -d tmp ]
+# verify args
+if [ "$1" != "" -a "$1" != clean ]
 then
-  echo "error: android-project or tmp directories already exist, delete them and try again"
+  echo "usage:"
+  echo " $ setup"
+  echo " $ setup clean"
+  exit
+fi
+
+# process clearn request
+if [ "$1" = clean ]
+then 
+  echo "Cleaning ..."
+  rm -rf jni res src bin gen libs obj 
+  rm -f  AndroidManifest.xml ant.properties build.properties build.xml \
+         default.properties local.properties proguard-project.txt project.properties
+  rm -f do_build do_build_and_install do_clean do_clobber do_install do_logcat do_logclear *.orig
+  exit
+fi
+
+# make sure directory is cleaned before proceeding
+if [ `echo *` != "setup-script" ]
+then
+  echo "ERROR can not proceed with setup unless directory has been cleaned"
   exit
 fi
 
@@ -20,18 +41,18 @@ wget http://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.0.tar.gz
 # extract the template android-project and move it, and 
 # remove the SDL2-2.0.3 directory
 tar -xf SDL2-2.0.3.tar.gz SDL2-2.0.3/android-project
-mv SDL2-2.0.3/android-project ..
-rmdir SDL2-2.0.3
+mv SDL2-2.0.3/android-project/* ..
+rmdir SDL2-2.0.3/android-project SDL2-2.0.3
 
 # move the tar files to the android-project/jni directory
-mv *.gz ../android-project/jni
+mv *.gz ../jni
 
 # delete the tmp dir
 cd ..
 rmdir tmp
 
 # expand the SDL tar files
-cd android-project/jni
+cd jni
 tar -xf SDL2-2.0.3.tar.gz
 tar -xf SDL2_mixer-2.0.0.tar.gz
 tar -xf SDL2_ttf-2.0.12.tar.gz
@@ -58,14 +79,18 @@ sed -i.orig \
      src/org/libsdl/app/SDLActivity.java 
 
 # populate jni/src 
-ln -s ../../../entropy.c      jni/src
-ln -s ../../../util.c         jni/src
-ln -s ../../../util.h         jni/src
-ln -s ../../../button_sound.h jni/src
+ln -s ../../../entropy.c                         jni/src
+ln -s ../../../util.c                            jni/src
+ln -s ../../../util.h                            jni/src
+ln -s ../../../button_sound.h                    jni/src
+ln -s ../../../sdl2-gfx/src/SDL2_framerate.c     jni/src
+ln -s ../../../sdl2-gfx/src/SDL2_gfxPrimitives.c jni/src
+ln -s ../../../sdl2-gfx/src/SDL2_imageFilter.c   jni/src
+ln -s ../../../sdl2-gfx/src/SDL2_rotozoom.c      jni/src
 
 # replace jni/src/Android.mk
 cp jni/src/Android.mk jni/src/Android.mk.orig
-cp ../android-project-setup/jni_src_Android.mk jni/src/Android.mk
+cp .setup/jni_src_Android.mk jni/src/Android.mk
 
 # remove support from SDL2_mixer, otherwise more libraries are needed
 sed -i.orig \
@@ -76,14 +101,14 @@ sed -i.orig \
     jni/SDL2_mixer-2.0.0/Android.mk
 
 # copy in script files
-cp ../android-project-setup/do_* .
+cp .setup/do_* .
 
 # change program name
 # - create src/org//sthaid/app/Entropy.java
 # - edit AndroidManifest.xml
 # - edit build.xml
 mkdir -p src/org/sthaid/app
-cp ../android-project-setup/Entropy.java src/org/sthaid/app
+cp .setup/Entropy.java src/org/sthaid/app
 sed -i.orig \
     -e "/package=/ s/org.libsdl.app/org.sthaid.app/" \
     -e "/android:name=\"SDLActivity\"/ s/SDLActivity/Entropy/" \
@@ -95,7 +120,7 @@ sed -i.orig \
 # change launcher icon
 rm -rf res/drawable-*
 mkdir res/drawable
-cp ../android-project-setup/ic_launcher.png res/drawable
+cp .setup/ic_launcher.png res/drawable
 
 # change launcher icon name
 sed -i \
