@@ -1,0 +1,24 @@
+// XXX TODO
+// - help screen
+// - use config_read ?
+// - larger font
+
+
+// XXX lots of cleanup
+// - review all code
+// - populate fnts dir
+// - update the script that populates all this from SDL,
+// - stop building the SDL_gfx, and just keep it around
+// - finish work on fonts
+// - need a readme
+// - choose a linux font that is universal
+// - window rotation ?
+// - all other xxx
+
+test fields up to 4
+
+
+DONE
+----
+
+
