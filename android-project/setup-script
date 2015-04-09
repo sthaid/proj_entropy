@@ -17,7 +17,7 @@ fi
 if [ "$1" = clean ]
 then 
   echo "Cleaning ..."
-  rm -rf jni res src bin gen libs obj 
+  rm -rf jni res src bin gen libs obj assets
   rm -f  AndroidManifest.xml ant.properties build.properties build.xml \
          default.properties local.properties proguard-project.txt project.properties
   rm -f do_build do_build_and_install do_clean do_clobber do_install do_logcat do_logclear *.orig
@@ -79,10 +79,11 @@ sed -i.orig \
      src/org/libsdl/app/SDLActivity.java 
 
 # populate jni/src 
-ln -s ../../../entropy.c                         jni/src
-ln -s ../../../util.c                            jni/src
-ln -s ../../../util.h                            jni/src
-ln -s ../../../button_sound.h                    jni/src
+ln -s ../../../main.c           jni/src
+ln -s ../../../util.c           jni/src
+ln -s ../../../sim_container.c  jni/src
+ln -s ../../../util.h           jni/src
+ln -s ../../../button_sound.h   jni/src
 
 # replace jni/src/Android.mk
 cp jni/src/Android.mk jni/src/Android.mk.orig

@@ -296,7 +296,7 @@ bool sim_container_display(void)
     sdl_render_text_font0(&ctlpane, 18,15,  "BACK",            SDL_EVENT_BACK);
 
     // display status line
-    sprintf(str, "yp_j%s %"PRId64" ", STATE_STR(state), sim->state_num);
+    sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
     if (state == STATE_RUN || state == STATE_STOP || state == STATE_LOW_ENTROPY_STOP) {
         if (cont_shrink_restore_speed < 0) {
             strcat(str, "SHRINK");
