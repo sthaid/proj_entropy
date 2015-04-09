@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# this script:
+# - must be run from the sdl2-gfx directory, and
+# - when setting up, the directory must be clean
+
 # verify args
 if [ "$1" != "" -a "$1" != clean ]
 then

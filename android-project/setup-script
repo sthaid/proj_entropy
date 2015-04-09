@@ -83,10 +83,6 @@ ln -s ../../../entropy.c                         jni/src
 ln -s ../../../util.c                            jni/src
 ln -s ../../../util.h                            jni/src
 ln -s ../../../button_sound.h                    jni/src
-ln -s ../../../sdl2-gfx/src/SDL2_framerate.c     jni/src
-ln -s ../../../sdl2-gfx/src/SDL2_gfxPrimitives.c jni/src
-ln -s ../../../sdl2-gfx/src/SDL2_imageFilter.c   jni/src
-ln -s ../../../sdl2-gfx/src/SDL2_rotozoom.c      jni/src
 
 # replace jni/src/Android.mk
 cp jni/src/Android.mk jni/src/Android.mk.orig
@@ -99,6 +95,10 @@ sed -i.orig \
     -e "/^SUPPORT_MP3_SMPEG/ s/true/false/" \
     -e "/^SUPPORT_OGG/ s/true/false/" \
     jni/SDL2_mixer-2.0.0/Android.mk
+
+# add assets directory, and populate
+mkdir assets
+cp /usr/share/fonts/gnu-free/FreeMonoBold.ttf assets
 
 # copy in script files
 cp .setup/do_* .
