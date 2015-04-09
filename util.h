@@ -13,6 +13,8 @@
 #include <limits.h>
 #include <pthread.h>
 #include <time.h>
+#include <fcntl.h> 
+#include <math.h> 
 #include <assert.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -21,6 +23,10 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <SDL_mixer.h>
+
+// -----------------  SIMULATIONS  --------------------------------------------------
+
+bool sim_container(void);
 
 // -----------------  VERSION  ------------------------------------------------------
 
@@ -44,6 +50,9 @@ int32_t        sdl_win_width;
 int32_t        sdl_win_height;
 bool           sdl_win_minimized;
 
+// program quit requested
+bool           sdl_quit;
+
 // render_text
 #define SDL_FIELD_COLS_UNLIMITTED 999
 #define SDL_INIT_PANE(r,_x,_y,_w,_h) \
@@ -55,33 +64,67 @@ bool           sdl_win_minimized;
     } while (0)
 
 // events
-#define SDL_EVENT_NONE 0
-#define SDL_MAX_EVENT  256 
-int32_t  sdl_event;
-bool     sdl_quit_event;
+#define SDL_EVENT_NONE              0
+#define SDL_EVENT_QUIT              1
+#define SDL_EVENT_WIN_SIZE_CHANGE   2
+#define SDL_EVENT_WIN_MINIMIZED     3
+#define SDL_EVENT_WIN_RESTORED      4
+#define SDL_EVENT_USER_START        10  
+#define SDL_EVENT_USER_END          255
+#define SDL_EVENT_MAX               256 
+
 
 // sdl support: prototypes
-void sdl_init(void);
+void sdl_init(uint32_t w, uint32_t h);
 void sdl_terminate(void);
 void sdl_render_text_font0(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
 void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
 void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
         int32_t field_cols, bool center, int32_t font_id);
 void sdl_event_init(void);
-void sdl_poll_event(void);
-bool sdl_get_string(char * prompt_str, char * ret_str, size_t ret_str_size);
+int32_t sdl_poll_event(void);
+void sdl_get_string(int32_t count, ...);
+void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint8_t r, uint8_t g, uint8_t b, uint8_t alpha);
+
+// -----------------  PTHREAD ADDITIONS FOR ANDROID  --------------------------------
+
+#ifdef ANDROID
+
+#define pthread_barrier_init    Pthread_barrier_init
+#define pthread_barrier_destroy Pthread_barrier_destroy
+#define pthread_barrier_wait    Pthread_barrier_wait
+#define pthread_barrier_t       Pthread_barrier_t
+#define pthread_barrierattr_t   Pthread_barrierattr_t
+
+typedef void * Pthread_barrierattr_t;
+
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    uint64_t       count;
+    uint64_t       current;;
+} Pthread_barrier_t;
+
+int Pthread_barrier_wait(Pthread_barrier_t *barrier);
+int Pthread_barrier_destroy(Pthread_barrier_t *barrier);
+int Pthread_barrier_init(Pthread_barrier_t *barrier, const Pthread_barrierattr_t *attr, unsigned count);
+
+#endif
 
 // -----------------  CONFIG READ/WRITE  --------------------------------------------
 
 #define MAX_CONFIG_VALUE_STR 100
 
 typedef struct {
-    const char * name;
-    char         value[MAX_CONFIG_VALUE_STR];
+    uint32_t version;
+    struct {
+        const char * name;
+        char         value[MAX_CONFIG_VALUE_STR];
+    } ent[];
 } config_t;
 
-int config_read(char * config_path, config_t * config, int config_version);
-int config_write(char * config_path, config_t * config, int config_version);
+int config_read(char * filename, config_t * config);
+int config_write(char * filename, config_t * config);
 
 // -----------------  LOGGING  -------------------------------------------------------
 
@@ -124,9 +167,6 @@ void printmsg(char *fmt, ...);
 
 // -----------------  TIME  ----------------------------------------------------------
 
-// #define TIMESPEC_TO_US(ts) ((uint64_t)(ts)->tv_sec * 1000000 + (ts)->tv_nsec / 1000)
-// #define TIMEVAL_TO_US(tv)  ((uint64_t)(tv)->tv_sec * 1000000 + (tv)->tv_usec)
-
 #define MAX_TIME_STR    32
 
 uint64_t microsec_timer(void);
@@ -134,73 +174,9 @@ time_t get_real_time_sec(void);
 uint64_t get_real_time_us(void);
 char * time2str(char * str, time_t time, bool gmt);
 
-// -----------------  TIMING CODE PATH DURATION  -------------------------------------
+// -----------------  MISC  ----------------------------------------------------------
 
-#ifdef DEBUG_TIMING
-
-typedef struct {
-    const char * name;
-    uint64_t     min;
-    uint64_t     max;
-    uint64_t     sum;
-    uint64_t     count;
-    uint64_t     begin_us;
-    uint64_t     last_print_us;
-    uint64_t     print_intvl_us;
-} timing_t;
-
-#define TIMING_DECLARE(tmg, pr_intvl) \
-    static timing_t tmg = { #tmg, UINT64_MAX, 0, 0, 0, 0, 0, pr_intvl }
-
-#define TIMING_BEGIN(tmg) \
-    do {\
-        (tmg)->begin_us = microsec_timer(); \
-    } while (0)
-
-#define TIMING_END(tmg) \
-    do { \
-        uint64_t curr_us = microsec_timer(); \
-        uint64_t dur_us = curr_us - (tmg)->begin_us; \
-        if (dur_us < (tmg)->min) { \
-            (tmg)->min = dur_us; \
-        } \
-        if (dur_us > (tmg)->max) { \
-            (tmg)->max = dur_us; \
-        } \
-        (tmg)->sum += dur_us; \
-        (tmg)->count++; \
-        if ((tmg)->last_print_us == 0) { \
-            (tmg)->last_print_us = curr_us; \
-        } else if (curr_us - (tmg)->last_print_us > (tmg)->print_intvl_us) { \
-            NOTICE("TIMING %s avg=%d.%3.3d min=%d.%3.3d max=%d.%3.3d count=%d\n", \
-                   (tmg)->name, \
-                   (int)(((tmg)->sum/(tmg)->count) / 1000000), \
-                   (int)(((tmg)->sum/(tmg)->count) % 1000000) / 1000, \
-                   (int)((tmg)->min / 1000000), \
-                   (int)((tmg)->min % 1000000) / 1000, \
-                   (int)((tmg)->max / 1000000), \
-                   (int)((tmg)->max % 1000000) / 1000, \
-                   (int)((tmg)->count)); \
-            (tmg)->min           = UINT64_MAX; \
-            (tmg)->max           = 0; \
-            (tmg)->sum           = 0; \
-            (tmg)->count         = 0; \
-            (tmg)->begin_us      = 0; \
-            (tmg)->last_print_us = curr_us; \
-        } \
-    } while (0)
-
-#else
-
-#define TIMING_DECLARE(tmg, pr_intvl)
-
-#define TIMING_BEGIN(tmg) \
-    do { \
-    } while (0)
-
-#define TIMING_END(tmg) \
-    do { \
-    } while (0)
-
-#endif
+int32_t random_uniform(int32_t low, int32_t high);
+int32_t random_triangular(int32_t low, int32_t high);
+void wavelength_to_rgb(int32_t wl, uint8_t * r, uint8_t * g, uint8_t * b);
 

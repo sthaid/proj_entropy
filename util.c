@@ -4,12 +4,8 @@
 // -----------------  SDL SUPPORT  ---------------------------------------
 
 // window init
-//XXX #define SDL_WIN_WIDTH_INITIAL  1000
-//XXX #define SDL_WIN_HEIGHT_INITIAL 900
-#define SDL_WIN_WIDTH_INITIAL  400  
-#define SDL_WIN_HEIGHT_INITIAL 640
 #ifndef ANDROID 
-#define SDL_FLAGS SDL_WINDOW_RESIZABLE //XXX ?
+#define SDL_FLAGS SDL_WINDOW_RESIZABLE
 #else
 #define SDL_FLAGS SDL_WINDOW_FULLSCREEN
 #endif
@@ -19,51 +15,43 @@
     do { \
         Mix_PlayChannel(-1, sdl_button_sound, 0); \
     } while (0)
-Mix_Chunk * sdl_button_sound;
+static Mix_Chunk * sdl_button_sound;
 
 // events
-#define EVENT_KEY_SHIFT   1
-#define EVENT_KEY_ESC     2
-#define EVENT_KEY_BS      3
-#define EVENT_KEY_ENTER   4
-SDL_Rect sdl_event_pos[SDL_MAX_EVENT];
+#define SDL_EVENT_KEY_SHIFT      128
+#define SDL_EVENT_KEY_BS         129
+#define SDL_EVENT_KEY_TAB        130
+#define SDL_EVENT_KEY_ENTER      131
+#define SDL_EVENT_KEY_ESC        132
+#define SDL_EVENT_FIELD_SELECT   140
+static SDL_Rect sdl_event_pos[SDL_EVENT_MAX];
 
 // fonts
-#define SDL_MAX_FONT                    2
-#define SDL_PANE_COLS(p,fid)            ((p)->w / sdl_font[fid].char_width)
-#define SDL_PANE_ROWS(p,fid)            ((p)->h / sdl_font[fid].char_height)
-#ifndef ANDROID
-#define SDL_FONT0_PATH                   "/usr/share/fonts/gnu-free/FreeMonoBold.ttf"
-#define SDL_FONT0_PTSIZE                 20
-#define SDL_FONT1_PATH                   "/usr/share/fonts/gnu-free/FreeMonoBold.ttf"
-#define SDL_FONT1_PTSIZE                 32
-#else
-#define SDL_FONT0_PATH                   "/system/fonts/DroidSansMono.ttf"
-#define SDL_FONT0_PTSIZE                 24
-#define SDL_FONT1_PATH                   "/system/fonts/DroidSansMono.ttf"
-#define SDL_FONT1_PTSIZE                 40 
-#endif
-struct {
+#define SDL_MAX_FONT          2
+#define SDL_PANE_COLS(p,fid)  ((p)->w / sdl_font[fid].char_width)
+#define SDL_PANE_ROWS(p,fid)  ((p)->h / sdl_font[fid].char_height)
+static struct {
     TTF_Font * font;
     int32_t    char_width;
     int32_t    char_height;
 } sdl_font[SDL_MAX_FONT];
 
 // getstring 
-bool sdl_get_string_active;
+static bool sdl_get_string_active;
 
 // code
-void sdl_init(void)
+void sdl_init(uint32_t w, uint32_t h)
 {
+    char  * font0_path, * font1_path;
+    int32_t font0_ptsize, font1_ptsize;
+
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
         FATAL("SDL_Init failed\n");
     }
 
     // create SDL Window and Renderer
-    if (SDL_CreateWindowAndRenderer(SDL_WIN_WIDTH_INITIAL, SDL_WIN_HEIGHT_INITIAL, 
-                                    SDL_FLAGS, &sdl_window, &sdl_renderer) != 0) 
-    {
+    if (SDL_CreateWindowAndRenderer(w, h, SDL_FLAGS, &sdl_window, &sdl_renderer) != 0) {
         FATAL("SDL_CreateWindowAndRenderer failed\n");
     }
     SDL_GetWindowSize(sdl_window, &sdl_win_width, &sdl_win_height);
@@ -79,20 +67,67 @@ void sdl_init(void)
     }
     Mix_VolumeChunk(sdl_button_sound,MIX_MAX_VOLUME/2);
 
+#ifdef ANDROID
+    // on Android copy the font from assets to the internal storage directory
+    SDL_RWops * rw;
+    int         size, len, fd;
+    void      * buff;
+    char        filename[200];
+   
+    // - read the font from asset
+    rw = SDL_RWFromFile("FreeMonoBold.ttf", "r");
+    if (rw == NULL) {
+        FATAL("asset FreeMonoBold.ttf not found\n");
+    }
+    size = rw->size(rw);
+    buff = malloc(size);
+    len = rw->read(rw, buff, 1, size);
+    if (len != size) {
+        FATAL("asset FreeMonoBold.ttf read failed, len=%d siz%d\n", len, size);
+    }
+    rw->close(rw);
+
+    // - write font to internal storage diretory
+    sprintf(filename, "%s/%s", SDL_AndroidGetInternalStoragePath(), "FreeMonoBold.ttf");
+    fd = open(filename, O_RDWR|O_TRUNC|O_CREAT, 0666);
+    if (fd < 0) {
+        FATAL("open %s\n", filename);
+    }
+    len = write(fd, buff, size);
+    if (len != size) {
+        FATAL("write %s, len=%d size=%d\n", filename, len, size);
+    }
+    close(fd);
+    free(buff);
+
+    // - describe fonts for the following section
+    font0_path = filename;
+    font0_ptsize = 40;
+    font1_path = filename;
+    font1_ptsize = 60;
+#else
+    // on Linux describe fonts
+    font0_path = "/usr/share/fonts/gnu-free/FreeMonoBold.ttf";
+    font0_ptsize = 40;
+    font1_path = "/usr/share/fonts/gnu-free/FreeMonoBold.ttf";
+    font1_ptsize = 60;
+#endif
+
     // initialize True Type Font
     if (TTF_Init() < 0) {
         FATAL("TTF_Init failed\n");
     }
-    sdl_font[0].font = TTF_OpenFont(SDL_FONT0_PATH, SDL_FONT0_PTSIZE);
+    sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
-        FATAL("failed TTF_OpenFont %s\n", SDL_FONT0_PATH);
+        FATAL("failed TTF_OpenFont %s\n", font0_path);
     }
     TTF_SizeText(sdl_font[0].font, "X", &sdl_font[0].char_width, &sdl_font[0].char_height);
-    sdl_font[1].font = TTF_OpenFont(SDL_FONT1_PATH, SDL_FONT1_PTSIZE);
+    sdl_font[1].font = TTF_OpenFont(font1_path, font1_ptsize);
     if (sdl_font[1].font == NULL) {
-        FATAL("failed TTF_OpenFont %s\n", SDL_FONT1_PATH);
+        FATAL("failed TTF_OpenFont %s\n", font1_path);
     }
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
+
 }
 
 void sdl_terminate(void)
@@ -108,8 +143,6 @@ void sdl_terminate(void)
     }
     TTF_Quit();
 
-    // xxx SDL_PumpEvents();  // helps on Android when terminating via return
-    // xxx SDL_DestroyTexture(webcam[i].texture); 
     SDL_DestroyRenderer(sdl_renderer);
     SDL_DestroyWindow(sdl_window);
     SDL_Quit();
@@ -205,7 +238,7 @@ void sdl_event_init(void)
     bzero(sdl_event_pos, sizeof(sdl_event_pos));
 }
 
-void sdl_poll_event(void)
+int32_t sdl_poll_event(void)
 {
     #define AT_POS(pos) ((ev.button.x >= (pos).x - 5) && \
                                (ev.button.x < (pos).x + (pos).w + 5) && \
@@ -229,6 +262,7 @@ void sdl_poll_event(void)
         (x) == SDL_WINDOWEVENT_CLOSE        ? "SDL_WINDOWEVENT_CLOSE"        : \
 
     SDL_Event ev;
+    int32_t   event;
 
     while (true) {
         // get the next event, break out of loop if no event
@@ -237,7 +271,7 @@ void sdl_poll_event(void)
         }
 
         // process the SDL event, this code
-        // - sets sdl_event and sdl_quit_event
+        // - sets event and sdl_quit
         // - updates sdl_win_width, sdl_win_height, sdl_win_minimized
         switch (ev.type) {
         case SDL_MOUSEBUTTONDOWN: {
@@ -258,10 +292,10 @@ void sdl_poll_event(void)
                 break;
             }
 
-            for (i = 0; i < SDL_MAX_EVENT; i++) {
+            for (i = 0; i < SDL_EVENT_MAX; i++) {
                 if (AT_POS(sdl_event_pos[i])) {
                     DEBUG("got event EVENT %d\n", i);
-                    sdl_event = i;
+                    event = i;
                     SDL_PLAY_BUTTON_SOUND();
                     break;
                 }
@@ -277,17 +311,21 @@ void sdl_poll_event(void)
             }
 
             if (key == 27) {
-                sdl_event = EVENT_KEY_ESC;
+                event = SDL_EVENT_KEY_ESC;
             } else if (key == 8) {
-                sdl_event = EVENT_KEY_BS;
+                event = SDL_EVENT_KEY_BS;
+            } else if (key == 9) {
+                event = SDL_EVENT_KEY_TAB;
             } else if (key == 13) {
-                sdl_event = EVENT_KEY_ENTER;
+                event = SDL_EVENT_KEY_ENTER;
             } else if (!shift && ((key >= 'a' && key <= 'z') || (key >= '0' && key <= '9'))) {
-                sdl_event = key;
+                event = key;
             } else if (shift && (key >= 'a' && key <= 'z')) {
-                sdl_event = 'A' + (key - 'a');
+                event = 'A' + (key - 'a');
             } else if (shift && key == '-') {
-                sdl_event = '_';
+                event = '_';
+            } else if (key == ' ' || key == '.' || key == ',') {
+                event = key;
             } else {
                 break;
             }
@@ -300,14 +338,17 @@ void sdl_poll_event(void)
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 sdl_win_width = ev.window.data1;
                 sdl_win_height = ev.window.data2;
+                event = SDL_EVENT_WIN_SIZE_CHANGE;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_MINIMIZED:
                 sdl_win_minimized = true;
+                event = SDL_EVENT_WIN_MINIMIZED;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_RESTORED:
                 sdl_win_minimized = false;
+                event = SDL_EVENT_WIN_RESTORED;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             }
@@ -315,7 +356,8 @@ void sdl_poll_event(void)
 
         case SDL_QUIT: {
             DEBUG("got event SDL_QUIT\n");
-            sdl_quit_event = true;
+            sdl_quit = true;
+            event = SDL_EVENT_QUIT;
             SDL_PLAY_BUTTON_SOUND();
             break; }
 
@@ -327,29 +369,56 @@ void sdl_poll_event(void)
             break; }
         }
 
-        // break if sdl_event or sdl_quit_event is set
-        if (sdl_event != SDL_EVENT_NONE || sdl_quit_event) {
+        // break if event is set
+        if (event != SDL_EVENT_NONE) {
             break; 
         }
     }
+
+    return event;
 }
 
-bool sdl_get_string(char * prompt_str, char * ret_str, size_t ret_str_size)
+void sdl_get_string(int32_t count, ...)
 {
-    bool     ret            = false;
-    char     input_str[100] = "";
-    int32_t  input_str_len  = 0;
-    bool     shift          = false;
-    int32_t  sdl_event_save = sdl_event;
+    char    * prompt_str[10];
+    char    * curr_str[10];
+    char    * ret_str[10];
 
-    SDL_Rect keybdpane; 
-    char     display_str[500];
+    va_list   ap;
+    SDL_Rect  keybdpane; 
+    char      str[200];
+    int32_t   event, i;
 
-    // init
-    sdl_event = SDL_EVENT_NONE;
+    int32_t   field_select;
+    bool      shift;
+
+    // this supports up to 4 fields
+    if (count > 4) {
+        ERROR("count %d too big, max 4\n", count);
+    }
+
+    // set sdl_get_string_active, which enables keyboard input
     sdl_get_string_active = true;
 
-    // loop until string entered, or escape
+    // transfer variable arg list to array
+    va_start(ap, count);
+    for (i = 0; i < count; i++) {
+        prompt_str[i] = va_arg(ap, char*);
+        curr_str[i] = va_arg(ap, char*);
+        ret_str[i] = va_arg(ap, char*);
+    }
+    va_end(ap);
+
+    // init ret_str to curr_str
+    for (i = 0; i < count; i++) {
+        strcpy(ret_str[i], curr_str[i]);
+    }
+
+    // other init
+    field_select = 0;
+    shift = false;
+    
+    // loop until ENTER or ESC event received
     while (true) {
         // init
         SDL_INIT_PANE(keybdpane, 0, 0, sdl_win_width, sdl_win_height);
@@ -363,68 +432,86 @@ bool sdl_get_string(char * prompt_str, char * ret_str, size_t ret_str_size)
         static char * row_chars_unshift[4] = { "1234567890_",
                                                "qwertyuiop",
                                                "asdfghjkl",
-                                               "zxcvbnm" };
+                                               "zxcvbnm,." };
         static char * row_chars_shift[4]   = { "1234567890_",
                                                "QWERTYUIOP",
                                                "ASDFGHJKL",
-                                               "ZXCVBNM" };
+                                               "ZXCVBNM,." };
         char ** row_chars;
         int32_t r, c, i, j;
-        char str[2];
 
         row_chars = (!shift ? row_chars_unshift : row_chars_shift);
-        r = SDL_PANE_ROWS(&keybdpane,1) / 2 - 4;
+        r = SDL_PANE_ROWS(&keybdpane,1) / 2 - 10;
+        if (r < 0) {
+            r = 0;
+        }
         c = (SDL_PANE_COLS(&keybdpane,1) - 33) / 2;
 
         for (i = 0; i < 4; i++) {
             for (j = 0; row_chars[i][j] != '\0'; j++) {
-                str[0] = row_chars[i][j];
-                str[1] = '\0';
-                sdl_render_text_ex(&keybdpane, r+2*i, c+3*j, str, str[0], 1, false, 1);
+                char s[2];
+                s[0] = row_chars[i][j];
+                s[1] = '\0';
+                sdl_render_text_ex(&keybdpane, r+2*i, c+3*j, s, s[0], 1, false, 1);
             }
         }
+        sdl_render_text_ex(&keybdpane, r+6, c+27,  "SPACE",  ' ',   5, false, 1);
 
-        sdl_render_text_ex(&keybdpane, r+8, c+0,  "SHIFT", EVENT_KEY_SHIFT, 5, false, 1);
-        sdl_render_text_ex(&keybdpane, r+8, c+8,  "ESC",   EVENT_KEY_ESC,   3, false, 1);
-        sdl_render_text_ex(&keybdpane, r+8, c+14, "BS",    EVENT_KEY_BS,    2, false, 1);
-        sdl_render_text_ex(&keybdpane, r+8, c+19, "ENTER", EVENT_KEY_ENTER, 5, false, 1);
+        sdl_render_text_ex(&keybdpane, r+8, c+0,  "SHIFT",   SDL_EVENT_KEY_SHIFT,   5, false, 1);
+        sdl_render_text_ex(&keybdpane, r+8, c+8,  "BS",      SDL_EVENT_KEY_BS,      2, false, 1);
+        sdl_render_text_ex(&keybdpane, r+8, c+13, "TAB",     SDL_EVENT_KEY_TAB,     3, false, 1);
+        sdl_render_text_ex(&keybdpane, r+8, c+19, "ESC",     SDL_EVENT_KEY_ESC,     3, false, 1);
+        sdl_render_text_ex(&keybdpane, r+8, c+25, "ENTER",   SDL_EVENT_KEY_ENTER,   5, false, 1);
 
-        // xxx horizontal scroll on long inputs
-        sprintf(display_str, "%s: %s%c", 
-                prompt_str, 
-                input_str, 
-                ((microsec_timer() % 1000000) > 500000) ? '_' : ' ');
-        sdl_render_text_ex(&keybdpane, r+10, c+0, display_str, SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, false, 1);
+        // draw prompts
+        for (i = 0; i < count; i++) {
+            sprintf(str, "%s: %s", prompt_str[i], ret_str[i]);
+            if ((i == field_select) && ((microsec_timer() % 1000000) > 500000) ) {
+                strcat(str, "_");
+            }
+            sdl_render_text_ex(&keybdpane, 
+                               r + 10 + 2 * (i % 2), 
+                               i / 2 * SDL_PANE_COLS(&keybdpane,1) / 2, 
+                               str, 
+                               SDL_EVENT_FIELD_SELECT+i,
+                               SDL_FIELD_COLS_UNLIMITTED, false, 1);
+        }
 
         // present the display
         SDL_RenderPresent(sdl_renderer);
 
-        // poll for events
-        sdl_poll_event();
-
         // handle events 
-        if (sdl_event >= 0x20 && sdl_event <= 0x7e) {
-            if (input_str_len < sizeof(input_str) - 1) {
-                input_str[input_str_len++] = sdl_event;
-                input_str[input_str_len]   = '\0';
-            }
-        } else if (sdl_event == EVENT_KEY_SHIFT) {
+        event = sdl_poll_event();
+        if (event == SDL_EVENT_QUIT) {
+            break;
+        } else if (event == SDL_EVENT_KEY_SHIFT) {
             shift = !shift;
-        } else if (sdl_event == EVENT_KEY_ESC || sdl_quit_event) {
-            ret = false;
-            break;
-        } else if (sdl_event == EVENT_KEY_BS) {
-            if (input_str_len > 0) {
-                input_str_len--;
-                input_str[input_str_len] = '\0';
+        } else if (event == SDL_EVENT_KEY_BS) {
+            int32_t len = strlen(ret_str[field_select]);
+            if (len > 0) {
+                ret_str[field_select][len-1] = '\0';
             }
-        } else if (sdl_event == EVENT_KEY_ENTER) {
-            strncpy(ret_str, input_str, ret_str_size);
-            ret_str[ret_str_size-1] = '\0';
-            ret = true;
+        } else if (event == SDL_EVENT_KEY_TAB) {
+            field_select = (field_select + 1) % count;
+        } else if (event == SDL_EVENT_KEY_ENTER) {
             break;
+        } else if (event == SDL_EVENT_KEY_ESC) {
+            if (strcmp(ret_str[field_select], curr_str[field_select])) {
+                strcpy(ret_str[field_select], curr_str[field_select]);
+            } else {
+                for (i = 0; i < count; i++) {
+                    strcpy(ret_str[i], curr_str[i]);
+                }
+                break;
+            }
+        } else if (event >= SDL_EVENT_FIELD_SELECT && event < SDL_EVENT_FIELD_SELECT+count) {
+            field_select = event - SDL_EVENT_FIELD_SELECT;
+        } else if (event >= 0x20 && event <= 0x7e) {
+            char s[2];
+            s[0] = event;
+            s[1] = '\0';
+            strcat(ret_str[field_select], s);
         }
-        sdl_event = SDL_EVENT_NONE;
 
         // short sleep
         usleep(1000);
@@ -432,14 +519,74 @@ bool sdl_get_string(char * prompt_str, char * ret_str, size_t ret_str_size)
 
     // done
     sdl_event_init();
-    sdl_event = sdl_event_save;
     sdl_get_string_active = false;
-    return ret;
 }
+
+void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
+{
+    SDL_Rect rect = *rect_arg;
+    int32_t i;
+
+   SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
+
+    for (i = 0; i < line_width; i++) {
+        SDL_RenderDrawRect(sdl_renderer, &rect);
+        if (rect.w < 2 || rect.h < 2) {
+            break;
+        }
+        rect.x += 1;
+        rect.y += 1;
+        rect.w -= 2;
+        rect.h -= 2;
+    }
+}
+
+
+// -----------------  PTHREAD ADDITIONS FOR ANDROID  ---------------------
+
+#ifdef ANDROID
+
+// Android NDK does not include pthread_barrier support, so add it here
+
+int Pthread_barrier_init(Pthread_barrier_t *barrier,
+    const Pthread_barrierattr_t *attr, unsigned count)
+{
+    pthread_mutex_init(&barrier->mutex, NULL);
+    pthread_cond_init(&barrier->cond, NULL);
+    barrier->count = count;
+    barrier->current = 0;
+    return 0;
+}
+
+int Pthread_barrier_wait(Pthread_barrier_t *barrier)
+{
+    uint64_t done;
+
+    pthread_mutex_lock(&barrier->mutex);
+    done = barrier->current / barrier->count + 1;
+    barrier->current++;
+    if ((barrier->current % barrier->count) == 0) {
+        pthread_cond_broadcast(&barrier->cond);
+    } else {
+        do {
+            pthread_cond_wait(&barrier->cond, &barrier->mutex);
+        } while (barrier->current / barrier->count != done);
+    }
+    pthread_mutex_unlock(&barrier->mutex);
+    return 0;
+}
+
+int Pthread_barrier_destroy(Pthread_barrier_t *barrier)
+{
+    // xxx should delete the mutex and cond
+    return 0;
+}
+
+#endif
 
 // -----------------  CONFIG READ / WRITE  -------------------------------
 
-int config_read(char * config_path, config_t * config, int config_version)
+int config_read(char * filename, config_t * config)
 {
     FILE * fp;
     int    i, version=0;
@@ -447,19 +594,34 @@ int config_read(char * config_path, config_t * config, int config_version)
     char * value;
     char * saveptr;
     char   s[100] = "";
+    const char * config_dir;
+    char   config_path[PATH_MAX];
+
+    // get directory for config filename, and 
+    // construct config_path
+#ifndef ANDROID
+    config_dir = getenv("HOME");
+#else
+    config_dir = SDL_AndroidGetInternalStoragePath();
+#endif
+    if (config_dir == NULL) {
+        ERROR("failed get config_dir\n");
+        return -1;
+    }
+    sprintf(config_path, "%s/%s", config_dir, filename);
 
     // open config_file and verify version, 
     // if this fails then write the config file with default values
     if ((fp = fopen(config_path, "re")) == NULL ||
         fgets(s, sizeof(s), fp) == NULL ||
         sscanf(s, "VERSION %d", &version) != 1 ||
-        version != config_version)
+        version != config->version)
     {
         if (fp != NULL) {
             fclose(fp);
         }
-        INFO("creating default config file %s, version=%d\n", config_path, config_version);
-        return config_write(config_path, config, config_version);
+        INFO("creating default config file %s, version=%d\n", config_path, config->version);
+        return config_write(filename, config);
     }
 
     // read config entries
@@ -474,9 +636,9 @@ int config_read(char * config_path, config_t * config, int config_version)
             value = "";
         }
 
-        for (i = 0; config[i].name[0]; i++) {
-            if (strcmp(name, config[i].name) == 0) {
-                strcpy(config[i].value, value);
+        for (i = 0; config->ent[i].name[0]; i++) {
+            if (strcmp(name, config->ent[i].name) == 0) {
+                strcpy(config->ent[i].value, value);
                 break;
             }
         }
@@ -487,10 +649,25 @@ int config_read(char * config_path, config_t * config, int config_version)
     return 0;
 }
 
-int config_write(char * config_path, config_t * config, int config_version)
+int config_write(char * filename, config_t * config)
 {
     FILE * fp;
     int    i;
+    const char * config_dir;
+    char   config_path[PATH_MAX];
+
+    // get directory for config filename, and 
+    // construct config_path
+#ifndef ANDROID
+    config_dir = getenv("HOME");
+#else
+    config_dir = SDL_AndroidGetInternalStoragePath();
+#endif
+    if (config_dir == NULL) {
+        ERROR("failed get config_dir\n");
+        return -1;
+    }
+    sprintf(config_path, "%s/%s", config_dir, filename);
 
     // open
     fp = fopen(config_path, "we");  // mode: truncate-or-create, close-on-exec
@@ -500,11 +677,11 @@ int config_write(char * config_path, config_t * config, int config_version)
     }
 
     // write version
-    fprintf(fp, "VERSION %d\n", config_version);
+    fprintf(fp, "VERSION %d\n", config->version);
 
     // write name/value pairs
-    for (i = 0; config[i].name[0]; i++) {
-        fprintf(fp, "%-20s %s\n", config[i].name, config[i].value);
+    for (i = 0; config->ent[i].name[0]; i++) {
+        fprintf(fp, "%-20s %s\n", config->ent[i].name, config->ent[i].value);
     }
 
     // close
@@ -765,5 +942,73 @@ char * time2str(char * str, time_t time, bool gmt)
 
 
     return str;
+}
+
+// -----------------  MISC UTILS  -----------------------------------------
+
+int32_t random_uniform(int32_t low, int32_t high)
+{
+    int32_t range = high - low + 1;
+
+    return low + (random() % range);
+}
+
+// Refer to:
+// - http://en.wikipedia.org/wiki/Triangular_distribution
+// - http://stackoverflow.com/questions/3510475/generate-random-numbers-according-to-distributions
+int32_t random_triangular(int32_t low, int32_t high)
+{
+    int32_t range = high - low;
+    double U = rand() / (double) RAND_MAX;
+
+    if (U <= 0.5) {
+        return low + sqrt(U * range * range / 2);   
+    } else {
+        return high - sqrt((1 - U) * range * range / 2);  
+    }
+}
+
+// Refer to:
+// - http://scienceprimer.com/javascript-code-convert-light-wavelength-color
+void wavelength_to_rgb(int32_t wl, uint8_t * r, uint8_t * g, uint8_t * b)
+{
+    // clip input wavelength to the allowed range
+    if (wl < 380) {
+        wl = 380;
+    }
+    if (wl > 780) {
+        wl = 780;
+    }
+
+    // convert wavelength to r,g,b
+    if (wl >= 380 && wl < 440) {
+        *r = 255 * (440 - wl) / (440 - 380);
+        *g = 0;
+        *b = 255;
+    } else if (wl >= 440 && wl < 490) {
+        *r = 0;
+        *g = (wl - 440) / (490 - 440);
+        *b = 255;  
+    } else if (wl >= 490 && wl < 510) {
+        *r = 0;
+        *g = 255;
+        *b = 255 * (510 - wl) / (510 - 490);
+    } else if (wl >= 510 && wl < 580) {
+        *r = (wl - 510) / (580 - 510);
+        *g = 255;
+        *b = 0;
+    } else if (wl >= 580 && wl < 645) {
+        *r = 255;
+        *g = 255 * (645 - wl) / (645 - 580);
+        *b = 0;
+    } else if (wl >= 645 && wl <= 780) {
+        *r = 255;
+        *g = 0;
+        *b = 0;
+    } else {
+        *r = 0;
+        *g = 0;
+        *b = 0;
+    }
 }
 
