@@ -14,32 +14,32 @@
 
 typedef struct {
     char * select_menu_name;
-    bool (*sim)(void);
+    void (*sim)(void);
 } mode_tbl_t;
 
 //
 // variables
 //
 
-static int32_t  mode;
+static config_t   config = { 1, 
+                             { { "debug",     "Y"         },
+                               { "",          ""          } } };
 
-static bool     mode_select  = false;  // XXX true
-static config_t config       = { 1, 
-                                 { { "debug",     "Y"         },
-                                   { "",          ""          } } };
-static mode_tbl_t mode_tbl[] = { { "CONTAINER", sim_container }, };
+static mode_tbl_t mode_tbl[] = { { "CONTAINER", sim_container },
+                                 { "GRAVITY",   sim_gravity   }, };
 
 //
 // prototypes
 //
 
-void display_handler_mode_select(void);
+int32_t mode_select(void);
 
 // -----------------  MAIN  ----------------------------------------------
 
 int32_t main(int32_t argc, char **argv)
 {
     struct rlimit rl;
+    int32_t       mode;
 
     // init core dumps
     rl.rlim_cur = RLIM_INFINITY;
@@ -58,12 +58,14 @@ int32_t main(int32_t argc, char **argv)
 
     // processing
     while (!sdl_quit) {
-        if (mode_select) {
-            display_handler_mode_select();
-        } else {
-            // printf("CALLING MODE HANDLER %d\n", mode);
-            mode_select = mode_tbl[mode].sim();
-            // printf("BACK FROM  MODE HANDLER %d\n", mode);
+        mode = mode_select();
+        if (sdl_quit) {
+            break;
+        }
+    
+        mode_tbl[mode].sim();
+        if (sdl_quit) {
+            break;
         }
     }
 
@@ -73,44 +75,53 @@ int32_t main(int32_t argc, char **argv)
     return 0;
 }
 
-void display_handler_mode_select(void)
+// -----------------  MODE_SELECT  ---------------------------------------
+
+int32_t mode_select(void)
 {
-    int32_t i, event;
+    int32_t i, event, mode=-1;
     SDL_Rect winpane;
 
-    // clear window
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdl_renderer);
+    return 1; // XXX temp
 
-    // title
-    SDL_INIT_PANE(winpane, 0, 0, sdl_win_width, sdl_win_height);
-    sdl_render_text_font0(&winpane, 1, 10, "MODE SELECTION", SDL_EVENT_NONE);
-
-    // menu list
-    for (i = 0; i < MAX_MODE_TBL; i++) {
-        sdl_render_text_font0(&winpane, 5+2*i, 10, mode_tbl[i].select_menu_name, SDL_EVENT_USER_START+i);
-    }
-
-    // present the display
-    SDL_RenderPresent(sdl_renderer);
-
-    // handle events
     while (true) {
-        event = sdl_poll_event();
-        switch (event) {
-        case SDL_EVENT_NONE:
-            usleep(10000);
-            break;
-        case SDL_EVENT_USER_START ... SDL_EVENT_USER_START+MAX_MODE_TBL-1:
-            mode = event - SDL_EVENT_USER_START;
-            mode_select = false;
-            break;
-        default:
-            break;
+        // clear window
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
+
+        // title
+        SDL_INIT_PANE(winpane, 0, 0, sdl_win_width, sdl_win_height);
+        sdl_render_text_font0(&winpane, 1, 10, "MODE SELECTION", SDL_EVENT_NONE);
+
+        // menu list
+        for (i = 0; i < MAX_MODE_TBL; i++) {
+            sdl_render_text_font0(&winpane, 5+2*i, 10, mode_tbl[i].select_menu_name, SDL_EVENT_USER_START+i);
         }
 
-        if (event != SDL_EVENT_NONE) {
+        // present the display
+        SDL_RenderPresent(sdl_renderer);
+
+        // handle events
+        do {
+            event = sdl_poll_event();
+            switch (event) {
+            case SDL_EVENT_NONE:
+                usleep(10000);
+                break;
+            case SDL_EVENT_USER_START ... SDL_EVENT_USER_START+MAX_MODE_TBL-1:
+                mode = event - SDL_EVENT_USER_START;
+                break;
+            default:
+                break;
+            }
+        } while (event == SDL_EVENT_NONE);
+
+        // if a mode has been selected, or sdl_quit is set then return
+        if (mode != -1 || sdl_quit) {
             break;
         }
     }
+
+    // return the selecte mode
+    return mode;
 }

@@ -26,7 +26,8 @@
 
 // -----------------  SIMULATIONS  --------------------------------------------------
 
-bool sim_container(void);
+void sim_container(void);
+void sim_gravity(void);
 
 // -----------------  VERSION  ------------------------------------------------------
 

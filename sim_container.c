@@ -108,23 +108,20 @@ bool sim_container_should_auto_stop(void);
 
 // -----------------  MAIN  -----------------------------------------------------
 
-bool sim_container(void) 
+void sim_container(void) 
 {
-    bool terminate;
+    if (sim_container_init(true, DEFAULT_MAX_PARTICLE, DEFAULT_SIM_WIDTH*PARTICLE_DIAMETER) != 0) {
+        return;
+    }
 
-    if (sim == NULL) {
-        if (sim_container_init(true, DEFAULT_MAX_PARTICLE, DEFAULT_SIM_WIDTH*PARTICLE_DIAMETER) != 0) {
-            return true;
+    while (true) {
+        bool done = sim_container_display();
+        if (done) {
+            break;
         }
     }
 
-    terminate = sim_container_display();
-
-    if (terminate) {
-        sim_container_terminate();
-    }
-    
-    return terminate;
+    sim_container_terminate();
 }
 
 // -----------------  INIT & TERMINATE  -----------------------------------------
@@ -201,7 +198,6 @@ void sim_container_terminate(void)
     }
 
     // free allocations 
-    printf("CALL barrier destro\n");
     pthread_barrier_destroy(&barrier);
     free(sim);
     sim = NULL;
@@ -221,7 +217,7 @@ bool sim_container_display(void)
     uint8_t        r, g, b;
     double         sum_speed, temperature;
     char           str[100];
-    bool           terminate = false;
+    bool           done = false;
     
     // init
     if (sdl_win_width > sdl_win_height) {
@@ -388,14 +384,14 @@ bool sim_container_display(void)
         break; }
     case SDL_EVENT_BACK: 
     case SDL_EVENT_QUIT:
-        terminate = true;
+        done = true;
         break;
     default:
         break;
     }
 
-    // return terminate flag
-    return terminate;
+    // return done flag
+    return done;
 }
 
 // -----------------  THREAD  ---------------------------------------------------
@@ -404,7 +400,6 @@ void * sim_container_thread(void * cx)
 {
     #define BATCH_SIZE 100 
     #define PB(n)      (pb_buff + (n) * sim_size)
-    #define PB_DELAY   50000
 
     int32_t         id = (long)cx;
 
@@ -654,7 +649,6 @@ void * sim_container_thread(void * cx)
             }
 
         } else if (curr_state == STATE_TERMINATE_THREADS) {
-            printf("TERMINATE id %d\n", id);
             if (id == 0) {
                 free(pb_buff);
                 pb_buff = NULL;
