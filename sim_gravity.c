@@ -1,9 +1,24 @@
-// XXX how to use color
 // XXX fast circles
+// xxx how to use color
+// xxx may want to display a tail
 
-// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+//            DOUBLE      LONG DOUBLE
+// LINUX        8            10 
+// ANDROID      8             8
+//
+// Distance to Pluto = 
+//   13 light hours
+//   1.4E13 meters
+//   1.4E16 mm
+//
+// 2^63 = 9E18
+//
+// Range of Floating point types:
+//   float        4 byte    1.2E-38   to 3.4E+38      6 decimal places
+//   double       8 byte    2.3E-308  to 1.7E+308    15 decimal places
+//   long double 10 byte    3.4E-4932 to 1.1E+4932   19 decimal places
+
+// -----------------  BEGIN  --------------------------------------------------------------------------
 
 #include "util.h"
 
@@ -24,14 +39,12 @@
 #define SDL_EVENT_RESET          (SDL_EVENT_USER_START + 9)
 #define SDL_EVENT_RESET_PARAMS   (SDL_EVENT_USER_START + 10)
 #define SDL_EVENT_BACK           (SDL_EVENT_USER_START + 11)
-// xxx pan and zoom
-// xxx configure new sim
-// xxx configure from saved sim
 
-#define PURPLE 380  // XXX move to util.h
+#define PURPLE 380  // xxx move to util.h
+#define BLUE   440
 #define GREEN  540
 #define RED    700
-#if 0 // XXX move to util.h and generalize
+#if 0 // xxx move to util.h and generalize
 #define WAVELENGTH(speed) \
         (PURPLE + ((speed) - (SPEED_AVG-SPEED_SPREAD/2)) * (RED - PURPLE) / SPEED_SPREAD)
 #endif
@@ -54,23 +67,45 @@
 
 #define MIN_RUN_SPEED     1
 #define MAX_RUN_SPEED     9
-#define DEFAULT_RUN_SPEED 5
+#define DEFAULT_RUN_SPEED 9
 #define RUN_SPEED_SLEEP_TIME (100 * ((1 << (MAX_RUN_SPEED-run_speed)) - 1))
+
+#define TWO_PI (2.0*M_PI)
+
+#define DT             1.0                  // second
+
+#define G              6.673E-11            // mks units  
+#define AU             149597870700.0       // meters XXX cvt to scientific
+
+#define M_SUN          1.989E30             // kg
+
+#define M_EARTH        5.972E24             // kg
+#define R_EARTH        AU                   // orbit radius in meters
+#define T_EARTH        (365.256*86400)      // orbit time in seconds
+
+#define M_MOON         7.347E22             // kg
+#define R_MOON         3.844E8              // orbit radius in meters
+#define T_MOON         (27.3217*86400)      // orbit time in seconds
+
+#define M_VENUS        4.867E24             // kg
+#define R_VENUS        1.0821E11            // orbit radius in meters
+#define T_VENUS        (224.701*86400)      // orbit time in seconds
 
 //
 // typedefs
 //
 
 typedef struct {
-    long double x;  // XXX check size and precision, maybe use int128 if available on android
-    long double y;
-    long double x_speed;
-    long double y_speed;
+    long double X;        // meters
+    long double Y;
+    long double VX;  // meters/secod
+    long double VY;
+    long double MASS;     // kg
 } object_t; 
 
 typedef struct {
+    int64_t sim_alloc_size; 
     int64_t state_num;
-    int64_t sim_size; 
     int32_t max_object;
     object_t object[0];
 } sim_t;
@@ -89,7 +124,7 @@ static sim_t           * sim;
 
 static int32_t           state; 
 static int32_t           run_speed;
-static double            sim_width;
+static long double       sim_width;
 
 static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
@@ -130,48 +165,83 @@ void sim_gravity(void)
 
 int32_t sim_gravity_init(void) 
 {
-    #define SIM_SIZE(n) (sizeof(sim_t) + (n) * sizeof(object_t))
+    #define SIM_ALLOC_SIZE(n) (sizeof(sim_t) + (n) * sizeof(object_t))
 
     int32_t i, num_proc;
-    int64_t sim_size;
+    int64_t sim_alloc_size;
 
     // print info msg
     INFO("initialize start\n");
 
-    int32_t max_object = 2;  //XXX
- 
+    #define MAX_OBJECT 4
+
     // allocate sim
     free(sim);
-    sim_size = SIM_SIZE(max_object);
-    sim = calloc(1, sim_size);
+    sim_alloc_size = SIM_ALLOC_SIZE(MAX_OBJECT);
+    sim = calloc(1, sim_alloc_size);
     if (sim == NULL) {
         return -1;
     }
 
-    // set simulation state
+    // init sim  
+    // XXX using XML for solar system, 
+    //   - embed some of the XML in here
+    //   - and get additional from web site
+    object_t sun;
+    sun.X    = 0;
+    sun.Y    = 0;
+    sun.VX   = 0;
+    sun.VY   = 0;
+    sun.MASS = M_SUN;
+    sim->object[0] = sun;
+
+    object_t earth;
+    earth.X    = R_EARTH;
+    earth.Y    = 0;
+    earth.VX   = 0;
+    earth.VY   = TWO_PI * R_EARTH / T_EARTH;
+    earth.MASS = M_EARTH;
+    sim->object[1] = earth;
+
+#if MAX_OBJECT > 2
+    object_t moon;
+    moon.X    = earth.X - R_MOON;
+    moon.Y    = earth.Y;
+    moon.VX   = 0;
+    moon.VY   = earth.VY + TWO_PI * R_MOON / T_MOON;
+    moon.MASS = M_MOON;
+    sim->object[2] = moon;
+#endif
+
+#if MAX_OBJECT > 3
+    object_t venus;
+    venus.X    = R_VENUS;
+    venus.Y    = 0;
+    venus.VX   = 0;
+    venus.VY   = TWO_PI * R_VENUS / T_VENUS;
+    venus.MASS = M_VENUS;
+    sim->object[3] = venus;
+#endif
+
+    sim->sim_alloc_size = sim_alloc_size;
     sim->state_num  = 0;
-    sim->sim_size   = sim_size;
-    sim->max_object = max_object;
-    // XXX print the sizeof doubles
-    // XXX is 0 init okay for obj
+    sim->max_object = MAX_OBJECT;
 
     // init control variables
     state = STATE_STOP;
     run_speed = DEFAULT_RUN_SPEED;
-    sim_width = 100000000;
+    sim_width = 2.1 * AU;
 
     // create worker threads
-    // XXX do this based on number of objects, pass
-    //   each thread a context which is the first and count of its objects, and whether barrier is needed
     num_proc = sysconf(_SC_NPROCESSORS_ONLN);
-    max_thread = 1;
+    max_thread = 1;  // xxx tbd
     INFO("max_thread=%d num_proc=%d\n", max_thread, num_proc);
     pthread_barrier_init(&barrier,NULL,max_thread);
     for (i = 0; i < max_thread; i++) {
         thread_cx_t * cx = malloc(sizeof(thread_cx_t));
         cx->id        = i;
         cx->first_obj = 0;
-        cx->last_obj  = 1;
+        cx->last_obj  = sim->max_object-1;
         pthread_create(&thread_id[i], NULL, sim_gravity_thread, cx);
     }
 
@@ -212,16 +282,10 @@ bool sim_gravity_display(void)
     SDL_Rect       ctlpane;
     SDL_Rect       rect;
     int32_t        simpane_width, count, event, i;
-    int32_t        win_x, win_y, win_r;
     uint8_t        r, g, b;
     char           str[100];
     bool           done = false;
 
-#if 0
-    int32_t        i, event, simpane_width, cont_width, count;
-    double         sum_speed, temperature;
-#endif
-    
     // init
     if (sdl_win_width > sdl_win_height) {
         simpane_width = sdl_win_height;
@@ -248,39 +312,39 @@ bool sim_gravity_display(void)
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(sdl_renderer);
 
-    // draw object
-
-
-
-    //win_r = simpane_width / (sim->sim_width/OBJECT_DIAMETER) / 2;
-    //if (win_r < 2) {
-        //win_r = 2;
-    //}
-    // XXX may want to display a tail
-    win_r = 5;
-    wavelength_to_rgb(GREEN, &r, &g, &b);
-    SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
-
+    // draw objects 
     for (i = 0; i < sim->max_object; i++) {
-        SDL_Rect rect;
         object_t * p = &sim->object[i];
+        int32_t    win_x, win_y;
 
-        win_x = (p->x + sim_width/2) * (simpane_width / sim_width);
-        win_y = (p->y + sim_width/2) * (simpane_width / sim_width);
+        win_x = (p->X + sim_width/2) * (simpane_width / sim_width);
+        win_y = (p->Y + sim_width/2) * (simpane_width / sim_width);
 
+#if 1
+        int32_t win_r;
+        SDL_Rect rect;
+
+        wavelength_to_rgb((i%3) == 0 ? RED : (i%3) == 1 ? GREEN : BLUE,
+                          &r, &g, &b);
+        SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
+
+        win_r = 2; // XXX use real value
         rect.x = win_x - win_r;
         rect.y = win_y - win_r;
         rect.w = 2 * win_r;
         rect.h = 2 * win_r;
-
         SDL_RenderFillRect(sdl_renderer, &rect);
+#else
+        SDL_RenderDrawPoint(sdl_renderer, win_x, win_y);
+#endif
     }
 
     // clear ctlpane
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(sdl_renderer, &ctlpane);
 
-    // display controls
+    // display controls  
+    // xxx clean all thi up
     sdl_render_text_font0(&ctlpane,  0, 3,  "GRAVITY",         SDL_EVENT_NONE);
     sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",             SDL_EVENT_RUN);
     sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",            SDL_EVENT_STOP);
@@ -295,6 +359,18 @@ bool sim_gravity_display(void)
     // display status lines
     sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
     sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+
+    int64_t days, hours, minutes, seconds;  // xxx use a routine
+    seconds = sim->state_num * DT;
+    days = seconds / 86400;
+    seconds -= 86400 * days;
+    hours = seconds / 3600;
+    seconds -= hours * 3600;
+    minutes = seconds / 60;
+    seconds -= minutes * 60;
+    sprintf(str, "%d %2.2d:%2.2d:%2.d", (int32_t)days, (int32_t)hours, (int32_t)minutes, (int32_t)seconds);
+    sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
+
     sprintf(str, "RUN_SPEED   = %d", run_speed);    
     sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
 
@@ -340,7 +416,7 @@ bool sim_gravity_display(void)
         break;
     case SDL_EVENT_RESET:
     case SDL_EVENT_RESET_PARAMS: {
-        sim_gravity_terminate();  //XXX parms tbd
+        sim_gravity_terminate();  //xxx parms tbd, get the XML here
         sim_gravity_init();
         break; }
     case SDL_EVENT_BACK: 
@@ -359,7 +435,7 @@ bool sim_gravity_display(void)
 
 void * sim_gravity_thread(void * cx_arg)
 {
-    #define PB(n)      (pb_buff + (n) * sim->sim_size)
+    #define PB(n)      (pb_buff + (n) * sim->sim_alloc_size)
 
     thread_cx_t     cx = *(thread_cx_t*)cx_arg;
     int32_t         pb_end, pb_beg, pb_idx, pb_max=0;
@@ -382,9 +458,9 @@ void * sim_gravity_thread(void * cx_arg)
 
         pb_max = 10000;
         while (true) {
-            pb_buff = calloc(pb_max, sim->sim_size);
+            pb_buff = calloc(pb_max, sim->sim_alloc_size);
             if (pb_buff != NULL) {
-                INFO("playback buff_size %d MB, pb_max=%d\n", (int32_t)((pb_max * sim->sim_size) / MB), pb_max);
+                INFO("playback buff_size %d MB, pb_max=%d\n", (int32_t)((pb_max * sim->sim_alloc_size) / MB), pb_max);
                 break;
             }
             pb_max -= 100;
@@ -393,10 +469,12 @@ void * sim_gravity_thread(void * cx_arg)
             }
         }
         pb_end = pb_beg = pb_idx = 0;
-        memcpy(PB(0), sim, sim->sim_size);
+        memcpy(PB(0), sim, sim->sim_alloc_size);
         pb_tail = 1;
     }
-    pthread_barrier_wait(&barrier);
+    if (max_thread > 1) {
+        pthread_barrier_wait(&barrier);
+    }
 
     while (true) {
         // thread id 0 performs control functions
@@ -411,41 +489,92 @@ void * sim_gravity_thread(void * cx_arg)
                 (curr_state == STATE_RUN || 
                  curr_state == STATE_STOP))
             {
-                memcpy(sim, PB((pb_tail-1)%pb_max), sim->sim_size);
+                memcpy(sim, PB((pb_tail-1)%pb_max), sim->sim_alloc_size);
             }
         }
 
         // all threads rendezvoud here
-        pthread_barrier_wait(&barrier);  // XXX don't if max_thread==1
+        if (max_thread > 1) {
+            pthread_barrier_wait(&barrier);
+        }
 
         // process based on curr_state
         if (curr_state == STATE_RUN) {
+            int32_t i, k;
 
-#if 0
-        Mself * Mi
-F = G * ----------
-           Ri^2
-                            DeltaXi                 Mi * DeltaXi
-Fx = F * cos(theta) = F * ----------- = G * Mself * ------------
-                              Ri                       Ri^3
+            // These are the simulation equations for updating an objects X position 
+            // and X component of velocity. Similar equations are implemented in the 
+            // following code for Y position and velocity.
+            //
+            // Where:
+            //   EVALOBJ.X   object being evaluated X position
+            //   EVALOBJ.VX  object being evaluated X velocity
+            //   DT          simulation step time, for example 1 second works well for earth orbit
+            //   G           gravitiational constant
+            //   AX          X acceleration component of EVALOBJ
+            //   Mi          mass of other object i
+            //   XDISTi      X distance to other object i
+            //   Ri          total distance to other object i
+            //   DX          distance travelled by EVALOBJ in DT
+            //   V1X         X velocity of EVALOBJ at begining of interval
+            //   V2X         X velocity of EVALOBJ at end of interval
+            // 
+            //               Mi * XDISTi
+            // AX = G * SUM(------------)
+            //                  Ri^3
+            //
+            //                  1
+            // DX = V1X * DT + --- * AX * DT^2
+            //                  2
+            //
+            // V2X = sqrt(VIX^2 + 2 AX * ds)
+            //
+            // MYOBJ.X  = MYOBJ.X + DX
+            // 
+            // MYOBJ.VX = V2X
+            //
 
-                      Mi * DeltaXi
-Fx = G * Mself * SUM(-------------)
-                         Ri^3
+            for (k = cx.first_obj; k <= cx.last_obj; k++) {
+                object_t * EVALOBJ = &sim->object[k];
+                long double SUMX, SUMY, Mi, XDISTi, YDISTi, Ri, AX, AY, DX, DY, V1X, V1Y, V2X, V2Y, tmp;
 
-                           1     Fx
-DeltaX = Xspeed * DeltaT + - * ------ * DeltaT^2
-                           2   Mself
+                SUMX = SUMY = 0;
+                for (i = 0; i < sim->max_object; i++) {
+                    if (i == k) continue;
 
-                           1                       Mi * DeltaXi
-DeltaX = Xspeed * DeltaT + - * DeltaT^2 * G * SUM(-------------)
-                           2                          Ri^3
-#endif
+                    object_t * OTHEROBJ = &sim->object[i];
 
-            // XXX tbd
+                    Mi      = OTHEROBJ->MASS;
+                    XDISTi  = OTHEROBJ->X - EVALOBJ->X;
+                    YDISTi  = OTHEROBJ->Y - EVALOBJ->Y;
+                    Ri      = sqrtl(XDISTi * XDISTi + YDISTi * YDISTi);
+                    tmp     = Mi / (Ri * Ri * Ri);
+                    SUMX    = SUMX + tmp * XDISTi;
+                    SUMY    = SUMY + tmp * YDISTi;
+                }
+
+                AX = G * SUMX;
+                AY = G * SUMY;
+
+                V1X = EVALOBJ->VX;
+                V1Y = EVALOBJ->VY;
+
+                DX = V1X * DT + 0.5 * AX * DT * DT;
+                DY = V1Y * DT + 0.5 * AY * DT * DT;
+
+                V2X = sqrtl(V1X * V1X + 2.0 * AX * DX);
+                V2Y = sqrtl(V1Y * V1Y + 2.0 * AY * DY);
+
+                EVALOBJ->X  = EVALOBJ->X + DX;
+                EVALOBJ->Y  = EVALOBJ->Y + DY;
+                EVALOBJ->VX = DX < 0 ? -V2X : V2X;  // XXX
+                EVALOBJ->VY = DY < 0 ? -V2Y : V2Y;
+            }
 
             // all threads rendezvoud here
-            pthread_barrier_wait(&barrier);
+            if (max_thread > 1) {
+                pthread_barrier_wait(&barrier);
+            }
 
             // all particles have been updated, thread 0 does post processing
             if (cx.id == 0) {
@@ -453,7 +582,7 @@ DeltaX = Xspeed * DeltaT + - * DeltaT^2 * G * SUM(-------------)
                 sim->state_num++;
 
                 // make playback copy
-                memcpy(PB(pb_tail%pb_max), sim, sim->sim_size);
+                memcpy(PB(pb_tail%pb_max), sim, sim->sim_alloc_size);
                 pb_tail++;
 
                 // sleep to pace the simulation
@@ -474,7 +603,7 @@ DeltaX = Xspeed * DeltaT + - * DeltaT^2 * G * SUM(-------------)
                     pb_idx = pb_end;
                 }
 
-                memcpy(sim, PB(pb_idx), sim->sim_size);
+                memcpy(sim, PB(pb_idx), sim->sim_alloc_size);
 
                 if (pb_idx == pb_beg) {
                     state = STATE_PLAYBACK_STOP;
@@ -500,7 +629,7 @@ DeltaX = Xspeed * DeltaT + - * DeltaT^2 * G * SUM(-------------)
                     pb_idx = pb_end;
                 }
 
-                memcpy(sim, PB(pb_idx), sim->sim_size);
+                memcpy(sim, PB(pb_idx), sim->sim_alloc_size);
 
                 if (pb_idx == pb_end) {
                     state = STATE_PLAYBACK_STOP;
@@ -528,7 +657,9 @@ DeltaX = Xspeed * DeltaT + - * DeltaT^2 * G * SUM(-------------)
         }
     }
 
-    pthread_barrier_wait(&barrier);
+    if (max_thread > 1) {
+        pthread_barrier_wait(&barrier);
+    }
     INFO("thread terminating, id=%d\n", cx.id);
     return NULL;
 }
