@@ -336,6 +336,9 @@ bool sim_container_display(void)
 
     // handle events
     event = sdl_poll_event();
+    if (event->event != SDL_EVENT_NONE) {
+        sdl_play_event_sound();
+    }
     switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;

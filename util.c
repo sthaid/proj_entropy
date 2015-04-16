@@ -11,10 +11,6 @@
 #endif
 
 // button sound
-#define SDL_PLAY_BUTTON_SOUND() \
-    do { \
-        Mix_PlayChannel(-1, sdl_button_sound, 0); \
-    } while (0)
 static Mix_Chunk * sdl_button_sound;
 
 // events
@@ -334,7 +330,6 @@ sdl_event_t * sdl_poll_event(void)
                     AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos, 5)) 
                 {
                     event.event = i;
-                    SDL_PLAY_BUTTON_SOUND();
                     break;
                 }
             }
@@ -381,7 +376,6 @@ sdl_event_t * sdl_poll_event(void)
                     event.event = i;
                     event.mouse_click.x = ev.button.x;
                     event.mouse_click.y = ev.button.y;
-                    SDL_PLAY_BUTTON_SOUND();
                     break;
                 }
             }
@@ -455,7 +449,6 @@ sdl_event_t * sdl_poll_event(void)
             } else {
                 break;
             }
-            SDL_PLAY_BUTTON_SOUND();
             break; }
 
        case SDL_WINDOWEVENT: {
@@ -465,17 +458,14 @@ sdl_event_t * sdl_poll_event(void)
                 sdl_win_width = ev.window.data1;
                 sdl_win_height = ev.window.data2;
                 event.event = SDL_EVENT_WIN_SIZE_CHANGE;
-                SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_MINIMIZED:
                 sdl_win_minimized = true;
                 event.event = SDL_EVENT_WIN_MINIMIZED;
-                SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_RESTORED:
                 sdl_win_minimized = false;
                 event.event = SDL_EVENT_WIN_RESTORED;
-                SDL_PLAY_BUTTON_SOUND();
                 break;
             }
             break; }
@@ -484,7 +474,6 @@ sdl_event_t * sdl_poll_event(void)
             DEBUG("got event SDL_QUIT\n");
             sdl_quit = true;
             event.event = SDL_EVENT_QUIT;
-            SDL_PLAY_BUTTON_SOUND();
             break; }
 
         default: {
@@ -499,6 +488,11 @@ sdl_event_t * sdl_poll_event(void)
     }
 
     return &event;
+}
+
+void sdl_play_event_sound(void)
+{
+    Mix_PlayChannel(-1, sdl_button_sound, 0);
 }
 
 void sdl_get_string(int32_t count, ...)
@@ -606,6 +600,9 @@ void sdl_get_string(int32_t count, ...)
 
         // handle events 
         event = sdl_poll_event();
+        if (event->event != SDL_EVENT_NONE) {
+            sdl_play_event_sound();
+        }
         if (event->event == SDL_EVENT_QUIT) {
             break;
         } else if (event->event == SDL_EVENT_KEY_SHIFT) {

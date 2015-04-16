@@ -124,6 +124,7 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
 void sdl_event_init(void);
 void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos);
 sdl_event_t * sdl_poll_event(void);
+void sdl_play_event_sound(void);
 void sdl_get_string(int32_t count, ...);
 void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba);
 SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba);

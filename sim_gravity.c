@@ -6,8 +6,7 @@
 // 2^63 = 9E18
 //
 
-// XXX reset simpane to center and also default width ??
-// XXX click sound
+// xxx reset simpane to center and also default width ??
 
 // ----------------------------------------------------------------------------------------------------
 // -----------------  BEGIN  --------------------------------------------------------------------------
@@ -193,14 +192,14 @@ int32_t sim_gravity_init(void)
     earth.VX    = 0;
     earth.VY    = TWO_PI * R_EARTH / T_EARTH;
     earth.MASS  = M_EARTH;
-    earth.DISP_COLOR = WHITE;
+    earth.DISP_COLOR = GREEN;
 
     moon.X    = earth.X + R_MOON;
     moon.Y    = earth.Y;
     moon.VX   = 0;
     moon.VY   = earth.VY + TWO_PI * R_MOON / T_MOON;
     moon.MASS = M_MOON;
-    moon.DISP_COLOR = BLUE;
+    moon.DISP_COLOR = WHITE;
 
     sim->object[0] = sun;
     sim->object[1] = venus;
@@ -273,7 +272,7 @@ void sim_gravity_set_object_diameters(void)
     // xxx redo to not rely on mass but on actual diamter
 
     #define MIN_DISP_R (2.)
-    #define MAX_DISP_R (10. * MIN_DISP_R)
+    #define MAX_DISP_R (5. * MIN_DISP_R)
     #define CENTER_DISP_R ((MAX_DISP_R + MIN_DISP_R) / 2.)
 
     // fill in radius raw values with cube root of mass
@@ -302,10 +301,10 @@ void sim_gravity_set_object_diameters(void)
             sim->object[i].DISP_R = CENTER_DISP_R;
         }
 
-    // else if max / min < 10 then
+    // else if max / min < 5 then
     //   map raw radius values to range min_disp_r to max_disp_r,
     //   where these values have ratio equal to max_radius_raw/min_radius_raw
-    } else if (max_radius_raw / min_radius_raw <= 10) {
+    } else if (max_radius_raw / min_radius_raw <= 5) {
         INFO("CASE 2 - LESS THAN 10\n");
         delta = (max_radius_raw / min_radius_raw * CENTER_DISP_R - CENTER_DISP_R) / 
                 (max_radius_raw  / min_radius_raw + 1);
@@ -543,19 +542,24 @@ bool sim_gravity_display(void)
     switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_STOP:
         state = STATE_STOP;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_BACK: 
     case SDL_EVENT_QUIT:
         done = true;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_IN:
         sim_width /= 2;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_OUT:
         sim_width *= 2;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
         int32_t found_obj = -1;
@@ -578,6 +582,7 @@ bool sim_gravity_display(void)
             break;
         }
         tracker_obj = (found_obj == tracker_obj ? -1 : found_obj);
+        sdl_play_event_sound();
         break; }
     case SDL_EVENT_SIMPANE_MOUSE_MOTION:
         sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
@@ -585,9 +590,11 @@ bool sim_gravity_display(void)
         break;
     case SDL_EVENT_TRACKERPANE_ZOOM_IN:
         tracker_width /= 2;
+        sdl_play_event_sound();
         break;
     case SDL_EVENT_TRACKERPANE_ZOOM_OUT:
         tracker_width *= 2;
+        sdl_play_event_sound();
         break;
     default:
         break;
