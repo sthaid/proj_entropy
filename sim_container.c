@@ -24,6 +24,14 @@
 
 #define SPEED_AVG                  524  // Kelvin = 70 deg F
 #define SPEED_SPREAD               20
+
+#define SPEED_TO_COLOR(s) \
+    ((s) <  SPEED_AVG - SPEED_SPREAD/2 ? PURPLE : \
+     (s) <  SPEED_AVG - SPEED_SPREAD/6 ? BLUE   : \
+     (s) <= SPEED_AVG + SPEED_SPREAD/6 ? GREEN  : \
+     (s) <= SPEED_AVG + SPEED_SPREAD/2 ? YELLOW   \
+                                       : RED)
+
 #define CONT_SHRINK_RESTORE_SPEED  10
 
 #define DEFAULT_MAX_PARTICLE  1000
@@ -33,11 +41,6 @@
 #define DEFAULT_SIM_WIDTH     100    // units is PARTICLE_DIAMETER
 #define MAX_SIM_WIDTH         10000
 #define MIN_SIM_WIDTH         3
-
-#define PURPLE 380
-#define RED    700
-#define WAVELENGTH(speed) \
-        (PURPLE + ((speed) - (SPEED_AVG-SPEED_SPREAD/2)) * (RED - PURPLE) / SPEED_SPREAD)
 
 #define STATE_STOP               0
 #define STATE_LOW_ENTROPY_STOP   1
@@ -210,14 +213,19 @@ void sim_container_terminate(void)
 
 bool sim_container_display(void)
 {
-    SDL_Rect       ctlpane;
-    SDL_Rect       cont_rect;
-    int32_t        i, event, simpane_width, cont_width, count;
-    int32_t        win_x, win_y, win_r;
-    uint8_t        r, g, b;
-    double         sum_speed, temperature;
-    char           str[100];
-    bool           done = false;
+    SDL_Rect      ctlpane;
+    SDL_Rect      cont_rect;
+    sdl_event_t * event;
+    int32_t       i, simpane_width, cont_width, count, color;
+    int32_t       win_x, win_y, win_r;
+    double        sum_speed, temperature;
+    char          str[100];
+    bool          done = false;
+
+    static int32_t       win_r_last = -1;
+    static SDL_Texture * circle_texture[RED-PURPLE+1];
+
+    _Static_assert(PURPLE==0, "purple");
     
     // init
     if (sdl_win_width > sdl_win_height) {
@@ -230,6 +238,23 @@ bool sim_container_display(void)
         SDL_INIT_PANE(ctlpane, 0, 0, 0, 0);
     }
     sdl_event_init();
+
+    // determine display radius of particles,
+    // if radius has changed then recompute the circle textures
+    win_r = simpane_width / (sim->sim_width/PARTICLE_DIAMETER) / 2;
+    if (win_r < 1) {
+        win_r = 1;
+    }
+    if (win_r != win_r_last) {
+        for (color = PURPLE; color <= RED; color++) {
+            if (circle_texture[color] != NULL) {
+                SDL_DestroyTexture(circle_texture[color]);
+                circle_texture[color] = NULL;
+            }
+            circle_texture[color] = sdl_create_filled_circle_texture(win_r, sdl_pixel_rgba[color]);
+        }
+        win_r_last = win_r;
+    }
 
     // if in a stopped state then delay for 50 ms, to reduce cpu usage
     count = 0;
@@ -247,27 +272,13 @@ bool sim_container_display(void)
     SDL_RenderClear(sdl_renderer);
 
     // draw particle
-    // note: this code used to use the following, but it proved too slow on Android
-    //       filledCircleRGBA(sdl_renderer, win_x, win_y, win_r, r, g, b, SDL_ALPHA_OPAQUE);
-
     sum_speed = 0;
-    win_r = simpane_width / (sim->sim_width/PARTICLE_DIAMETER) / 2;
-    if (win_r < 2) {
-        win_r = 2;
-    }
     for (i = 0; i < sim->max_particle; i++) {
-        SDL_Rect rect;
         particle_t * p = &sim->particle[i];
 
         win_x = (p->x + sim->sim_width/2) * simpane_width / sim->sim_width;
         win_y = (p->y + sim->sim_width/2) * simpane_width / sim->sim_width;
-        rect.x = win_x - win_r;
-        rect.y = win_y - win_r;
-        rect.w = 2 * win_r;
-        rect.h = 2 * win_r;
-        wavelength_to_rgb(WAVELENGTH(p->speed), &r, &g, &b);
-        SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
-        SDL_RenderFillRect(sdl_renderer, &rect);
+        sdl_render_circle(win_x, win_y, circle_texture[SPEED_TO_COLOR(p->speed)]);
 
         sum_speed += p->speed;
     }
@@ -313,20 +324,19 @@ bool sim_container_display(void)
     sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
 
     // draw container border
-    wavelength_to_rgb(WAVELENGTH(SPEED_AVG), &r, &g, &b);
     cont_width = (int64_t)simpane_width * sim->cont_width / sim->sim_width;
     cont_rect.x = (simpane_width - cont_width) / 2;
     cont_rect.y = (simpane_width - cont_width) / 2;
     cont_rect.w = cont_width;
     cont_rect.h = cont_width;
-    sdl_render_rect(&cont_rect, 3, r, g, b, SDL_ALPHA_OPAQUE);
+    sdl_render_rect(&cont_rect, 3, sdl_pixel_rgba[GREEN]);
 
     // present the display
     SDL_RenderPresent(sdl_renderer);
 
     // handle events
     event = sdl_poll_event();
-    switch (event) {
+    switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
         break;
@@ -365,7 +375,7 @@ bool sim_container_display(void)
         int32_t sw = sim->sim_width / PARTICLE_DIAMETER;
 
         sim_container_terminate();
-        if (event == SDL_EVENT_RESET_PARAMS) {
+        if (event->event == SDL_EVENT_RESET_PARAMS) {
             char cur_mp[100], cur_sw[100];
             char ret_mp[100], ret_sw[100];
 

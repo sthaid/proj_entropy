@@ -52,7 +52,18 @@ int32_t        sdl_win_height;
 bool           sdl_win_minimized;
 
 // program quit requested
-bool           sdl_quit;
+bool sdl_quit;
+
+// fonts
+#define SDL_PANE_COLS(p,fid)  ((p)->w / sdl_font[fid].char_width)
+#define SDL_PANE_ROWS(p,fid)  ((p)->h / sdl_font[fid].char_height)
+#define SDL_MAX_FONT 2
+typedef struct {
+    TTF_Font * font;
+    int32_t    char_width;
+    int32_t    char_height;
+} sdl_font_t;
+sdl_font_t sdl_font[SDL_MAX_FONT];
 
 // render_text
 #define SDL_FIELD_COLS_UNLIMITTED 999
@@ -74,6 +85,34 @@ bool           sdl_quit;
 #define SDL_EVENT_USER_END          255
 #define SDL_EVENT_MAX               256 
 
+#define SDL_EVENT_TYPE_NONE         0
+#define SDL_EVENT_TYPE_TEXT         1
+#define SDL_EVENT_TYPE_MOUSE_CLICK  2
+#define SDL_EVENT_TYPE_MOUSE_MOTION 3
+
+typedef struct {
+    int32_t event;
+    union {
+        struct {
+            int32_t x;
+            int32_t y;
+        } mouse_click;
+        struct {
+            int32_t delta_x;
+            int32_t delta_y;;
+        } mouse_motion;
+    };
+} sdl_event_t;
+
+// colors
+#define PURPLE  0 
+#define BLUE    1
+#define GREEN   2
+#define YELLOW  3
+#define RED     4
+#define WHITE   5
+#define MAX_COLOR 5
+extern uint32_t sdl_pixel_rgba[];
 
 // sdl support: prototypes
 void sdl_init(uint32_t w, uint32_t h);
@@ -83,9 +122,12 @@ void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str
 void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
         int32_t field_cols, bool center, int32_t font_id);
 void sdl_event_init(void);
-int32_t sdl_poll_event(void);
+void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos);
+sdl_event_t * sdl_poll_event(void);
 void sdl_get_string(int32_t count, ...);
-void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint8_t r, uint8_t g, uint8_t b, uint8_t alpha);
+void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba);
+SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba);
+void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture);
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  --------------------------------
 
@@ -174,6 +216,7 @@ uint64_t microsec_timer(void);
 time_t get_real_time_sec(void);
 uint64_t get_real_time_us(void);
 char * time2str(char * str, time_t time, bool gmt);
+char * dur2str(char * str, int64_t duration);
 
 // -----------------  MISC  ----------------------------------------------------------
 

@@ -79,8 +79,9 @@ int32_t main(int32_t argc, char **argv)
 
 int32_t mode_select(void)
 {
-    int32_t i, event, mode=-1;
+    int32_t i, mode=-1;
     SDL_Rect winpane;
+    sdl_event_t * event;
 
     return 1; // XXX temp
 
@@ -104,17 +105,17 @@ int32_t mode_select(void)
         // handle events
         do {
             event = sdl_poll_event();
-            switch (event) {
+            switch (event->event) {
             case SDL_EVENT_NONE:
                 usleep(10000);
                 break;
             case SDL_EVENT_USER_START ... SDL_EVENT_USER_START+MAX_MODE_TBL-1:
-                mode = event - SDL_EVENT_USER_START;
+                mode = event->event - SDL_EVENT_USER_START;
                 break;
             default:
                 break;
             }
-        } while (event == SDL_EVENT_NONE);
+        } while (event->event == SDL_EVENT_NONE);
 
         // if a mode has been selected, or sdl_quit is set then return
         if (mode != -1 || sdl_quit) {
@@ -125,3 +126,4 @@ int32_t mode_select(void)
     // return the selecte mode
     return mode;
 }
+

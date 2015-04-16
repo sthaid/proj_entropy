@@ -1,95 +1,66 @@
-// XXX fast circles
-// xxx how to use color
-// xxx may want to display a tail
-
-//            DOUBLE      LONG DOUBLE
-// LINUX        8            10 
-// ANDROID      8             8
-//
+// xxx DELETE
 // Distance to Pluto = 
 //   13 light hours
 //   1.4E13 meters
 //   1.4E16 mm
-//
 // 2^63 = 9E18
 //
-// Range of Floating point types:
-//   float        4 byte    1.2E-38   to 3.4E+38      6 decimal places
-//   double       8 byte    2.3E-308  to 1.7E+308    15 decimal places
-//   long double 10 byte    3.4E-4932 to 1.1E+4932   19 decimal places
 
+// XXX reset simpane to center and also default width ??
+// XXX click sound
+
+// ----------------------------------------------------------------------------------------------------
 // -----------------  BEGIN  --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
 
 #include "util.h"
+
+//
+// NOTES:
+//
+// * Size of floating point, in bytes, on 64bit Fedora20 Linux, and Android
+//                DOUBLE      LONG DOUBLE
+//     LINUX         8            10 
+//     ANDROID       8            8
+//
+// * Range of Floating point types:
+//     float        4 byte    1.2E-38   to 3.4E+38      6 decimal places
+//     double       8 byte    2.3E-308  to 1.7E+308    15 decimal places
+//     long double 10 byte    3.4E-4932 to 1.1E+4932   19 decimal places
+//
 
 //
 // defines
 //
 
-#define MB 0x100000
-
 #define MAX_THREAD 16
+#define TWO_PI     (2.0*M_PI)
+#define DT         1.0        // second
+#define G          6.673E-11  // mks units  
 
-#define SDL_EVENT_STOP           (SDL_EVENT_USER_START + 0)
-#define SDL_EVENT_RUN            (SDL_EVENT_USER_START + 1)
-#define SDL_EVENT_SLOW           (SDL_EVENT_USER_START + 2)
-#define SDL_EVENT_FAST           (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_PLAYBACK_REV   (SDL_EVENT_USER_START + 6)
-#define SDL_EVENT_PLAYBACK_FWD   (SDL_EVENT_USER_START + 7)
-#define SDL_EVENT_RESET          (SDL_EVENT_USER_START + 9)
-#define SDL_EVENT_RESET_PARAMS   (SDL_EVENT_USER_START + 10)
-#define SDL_EVENT_BACK           (SDL_EVENT_USER_START + 11)
-
-#define PURPLE 380  // xxx move to util.h
-#define BLUE   440
-#define GREEN  540
-#define RED    700
-#if 0 // xxx move to util.h and generalize
-#define WAVELENGTH(speed) \
-        (PURPLE + ((speed) - (SPEED_AVG-SPEED_SPREAD/2)) * (RED - PURPLE) / SPEED_SPREAD)
-#endif
+#define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
+#define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
+#define SDL_EVENT_SIMPANE_ZOOM_IN        (SDL_EVENT_USER_START + 10)
+#define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
+#define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
+#define SDL_EVENT_SIMPANE_MOUSE_MOTION   (SDL_EVENT_USER_START + 13)
+#define SDL_EVENT_TRACKERPANE_ZOOM_IN    (SDL_EVENT_USER_START + 20)
+#define SDL_EVENT_TRACKERPANE_ZOOM_OUT   (SDL_EVENT_USER_START + 21)
+#define SDL_EVENT_BACK                   (SDL_EVENT_USER_START + 30)
 
 #define STATE_STOP               0
 #define STATE_RUN                1
-#define STATE_PLAYBACK_REV       3
-#define STATE_PLAYBACK_FWD       4
-#define STATE_PLAYBACK_STOP      5
 #define STATE_TERMINATE_THREADS  9
 
 #define STATE_STR(s) \
     ((s) == STATE_STOP              ? "STOP"              : \
      (s) == STATE_RUN               ? "RUN"               : \
-     (s) == STATE_PLAYBACK_REV      ? "PLAYBACK_REV"      : \
-     (s) == STATE_PLAYBACK_FWD      ? "PLAYBACK_FWD"      : \
-     (s) == STATE_PLAYBACK_STOP     ? "PLAYBACK_STOP"     : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
 
-#define MIN_RUN_SPEED     1
-#define MAX_RUN_SPEED     9
-#define DEFAULT_RUN_SPEED 9
-#define RUN_SPEED_SLEEP_TIME (100 * ((1 << (MAX_RUN_SPEED-run_speed)) - 1))
-
-#define TWO_PI (2.0*M_PI)
-
-#define DT             1.0                  // second
-
-#define G              6.673E-11            // mks units  
-#define AU             149597870700.0       // meters XXX cvt to scientific
-
-#define M_SUN          1.989E30             // kg
-
-#define M_EARTH        5.972E24             // kg
-#define R_EARTH        AU                   // orbit radius in meters
-#define T_EARTH        (365.256*86400)      // orbit time in seconds
-
-#define M_MOON         7.347E22             // kg
-#define R_MOON         3.844E8              // orbit radius in meters
-#define T_MOON         (27.3217*86400)      // orbit time in seconds
-
-#define M_VENUS        4.867E24             // kg
-#define R_VENUS        1.0821E11            // orbit radius in meters
-#define T_VENUS        (224.701*86400)      // orbit time in seconds
+#ifdef ANDROID
+    #define sqrtl sqrt
+#endif
 
 //
 // typedefs
@@ -98,14 +69,16 @@
 typedef struct {
     long double X;        // meters
     long double Y;
-    long double VX;  // meters/secod
+    long double VX;       // meters/secod xxx maybe use int64_t
     long double VY;
     long double MASS;     // kg
+    int32_t     DISP_COLOR;
+    int32_t     DISP_R; 
 } object_t; 
 
 typedef struct {
     int64_t sim_alloc_size; 
-    int64_t state_num;
+    long double sim_time;
     int32_t max_object;
     object_t object[0];
 } sim_t;
@@ -123,8 +96,11 @@ typedef struct {
 static sim_t           * sim;
 
 static int32_t           state; 
-static int32_t           run_speed;
 static long double       sim_width;
+static long double       sim_x;
+static long double       sim_y;
+static long double       tracker_width;
+static int32_t           tracker_obj;
 
 static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
@@ -136,6 +112,7 @@ static pthread_barrier_t barrier;
 
 int32_t sim_gravity_init(void);
 void sim_gravity_terminate(void);
+void sim_gravity_set_object_diameters(void);
 bool sim_gravity_display(void);
 void * sim_gravity_thread(void * cx);
 
@@ -143,10 +120,6 @@ void * sim_gravity_thread(void * cx);
 
 void sim_gravity(void) 
 {
-    INFO("sizeof double = %d\n", (int)sizeof(double));
-    INFO("sizeof long double = %d\n", (int)sizeof(long double));
-    //INFO("sizeof long long double = %d\n", (int)sizeof(quad double));
-
     if (sim_gravity_init() != 0) {
         return;
     }
@@ -184,53 +157,69 @@ int32_t sim_gravity_init(void)
     }
 
     // init sim  
-    // XXX using XML for solar system, 
-    //   - embed some of the XML in here
-    //   - and get additional from web site
-    object_t sun;
-    sun.X    = 0;
-    sun.Y    = 0;
-    sun.VX   = 0;
-    sun.VY   = 0;
-    sun.MASS = M_SUN;
-    sim->object[0] = sun;
+    //
+    // XXX the following section is TBD, need to use a file or 
+    //     another better way to init the simulation
+    object_t sun, venus, earth, moon;
 
-    object_t earth;
-    earth.X    = R_EARTH;
-    earth.Y    = 0;
-    earth.VX   = 0;
-    earth.VY   = TWO_PI * R_EARTH / T_EARTH;
-    earth.MASS = M_EARTH;
-    sim->object[1] = earth;
+    #define AU             1.495978707E11       // meters 
+    #define M_SUN          1.989E30             // kg
+    #define M_EARTH        5.972E24             // kg
+    #define R_EARTH        AU                   // orbit radius in meters
+    #define T_EARTH        (365.256*86400)      // orbit time in seconds
+    #define M_MOON         7.347E22             // kg
+    #define R_MOON         3.844E8              // orbit radius in meters
+    #define T_MOON         (27.3217*86400)      // orbit time in seconds
+    #define M_VENUS        4.867E24             // kg
+    #define R_VENUS        1.0821E11            // orbit radius in meters
+    #define T_VENUS        (224.701*86400)      // orbit time in seconds
 
-#if MAX_OBJECT > 2
-    object_t moon;
-    moon.X    = earth.X - R_MOON;
+    sun.X     = 0;
+    sun.Y     = 0;
+    sun.VX    = 0;
+    sun.VY    = 0;
+    sun.MASS  = M_SUN;
+    sun.DISP_COLOR = YELLOW;
+
+    venus.X     = R_VENUS;
+    venus.Y     = 0;
+    venus.VX    = 0;
+    venus.VY    = TWO_PI * R_VENUS / T_VENUS;
+    venus.MASS  = M_VENUS;
+    venus.DISP_COLOR = WHITE;
+
+    earth.X     = R_EARTH;
+    earth.Y     = 0;
+    earth.VX    = 0;
+    earth.VY    = TWO_PI * R_EARTH / T_EARTH;
+    earth.MASS  = M_EARTH;
+    earth.DISP_COLOR = WHITE;
+
+    moon.X    = earth.X + R_MOON;
     moon.Y    = earth.Y;
     moon.VX   = 0;
     moon.VY   = earth.VY + TWO_PI * R_MOON / T_MOON;
     moon.MASS = M_MOON;
-    sim->object[2] = moon;
-#endif
+    moon.DISP_COLOR = BLUE;
 
-#if MAX_OBJECT > 3
-    object_t venus;
-    venus.X    = R_VENUS;
-    venus.Y    = 0;
-    venus.VX   = 0;
-    venus.VY   = TWO_PI * R_VENUS / T_VENUS;
-    venus.MASS = M_VENUS;
-    sim->object[3] = venus;
-#endif
+    sim->object[0] = sun;
+    sim->object[1] = venus;
+    sim->object[2] = earth;
+    sim->object[3] = moon;
 
     sim->sim_alloc_size = sim_alloc_size;
-    sim->state_num  = 0;
+    sim->sim_time  = 0;
     sim->max_object = MAX_OBJECT;
+
+    sim_gravity_set_object_diameters();
 
     // init control variables
     state = STATE_STOP;
-    run_speed = DEFAULT_RUN_SPEED;
     sim_width = 2.1 * AU;
+    sim_x = 0;
+    sim_y = 0;
+    tracker_width = 2000000000; 
+    tracker_obj = -1;
 
     // create worker threads
     num_proc = sysconf(_SC_NPROCESSORS_ONLN);
@@ -275,153 +264,330 @@ void sim_gravity_terminate(void)
     INFO("terminate complete\n");
 }
 
+void sim_gravity_set_object_diameters(void)
+{
+    long double radius_raw[sim->max_object]; 
+    long double min_radius_raw, max_radius_raw, min_disp_r, max_disp_r, delta;
+    int32_t i;
+
+    // xxx redo to not rely on mass but on actual diamter
+
+    #define MIN_DISP_R (2.)
+    #define MAX_DISP_R (10. * MIN_DISP_R)
+    #define CENTER_DISP_R ((MAX_DISP_R + MIN_DISP_R) / 2.)
+
+    // fill in radius raw values with cube root of mass
+    for (i = 0; i < sim->max_object; i++) {
+        radius_raw[i] = exp(log(sim->object[i].MASS) / 3);
+    }
+
+    // determine min and max raw radius values
+    min_radius_raw = 1E99;
+    max_radius_raw = -1E99;
+    for (i = 0; i < sim->max_object; i++) {
+        if (radius_raw[i] < min_radius_raw) {
+            min_radius_raw = radius_raw[i];
+        }
+        if (radius_raw[i] > max_radius_raw) {
+            max_radius_raw = radius_raw[i];
+        }
+    }
+    INFO("MIN/MAX RADIUS RAW  %Lf %Lf\n", min_radius_raw, max_radius_raw);  // xxx delete prints in here
+
+    // if min and max equal then
+    //   set obj_radius to CENTER_DISP_R
+    if (min_radius_raw == max_radius_raw) {
+        INFO("CASE 1 - EQUAL\n");
+        for (i = 0; i < sim->max_object; i++) {
+            sim->object[i].DISP_R = CENTER_DISP_R;
+        }
+
+    // else if max / min < 10 then
+    //   map raw radius values to range min_disp_r to max_disp_r,
+    //   where these values have ratio equal to max_radius_raw/min_radius_raw
+    } else if (max_radius_raw / min_radius_raw <= 10) {
+        INFO("CASE 2 - LESS THAN 10\n");
+        delta = (max_radius_raw / min_radius_raw * CENTER_DISP_R - CENTER_DISP_R) / 
+                (max_radius_raw  / min_radius_raw + 1);
+        min_disp_r = CENTER_DISP_R - delta;
+        max_disp_r = CENTER_DISP_R + delta;
+
+        for (i = 0; i < sim->max_object; i++) {
+            sim->object[i].DISP_R = (max_disp_r - min_disp_r) / (max_radius_raw - min_radius_raw) * 
+                                    (radius_raw[i] - min_radius_raw ) + min_disp_r;
+        }
+
+    // else 
+    //   convert raw radius values to log scale
+    //   map these new raw radius values to MIN_DISP_R to MAX_DISP_R
+    } else {
+        INFO("CASE 3 - \n");
+        for (i = 0; i < sim->max_object; i++) {
+            radius_raw[i] = log(radius_raw[i]);
+        }
+        for (i = 0; i < sim->max_object; i++) {
+            INFO("NEW %d = %LF\n", i, radius_raw[i]);
+        }
+
+        min_radius_raw = 1E99;
+        max_radius_raw = -1E99;
+        for (i = 0; i < sim->max_object; i++) {
+            if (radius_raw[i] < min_radius_raw) {
+                min_radius_raw = radius_raw[i];
+            }
+            if (radius_raw[i] > max_radius_raw) {
+                max_radius_raw = radius_raw[i];
+            }
+        }
+        INFO("NEW MIN/MAX RADIUS RAW  %Lf %Lf\n", min_radius_raw, max_radius_raw);
+
+        for (i = 0; i < sim->max_object; i++) {
+            sim->object[i].DISP_R = (MAX_DISP_R - MIN_DISP_R) / (max_radius_raw - min_radius_raw) * 
+                                    (radius_raw[i] - min_radius_raw) + MIN_DISP_R;
+        }
+    }
+
+    // xxx, and search for too many other INOFO prints
+    for (i = 0; i < sim->max_object; i++) {
+        INFO("RESULT %d = %d\n", i, sim->object[i].DISP_R);
+    }
+}
+
 // -----------------  DISPLAY  --------------------------------------------------
 
 bool sim_gravity_display(void)
 {
-    SDL_Rect       ctlpane;
-    SDL_Rect       rect;
-    int32_t        simpane_width, count, event, i;
-    uint8_t        r, g, b;
-    char           str[100];
+    #define IN_RECT(X,Y,RECT) \
+        ((X) >= (RECT).x && (X) < (RECT).x + (RECT).w && \
+         (Y) >= (RECT).y && (Y) < (RECT).y + (RECT).h)
+
+    #define MAX_CIRCLE_RADIUS 51
+    #define MAX_CIRCLE_COLOR  (MAX_COLOR+1)
+
+    SDL_Rect       ctl_pane, sim_pane, tracker_pane;
+    int32_t        sim_pane_width, tracker_pane_width, i, row, col;
+    sdl_event_t *  event;
+    char           str[100], str1[100];
     bool           done = false;
 
-    // init
+    static SDL_Texture * circle_texture_tbl[MAX_CIRCLE_RADIUS][MAX_CIRCLE_COLOR];
+
+    //
+    // INIT
+    //
+
     if (sdl_win_width > sdl_win_height) {
-        simpane_width = sdl_win_height;
-        SDL_INIT_PANE(ctlpane,
-                      simpane_width, 0,             // x, y
-                      sdl_win_width-simpane_width, sdl_win_height);     // w, h
+        int32_t ctl_pane_width, ctl_pane_height;
+        sim_pane_width = sdl_win_height;
+        ctl_pane_width = sdl_win_width - sim_pane_width, 
+        ctl_pane_height = sdl_win_height - ctl_pane_width;
+        tracker_pane_width = ctl_pane_width;
+        SDL_INIT_PANE(sim_pane, 
+                      0, 0,  
+                      sim_pane_width, sim_pane_width);
+        SDL_INIT_PANE(tracker_pane, 
+                      sim_pane_width, ctl_pane_height,
+                      tracker_pane_width, tracker_pane_width);
+        SDL_INIT_PANE(ctl_pane, 
+                      sim_pane_width, 0, 
+                      ctl_pane_width, ctl_pane_height);
     } else {
-        simpane_width = sdl_win_width;
-        SDL_INIT_PANE(ctlpane, 0, 0, 0, 0);
+        sim_pane_width = sdl_win_width;
+        tracker_pane_width = 0;
+        SDL_INIT_PANE(sim_pane, 0, 0,  sim_pane_width, sim_pane_width);
+        SDL_INIT_PANE(tracker_pane, 0, 0, 0, 0);
+        SDL_INIT_PANE(ctl_pane, 0, 0, 0, 0);
     }
     sdl_event_init();
 
-    // if in a stopped state then delay for 50 ms, to reduce cpu usage
-    count = 0;
-    while ((state == STATE_STOP ||
-            state == STATE_PLAYBACK_STOP) &&
-           (count < 100))
-    {
-        count++;
+    //
+    // if in stopped state then delay a bit, to reduce cpu usage
+    //
+
+    if (state == STATE_STOP) {
         usleep(1000);
     }
 
+    //
     // clear window
+    //
+
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(sdl_renderer);
 
-    // draw objects 
+    //
+    // SIMPANE ...
+    //
+
+    // draw sim_pane objects 
     for (i = 0; i < sim->max_object; i++) {
         object_t * p = &sim->object[i];
-        int32_t    win_x, win_y;
+        int32_t    disp_x, disp_y, disp_r, disp_color;
 
-        win_x = (p->X + sim_width/2) * (simpane_width / sim_width);
-        win_y = (p->Y + sim_width/2) * (simpane_width / sim_width);
+        disp_x     = sim_pane.x + (p->X - sim_x + sim_width/2) * (sim_pane_width / sim_width);
+        disp_y     = sim_pane.y + (p->Y - sim_y + sim_width/2) * (sim_pane_width / sim_width);
+        disp_r     = p->DISP_R;
+        disp_color = p->DISP_COLOR;
 
-#if 1
-        int32_t win_r;
-        SDL_Rect rect;
+        if (i == tracker_obj) { 
+            disp_color = RED;
+        }
 
-        wavelength_to_rgb((i%3) == 0 ? RED : (i%3) == 1 ? GREEN : BLUE,
-                          &r, &g, &b);
-        SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
+        if (IN_RECT(disp_x, disp_y, sim_pane) == false) {
+            continue;
+        }
 
-        win_r = 2; // XXX use real value
-        rect.x = win_x - win_r;
-        rect.y = win_y - win_r;
-        rect.w = 2 * win_r;
-        rect.h = 2 * win_r;
-        SDL_RenderFillRect(sdl_renderer, &rect);
-#else
-        SDL_RenderDrawPoint(sdl_renderer, win_x, win_y);
-#endif
+        if (disp_r < 1) disp_r = 1;
+        if (disp_r >= MAX_CIRCLE_RADIUS) disp_r = MAX_CIRCLE_RADIUS-1;
+        if (disp_color >= MAX_CIRCLE_COLOR) disp_color = MAX_CIRCLE_COLOR-1;
+
+        if (circle_texture_tbl[disp_r][disp_color] == NULL) {
+            circle_texture_tbl[disp_r][disp_color] =
+                sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
+        }
+        sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
     }
 
-    // clear ctlpane
+    // display sim_pane title
+    sprintf(str, "WIDTH %0.2Lf AU", sim_width/AU);
+    sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
+
+    // register sim_pane controls
+    col = SDL_PANE_COLS(&sim_pane,0)-2;
+    sdl_render_text_font0(&sim_pane,  0, col,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
+    sdl_render_text_font0(&sim_pane,  2, col,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+    sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK, SDL_EVENT_TYPE_MOUSE_CLICK, &sim_pane);
+    sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
+
+    // draw sim_pane border
+    sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
+
+    //
+    // TRACKERPANE ...
+    //
+
+    // draw tracker_pane objects 
+    if (tracker_obj != -1) {
+        long double tracker_x = sim->object[tracker_obj].X;
+        long double tracker_y = sim->object[tracker_obj].Y;
+        for (i = 0; i < sim->max_object; i++) {
+            object_t * p = &sim->object[i];
+            int32_t    disp_x, disp_y, disp_r, disp_color;
+
+            disp_x     = tracker_pane.x + (p->X - tracker_x + tracker_width/2) * (tracker_pane_width / tracker_width);
+            disp_y     = tracker_pane.y + (p->Y - tracker_y + tracker_width/2) * (tracker_pane_width / tracker_width);
+            disp_r     = p->DISP_R;
+            disp_color = p->DISP_COLOR;
+
+            if (IN_RECT(disp_x, disp_y, tracker_pane) == false) {
+                continue;
+            }
+
+            if (disp_r < 1) disp_r = 1;
+            if (disp_r >= MAX_CIRCLE_RADIUS) disp_r = MAX_CIRCLE_RADIUS-1;
+            if (disp_color >= MAX_CIRCLE_COLOR) disp_color = MAX_CIRCLE_COLOR-1;
+
+            if (circle_texture_tbl[disp_r][disp_color] == NULL) {
+                circle_texture_tbl[disp_r][disp_color] =
+                    sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
+            }
+            sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
+        }
+    } else {
+        row = SDL_PANE_ROWS(&tracker_pane,0) / 2 - 1;
+        sdl_render_text_ex(&tracker_pane, row, 0, "NOT", SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        sdl_render_text_ex(&tracker_pane, row+1, 0, "SELECTED", SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
+    }
+
+    // register tracker_pane controls
+    col = SDL_PANE_COLS(&tracker_pane,0)-2;
+    sdl_render_text_font0(&tracker_pane,  0, col,  "+", SDL_EVENT_TRACKERPANE_ZOOM_IN);
+    sdl_render_text_font0(&tracker_pane,  2, col,  "-", SDL_EVENT_TRACKERPANE_ZOOM_OUT);
+
+    // display tracker_pane title
+    sprintf(str, "WIDTH %0.2Lf AU", tracker_width/AU);
+    sdl_render_text_font0(&tracker_pane,  0, 0,  str, SDL_EVENT_NONE);
+
+    // draw trakerpane border
+    sdl_render_rect(&tracker_pane, 3, sdl_pixel_rgba[GREEN]);
+
+    //
+    // CTLPANE ...
+    //
+
+    // clear ctl_pane
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(sdl_renderer, &ctlpane);
+    SDL_RenderFillRect(sdl_renderer, &ctl_pane);
 
     // display controls  
-    // xxx clean all thi up
-    sdl_render_text_font0(&ctlpane,  0, 3,  "GRAVITY",         SDL_EVENT_NONE);
-    sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",             SDL_EVENT_RUN);
-    sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",            SDL_EVENT_STOP);
-    sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",            SDL_EVENT_SLOW);
-    sdl_render_text_font0(&ctlpane,  4, 9,  "FAST",            SDL_EVENT_FAST);
-    sdl_render_text_font0(&ctlpane,  6, 0,  "PB_REV",          SDL_EVENT_PLAYBACK_REV);
-    sdl_render_text_font0(&ctlpane,  6, 9,  "PB_FWD",          SDL_EVENT_PLAYBACK_FWD);
-    sdl_render_text_font0(&ctlpane,  8, 0,  "RESET",           SDL_EVENT_RESET);
-    sdl_render_text_font0(&ctlpane,  8, 9,  "RESET_PARAM",     SDL_EVENT_RESET_PARAMS);
-    sdl_render_text_font0(&ctlpane, 18,15,  "BACK",            SDL_EVENT_BACK);
+    sdl_render_text_font0(&ctl_pane,  0, 0,  "GRAVITY", SDL_EVENT_NONE);
+    sdl_render_text_font0(&ctl_pane,  0,15,  "BACK",    SDL_EVENT_BACK);
+    sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",     SDL_EVENT_RUN);
+    sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",    SDL_EVENT_STOP);
 
     // display status lines
-    sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
-    sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+    sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim->sim_time));
+    sdl_render_text_font0(&ctl_pane, 4, 0, str, SDL_EVENT_NONE);
 
-    int64_t days, hours, minutes, seconds;  // xxx use a routine
-    seconds = sim->state_num * DT;
-    days = seconds / 86400;
-    seconds -= 86400 * days;
-    hours = seconds / 3600;
-    seconds -= hours * 3600;
-    minutes = seconds / 60;
-    seconds -= minutes * 60;
-    sprintf(str, "%d %2.2d:%2.2d:%2.d", (int32_t)days, (int32_t)hours, (int32_t)minutes, (int32_t)seconds);
-    sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-
-    sprintf(str, "RUN_SPEED   = %d", run_speed);    
-    sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
-
-    // draw border
-    wavelength_to_rgb(GREEN, &r, &g, &b);
-    rect.x = 0;
-    rect.y = 0;
-    rect.w = simpane_width;
-    rect.h = simpane_width;
-    sdl_render_rect(&rect, 3, r, g, b, SDL_ALPHA_OPAQUE);
-
+    //
     // present the display
+    //
+
     SDL_RenderPresent(sdl_renderer);
 
+    //
     // handle events
+    //
+
     event = sdl_poll_event();
-    switch (event) {
+    switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
         break;
     case SDL_EVENT_STOP:
-        if (state == STATE_RUN) {
-            state = STATE_STOP;
-        } else if (state == STATE_PLAYBACK_REV || state == STATE_PLAYBACK_FWD) {
-            state = STATE_PLAYBACK_STOP;
-        }
+        state = STATE_STOP;
         break;
-    case SDL_EVENT_SLOW:
-        if (run_speed > MIN_RUN_SPEED) {
-            run_speed--;
-        }
-        break;
-    case SDL_EVENT_FAST:
-        if (run_speed < MAX_RUN_SPEED) {
-            run_speed++;
-        }
-        break;
-    case SDL_EVENT_PLAYBACK_REV:
-        state = STATE_PLAYBACK_REV;
-        break;
-    case SDL_EVENT_PLAYBACK_FWD:
-        state = STATE_PLAYBACK_FWD;
-        break;
-    case SDL_EVENT_RESET:
-    case SDL_EVENT_RESET_PARAMS: {
-        sim_gravity_terminate();  //xxx parms tbd, get the XML here
-        sim_gravity_init();
-        break; }
     case SDL_EVENT_BACK: 
     case SDL_EVENT_QUIT:
         done = true;
+        break;
+    case SDL_EVENT_SIMPANE_ZOOM_IN:
+        sim_width /= 2;
+        break;
+    case SDL_EVENT_SIMPANE_ZOOM_OUT:
+        sim_width *= 2;
+        break;
+    case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
+        int32_t found_obj = -1;
+        for (i = 0; i < sim->max_object; i++) {
+            object_t * p = &sim->object[i];
+            int32_t disp_x, disp_y;
+
+            disp_x = sim_pane.x + (p->X - sim_x + sim_width/2) * (sim_pane_width / sim_width);
+            disp_y = sim_pane.y + (p->Y - sim_y + sim_width/2) * (sim_pane_width / sim_width);
+            if (disp_x >= event->mouse_click.x - 15 &&
+                disp_x <= event->mouse_click.x + 15 &&
+                disp_y >= event->mouse_click.y - 15 &&
+                disp_y <= event->mouse_click.y + 15 &&
+                (found_obj == -1 || sim->object[i].MASS > sim->object[found_obj].MASS))
+            {
+                found_obj = i;
+            }
+        }
+        if (found_obj == -1) {
+            break;
+        }
+        tracker_obj = (found_obj == tracker_obj ? -1 : found_obj);
+        break; }
+    case SDL_EVENT_SIMPANE_MOUSE_MOTION:
+        sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
+        sim_y -= (event->mouse_motion.delta_y * (sim_width / sim_pane_width));
+        break;
+    case SDL_EVENT_TRACKERPANE_ZOOM_IN:
+        tracker_width /= 2;
+        break;
+    case SDL_EVENT_TRACKERPANE_ZOOM_OUT:
+        tracker_width *= 2;
         break;
     default:
         break;
@@ -435,15 +601,9 @@ bool sim_gravity_display(void)
 
 void * sim_gravity_thread(void * cx_arg)
 {
-    #define PB(n)      (pb_buff + (n) * sim->sim_alloc_size)
-
     thread_cx_t     cx = *(thread_cx_t*)cx_arg;
-    int32_t         pb_end, pb_beg, pb_idx, pb_max=0;
-    int64_t         pb_tail;
-    void          * pb_buff = NULL;
 
     static int32_t  curr_state;
-    static int32_t  last_state;
 
     // a copy of cx_arg has been made, so free cx_arg
     free(cx_arg);
@@ -454,23 +614,6 @@ void * sim_gravity_thread(void * cx_arg)
     // thread 0 initializes
     if (cx.id == 0) {
         curr_state = STATE_STOP;
-        last_state = STATE_STOP;
-
-        pb_max = 10000;
-        while (true) {
-            pb_buff = calloc(pb_max, sim->sim_alloc_size);
-            if (pb_buff != NULL) {
-                INFO("playback buff_size %d MB, pb_max=%d\n", (int32_t)((pb_max * sim->sim_alloc_size) / MB), pb_max);
-                break;
-            }
-            pb_max -= 100;
-            if (pb_max <= 0) {
-                FATAL("failed allocate playback buffer\n");
-            }
-        }
-        pb_end = pb_beg = pb_idx = 0;
-        memcpy(PB(0), sim, sim->sim_alloc_size);
-        pb_tail = 1;
     }
     if (max_thread > 1) {
         pthread_barrier_wait(&barrier);
@@ -478,22 +621,12 @@ void * sim_gravity_thread(void * cx_arg)
 
     while (true) {
         // thread id 0 performs control functions
+        // - determine current state
         if (cx.id == 0) {
-            // determine current and last state
-            last_state = curr_state;
             curr_state = state;
-
-            // if state has changed, and the current state is not playback then 
-            // reset sim to the last copy saved in the playback buffer array
-            if ((curr_state != last_state) &&
-                (curr_state == STATE_RUN || 
-                 curr_state == STATE_STOP))
-            {
-                memcpy(sim, PB((pb_tail-1)%pb_max), sim->sim_alloc_size);
-            }
         }
 
-        // all threads rendezvoud here
+        // all threads rendezvous here
         if (max_thread > 1) {
             pthread_barrier_wait(&barrier);
         }
@@ -567,88 +700,22 @@ void * sim_gravity_thread(void * cx_arg)
 
                 EVALOBJ->X  = EVALOBJ->X + DX;
                 EVALOBJ->Y  = EVALOBJ->Y + DY;
-                EVALOBJ->VX = DX < 0 ? -V2X : V2X;  // XXX
+                EVALOBJ->VX = DX < 0 ? -V2X : V2X;  // xxx may not be correct
                 EVALOBJ->VY = DY < 0 ? -V2Y : V2Y;
             }
 
-            // all threads rendezvoud here
+            // all threads rendezvous here
             if (max_thread > 1) {
                 pthread_barrier_wait(&barrier);
             }
 
             // all particles have been updated, thread 0 does post processing
+            // - update sim_time
             if (cx.id == 0) {
-                // increment the state_num
-                sim->state_num++;
-
-                // make playback copy
-                memcpy(PB(pb_tail%pb_max), sim, sim->sim_alloc_size);
-                pb_tail++;
-
-                // sleep to pace the simulation
-                if (RUN_SPEED_SLEEP_TIME > 0) {
-                    usleep(RUN_SPEED_SLEEP_TIME);
-                }
-            }
-
-
-        } else if (curr_state == STATE_PLAYBACK_REV) {
-            if (cx.id == 0) {
-                if (last_state != STATE_PLAYBACK_REV &&
-                    last_state != STATE_PLAYBACK_FWD &&
-                    last_state != STATE_PLAYBACK_STOP) 
-                {
-                    pb_end = (pb_tail - 1) % pb_max;
-                    pb_beg = (pb_tail <= pb_max ? 0 : (pb_tail + 1) % pb_max);
-                    pb_idx = pb_end;
-                }
-
-                memcpy(sim, PB(pb_idx), sim->sim_alloc_size);
-
-                if (pb_idx == pb_beg) {
-                    state = STATE_PLAYBACK_STOP;
-                } else {
-                    pb_idx = pb_idx - 1;
-                    if (pb_idx < 0) {
-                        pb_idx += pb_max;
-                    }
-                    if (RUN_SPEED_SLEEP_TIME > 0) {
-                        usleep(RUN_SPEED_SLEEP_TIME);
-                    }
-                }
-            }
-
-        } else if (curr_state == STATE_PLAYBACK_FWD) {
-            if (cx.id == 0) {
-                if (last_state != STATE_PLAYBACK_REV &&
-                    last_state != STATE_PLAYBACK_FWD &&
-                    last_state != STATE_PLAYBACK_STOP) 
-                {
-                    pb_end = (pb_tail - 1) % pb_max;
-                    pb_beg = (pb_tail <= pb_max ? 0 : (pb_tail + 1) % pb_max);
-                    pb_idx = pb_end;
-                }
-
-                memcpy(sim, PB(pb_idx), sim->sim_alloc_size);
-
-                if (pb_idx == pb_end) {
-                    state = STATE_PLAYBACK_STOP;
-                } else  {
-                    pb_idx = pb_idx + 1;
-                    if (pb_idx >= pb_max) {
-                        pb_idx -= pb_max;
-                    }
-                    if (RUN_SPEED_SLEEP_TIME > 0) {
-                        usleep(RUN_SPEED_SLEEP_TIME);
-                    }
-                }
+                sim->sim_time += DT;
             }
 
         } else if (curr_state == STATE_TERMINATE_THREADS) {
-            if (cx.id == 0) {
-                free(pb_buff);
-                pb_buff = NULL;
-            }
             break;
 
         } else {

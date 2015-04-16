@@ -18,23 +18,23 @@
 static Mix_Chunk * sdl_button_sound;
 
 // events
-#define SDL_EVENT_KEY_SHIFT      128
-#define SDL_EVENT_KEY_BS         129
-#define SDL_EVENT_KEY_TAB        130
-#define SDL_EVENT_KEY_ENTER      131
-#define SDL_EVENT_KEY_ESC        132
-#define SDL_EVENT_FIELD_SELECT   140
-static SDL_Rect sdl_event_pos[SDL_EVENT_MAX];
+typedef struct {
+    SDL_Rect pos;
+    int32_t type;
+} sdl_event_reg_t;
+static sdl_event_reg_t sdl_event_reg_tbl[SDL_EVENT_MAX];
 
-// fonts
-#define SDL_MAX_FONT          2
-#define SDL_PANE_COLS(p,fid)  ((p)->w / sdl_font[fid].char_width)
-#define SDL_PANE_ROWS(p,fid)  ((p)->h / sdl_font[fid].char_height)
-static struct {
-    TTF_Font * font;
-    int32_t    char_width;
-    int32_t    char_height;
-} sdl_font[SDL_MAX_FONT];
+// color to rgba
+// xxx add more colors 
+uint32_t sdl_pixel_rgba[] = {
+    //    red           green          blue    alpha
+       (255 << 24) |               (255 << 8) | 255,     // PURPLE
+                                   (255 << 8) | 255,     // BLUE
+                     (255 << 16)              | 255,     // GREEN
+       (255 << 24) | (255 << 16)              | 255,     // YELLOW
+       (255 << 24)                            | 255,     // RED         
+       (255 << 24) | (255 << 16) | (255 << 8) | 255,     // WHITE       
+                                        };
 
 // getstring 
 static bool sdl_get_string_active;
@@ -127,7 +127,6 @@ void sdl_init(uint32_t w, uint32_t h)
         FATAL("failed TTF_OpenFont %s\n", font1_path);
     }
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
-
 }
 
 void sdl_terminate(void)
@@ -229,21 +228,27 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
 
     // if there is a event then save the location for the event handler
     if (event != SDL_EVENT_NONE) {
-        sdl_event_pos[event] = pos;
+        sdl_event_register(event, SDL_EVENT_TYPE_TEXT, &pos);
     }
 }
 
 void sdl_event_init(void)
 {
-    bzero(sdl_event_pos, sizeof(sdl_event_pos));
+    bzero(sdl_event_reg_tbl, sizeof(sdl_event_reg_tbl));
 }
 
-int32_t sdl_poll_event(void)
+void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos)
 {
-    #define AT_POS(pos) ((ev.button.x >= (pos).x - 5) && \
-                               (ev.button.x < (pos).x + (pos).w + 5) && \
-                               (ev.button.y >= (pos).y - 5) && \
-                               (ev.button.y < (pos).y + (pos).h + 5))
+    sdl_event_reg_tbl[event_id].pos  = *pos;
+    sdl_event_reg_tbl[event_id].type = event_type;
+}
+
+sdl_event_t * sdl_poll_event(void)
+{
+    #define AT_POS(X,Y,pos,pad) (((X) >= (pos).x - (pad)) && \
+                                 ((X) < (pos).x + (pos).w + (pad)) && \
+                                 ((Y) >= (pos).y - (pad)) && \
+                                 ((Y) < (pos).y + (pos).h + (pad)))
 
     #define SDL_WINDOWEVENT_STR(x) \
        ((x) == SDL_WINDOWEVENT_SHOWN        ? "SDL_WINDOWEVENT_SHOWN"        : \
@@ -261,8 +266,36 @@ int32_t sdl_poll_event(void)
         (x) == SDL_WINDOWEVENT_FOCUS_LOST   ? "SDL_WINDOWEVENT_FOCUS_LOST"   : \
         (x) == SDL_WINDOWEVENT_CLOSE        ? "SDL_WINDOWEVENT_CLOSE"        : \
 
+    #define SDL_EVENT_KEY_SHIFT         128
+    #define SDL_EVENT_KEY_BS            129
+    #define SDL_EVENT_KEY_TAB           130
+    #define SDL_EVENT_KEY_ENTER         131
+    #define SDL_EVENT_KEY_ESC           132
+    #define SDL_EVENT_FIELD_SELECT      140
+
+    #define MOUSE_BUTTON_STATE_NONE     0
+    #define MOUSE_BUTTON_STATE_DOWN     1
+    #define MOUSE_BUTTON_STATE_MOTION   2
+
+    #define MOUSE_BUTTON_STATE_RESET \
+        do { \
+            mouse_button_state = MOUSE_BUTTON_STATE_NONE; \
+            mouse_button_motion_event = SDL_EVENT_NONE; \
+            mouse_button_x = 0; \
+            mouse_button_y = 0; \
+        } while (0)
+
     SDL_Event ev;
-    int32_t   event;
+    int32_t i;
+
+    static sdl_event_t event;
+    static int32_t     mouse_button_state;  // xxx how to ensure this is reset
+    static int32_t     mouse_button_motion_event;
+    static int32_t     mouse_button_x;
+    static int32_t     mouse_button_y;
+
+    bzero(&event, sizeof(event));
+    event.event = SDL_EVENT_NONE;
 
     while (true) {
         // get the next event, break out of loop if no event
@@ -275,7 +308,6 @@ int32_t sdl_poll_event(void)
         // - updates sdl_win_width, sdl_win_height, sdl_win_minimized
         switch (ev.type) {
         case SDL_MOUSEBUTTONDOWN: {
-            int32_t i;
             DEBUG("MOUSE DOWN which=%d button=%s state=%s x=%d y=%d\n",
                    ev.button.which,
                    (ev.button.button == SDL_BUTTON_LEFT   ? "LEFT" :
@@ -288,18 +320,112 @@ int32_t sdl_poll_event(void)
                    ev.button.x,
                    ev.button.y);
 
+            // if not the left button then get out
             if (ev.button.button != SDL_BUTTON_LEFT) {
                 break;
             }
 
+            // reset mouse_button_state
+            MOUSE_BUTTON_STATE_RESET;
+
+            // check for text event
             for (i = 0; i < SDL_EVENT_MAX; i++) {
-                if (AT_POS(sdl_event_pos[i])) {
-                    DEBUG("got event EVENT %d\n", i);
-                    event = i;
+                if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_TEXT &&
+                    AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos, 5)) 
+                {
+                    event.event = i;
                     SDL_PLAY_BUTTON_SOUND();
                     break;
                 }
             }
+            if (event.event != SDL_EVENT_NONE) {
+                break;
+            }
+
+            // it is not a text event, so set MOUSE_BUTTON_STATE_DOWN
+            mouse_button_state = MOUSE_BUTTON_STATE_DOWN;
+            mouse_button_x = ev.button.x;
+            mouse_button_y = ev.button.y;
+            break; }
+
+        case SDL_MOUSEBUTTONUP: {
+            DEBUG("MOUSE UP which=%d button=%s state=%s x=%d y=%d\n",
+                   ev.button.which,
+                   (ev.button.button == SDL_BUTTON_LEFT   ? "LEFT" :
+                    ev.button.button == SDL_BUTTON_MIDDLE ? "MIDDLE" :
+                    ev.button.button == SDL_BUTTON_RIGHT  ? "RIGHT" :
+                                                            "???"),
+                   (ev.button.state == SDL_PRESSED  ? "PRESSED" :
+                    ev.button.state == SDL_RELEASED ? "RELEASED" :
+                                                      "???"),
+                   ev.button.x,
+                   ev.button.y);
+
+            // if not the left button then get out
+            if (ev.button.button != SDL_BUTTON_LEFT) {
+                break;
+            }
+
+            // if not in MOUSE_BUTTON_STATE_DOWN then reset mouse_button_state and get out,
+            // this is where MOUSE_BUTTON_STATE_MOTION state is exitted
+            if (mouse_button_state != MOUSE_BUTTON_STATE_DOWN) {
+                MOUSE_BUTTON_STATE_RESET;
+                break;
+            }
+        
+            // check for mouse_click event
+            for (i = 0; i < SDL_EVENT_MAX; i++) {
+                if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_CLICK &&
+                    AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos, 0)) 
+                {
+                    event.event = i;
+                    event.mouse_click.x = ev.button.x;
+                    event.mouse_click.y = ev.button.y;
+                    SDL_PLAY_BUTTON_SOUND();
+                    break;
+                }
+            }
+
+            // reset mouse_button_state
+            MOUSE_BUTTON_STATE_RESET;
+            break; }
+
+        case SDL_MOUSEMOTION: {
+            // if MOUSE_BUTTON_STATE_NONE then get out
+            if (mouse_button_state == MOUSE_BUTTON_STATE_NONE) {
+                break;
+            }
+
+            // if in MOUSE_BUTTON_STATE_DOWN then check for mouse motion event; and if so
+            // then set state to MOUSE_BUTTON_STATE_MOTION
+            if (mouse_button_state == MOUSE_BUTTON_STATE_DOWN) {
+                for (i = 0; i < SDL_EVENT_MAX; i++) {
+                    if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_MOTION &&
+                        AT_POS(ev.motion.x, ev.motion.y, sdl_event_reg_tbl[i].pos, 0)) 
+                    {
+                        mouse_button_state = MOUSE_BUTTON_STATE_MOTION;
+                        mouse_button_motion_event = i;
+                        break;
+                    }
+                }
+            }
+
+            // if did not find mouse_motion_event then reset mouse_button_state, and get out
+            if (mouse_button_state != MOUSE_BUTTON_STATE_MOTION) {
+                MOUSE_BUTTON_STATE_RESET;
+                break;
+            }
+
+            // get all dditional pending mouse motion events, and sum the motion
+            event.event = mouse_button_motion_event;
+            event.mouse_motion.delta_x = 0;
+            event.mouse_motion.delta_y = 0;
+            do {
+                event.mouse_motion.delta_x += ev.motion.x - mouse_button_x;
+                event.mouse_motion.delta_y += ev.motion.y - mouse_button_y;
+                mouse_button_x = ev.motion.x;
+                mouse_button_y = ev.motion.y;
+            } while (SDL_PeepEvents(&ev, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) == 1);
             break; }
 
         case SDL_KEYDOWN: {
@@ -311,21 +437,21 @@ int32_t sdl_poll_event(void)
             }
 
             if (key == 27) {
-                event = SDL_EVENT_KEY_ESC;
+                event.event = SDL_EVENT_KEY_ESC;
             } else if (key == 8) {
-                event = SDL_EVENT_KEY_BS;
+                event.event = SDL_EVENT_KEY_BS;
             } else if (key == 9) {
-                event = SDL_EVENT_KEY_TAB;
+                event.event = SDL_EVENT_KEY_TAB;
             } else if (key == 13) {
-                event = SDL_EVENT_KEY_ENTER;
+                event.event = SDL_EVENT_KEY_ENTER;
             } else if (!shift && ((key >= 'a' && key <= 'z') || (key >= '0' && key <= '9'))) {
-                event = key;
+                event.event = key;
             } else if (shift && (key >= 'a' && key <= 'z')) {
-                event = 'A' + (key - 'a');
+                event.event = 'A' + (key - 'a');
             } else if (shift && key == '-') {
-                event = '_';
+                event.event = '_';
             } else if (key == ' ' || key == '.' || key == ',') {
-                event = key;
+                event.event = key;
             } else {
                 break;
             }
@@ -338,17 +464,17 @@ int32_t sdl_poll_event(void)
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 sdl_win_width = ev.window.data1;
                 sdl_win_height = ev.window.data2;
-                event = SDL_EVENT_WIN_SIZE_CHANGE;
+                event.event = SDL_EVENT_WIN_SIZE_CHANGE;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_MINIMIZED:
                 sdl_win_minimized = true;
-                event = SDL_EVENT_WIN_MINIMIZED;
+                event.event = SDL_EVENT_WIN_MINIMIZED;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             case SDL_WINDOWEVENT_RESTORED:
                 sdl_win_minimized = false;
-                event = SDL_EVENT_WIN_RESTORED;
+                event.event = SDL_EVENT_WIN_RESTORED;
                 SDL_PLAY_BUTTON_SOUND();
                 break;
             }
@@ -357,11 +483,8 @@ int32_t sdl_poll_event(void)
         case SDL_QUIT: {
             DEBUG("got event SDL_QUIT\n");
             sdl_quit = true;
-            event = SDL_EVENT_QUIT;
+            event.event = SDL_EVENT_QUIT;
             SDL_PLAY_BUTTON_SOUND();
-            break; }
-
-        case SDL_MOUSEMOTION: {
             break; }
 
         default: {
@@ -370,27 +493,28 @@ int32_t sdl_poll_event(void)
         }
 
         // break if event is set
-        if (event != SDL_EVENT_NONE) {
+        if (event.event != SDL_EVENT_NONE) {
             break; 
         }
     }
 
-    return event;
+    return &event;
 }
 
 void sdl_get_string(int32_t count, ...)
 {
-    char    * prompt_str[10];
-    char    * curr_str[10];
-    char    * ret_str[10];
+    char        * prompt_str[10];
+    char        * curr_str[10];
+    char        * ret_str[10];
 
-    va_list   ap;
-    SDL_Rect  keybdpane; 
-    char      str[200];
-    int32_t   event, i;
+    va_list       ap;
+    SDL_Rect      keybdpane; 
+    char          str[200];
+    int32_t       i;
+    sdl_event_t * event;
 
-    int32_t   field_select;
-    bool      shift;
+    int32_t       field_select;
+    bool          shift;
 
     // this supports up to 4 fields
     if (count > 4) {
@@ -482,20 +606,20 @@ void sdl_get_string(int32_t count, ...)
 
         // handle events 
         event = sdl_poll_event();
-        if (event == SDL_EVENT_QUIT) {
+        if (event->event == SDL_EVENT_QUIT) {
             break;
-        } else if (event == SDL_EVENT_KEY_SHIFT) {
+        } else if (event->event == SDL_EVENT_KEY_SHIFT) {
             shift = !shift;
-        } else if (event == SDL_EVENT_KEY_BS) {
+        } else if (event->event == SDL_EVENT_KEY_BS) {
             int32_t len = strlen(ret_str[field_select]);
             if (len > 0) {
                 ret_str[field_select][len-1] = '\0';
             }
-        } else if (event == SDL_EVENT_KEY_TAB) {
+        } else if (event->event == SDL_EVENT_KEY_TAB) {
             field_select = (field_select + 1) % count;
-        } else if (event == SDL_EVENT_KEY_ENTER) {
+        } else if (event->event == SDL_EVENT_KEY_ENTER) {
             break;
-        } else if (event == SDL_EVENT_KEY_ESC) {
+        } else if (event->event == SDL_EVENT_KEY_ESC) {
             if (strcmp(ret_str[field_select], curr_str[field_select])) {
                 strcpy(ret_str[field_select], curr_str[field_select]);
             } else {
@@ -504,11 +628,11 @@ void sdl_get_string(int32_t count, ...)
                 }
                 break;
             }
-        } else if (event >= SDL_EVENT_FIELD_SELECT && event < SDL_EVENT_FIELD_SELECT+count) {
-            field_select = event - SDL_EVENT_FIELD_SELECT;
-        } else if (event >= 0x20 && event <= 0x7e) {
+        } else if (event->event >= SDL_EVENT_FIELD_SELECT && event->event < SDL_EVENT_FIELD_SELECT+count) {
+            field_select = event->event - SDL_EVENT_FIELD_SELECT;
+        } else if (event->event >= 0x20 && event->event <= 0x7e) {
             char s[2];
-            s[0] = event;
+            s[0] = event->event;
             s[1] = '\0';
             strcat(ret_str[field_select], s);
         }
@@ -522,12 +646,19 @@ void sdl_get_string(int32_t count, ...)
     sdl_get_string_active = false;
 }
 
-void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
+void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba)
 {
     SDL_Rect rect = *rect_arg;
     int32_t i;
+    uint8_t r, g, b, a;
 
-   SDL_SetRenderDrawColor(sdl_renderer, r, g, b, SDL_ALPHA_OPAQUE);
+    // xxx endian
+    r = (rgba >> 24) & 0xff;
+    g = (rgba >> 16) & 0xff;
+    b = (rgba >>  8) & 0xff;
+    a = (rgba      ) & 0xff;
+
+    SDL_SetRenderDrawColor(sdl_renderer, r, g, b, a);
 
     for (i = 0; i < line_width; i++) {
         SDL_RenderDrawRect(sdl_renderer, &rect);
@@ -541,6 +672,65 @@ void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint8_t r, uint8_t
     }
 }
 
+SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba)
+{
+    int32_t width = 2 * radius + 1;
+    int32_t x = radius;
+    int32_t y = 0;
+    int32_t radiusError = 1-x;
+    int32_t pixels[width][width];
+    SDL_Texture * texture;
+
+    #define DRAWLINE(Y, XS, XE, V) \
+        do { \
+            int32_t i; \
+            for (i = XS; i <= XE; i++) { \
+                pixels[Y][i] = (V); \
+            } \
+        } while (0)
+
+    // initialize pixels
+    bzero(pixels,sizeof(pixels));
+    while(x >= y) {
+        DRAWLINE(y+radius, -x+radius, x+radius, rgba);
+        DRAWLINE(x+radius, -y+radius, y+radius, rgba);
+        DRAWLINE(-y+radius, -x+radius, x+radius, rgba);
+        DRAWLINE(-x+radius, -y+radius, y+radius, rgba);
+        y++;
+        if (radiusError<0) {
+            radiusError += 2 * y + 1;
+        } else {
+            x--;
+            radiusError += 2 * (y - x) + 1;
+        }
+    }
+
+    // create the texture and copy the pixels to the texture
+    texture = SDL_CreateTexture(sdl_renderer,
+                                SDL_PIXELFORMAT_RGBA8888,
+                                SDL_TEXTUREACCESS_STATIC,
+                                width, width);
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    SDL_UpdateTexture(texture, NULL, pixels, width*4);
+
+    // return texture
+    return texture;
+}
+
+void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture)
+{
+    SDL_Rect rect;
+    int32_t w, h;
+
+    SDL_QueryTexture(circle_texture, NULL, NULL, &w, &h);
+
+    rect.x = x - w/2;
+    rect.y = y - h/2;
+    rect.w = w;
+    rect.h = h;
+
+    SDL_RenderCopy(sdl_renderer, circle_texture, NULL, &rect);
+}
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  ---------------------
 
@@ -941,6 +1131,21 @@ char * time2str(char * str, time_t time, bool gmt)
     }
 
 
+    return str;
+}
+
+char * dur2str(char * str, int64_t duration)
+{
+    int64_t days, hours, minutes;
+
+    days = duration / 86400;
+    duration -= days * 86400;
+    hours = duration / 3600;
+    duration -= hours * 3600;
+    minutes = duration / 60;
+    duration -= minutes * 60;
+
+    sprintf(str, "%5ld %2.2ld:%2.2ld", days, hours, minutes);
     return str;
 }
 
