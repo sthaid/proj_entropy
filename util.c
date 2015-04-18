@@ -1216,14 +1216,14 @@ void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
 
 #endif
 
-void list_files_free(int32_t max, char ** filenames)
+void list_files_free(int32_t max_arg, char ** filenames_arg)
 {
     int32_t i;
 
-    for (i = 0; i < max; i++) {
-        free(filenames[i]);
+    for (i = 0; i < max_arg; i++) {
+        free(filenames_arg[i]);
     }
-    free(filenames);
+    free(filenames_arg);
 }
 
 // -----------------  MISC UTILS  -----------------------------------------

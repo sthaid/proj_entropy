@@ -6,6 +6,8 @@
 // 2^63 = 9E18
 //
 
+// xxx add select for DT
+
 // xxx reset simpane to center and also default width ??
 
 // ----------------------------------------------------------------------------------------------------
@@ -34,11 +36,16 @@
 
 #define MAX_THREAD 16
 #define TWO_PI     (2.0*M_PI)
-#define DT         100.0        // second XXX was 1
+#ifndef ANDROID
+#define DT         1.0        // second XXX was 1
+#else
+#define DT         5.0        // second XXX was 1
+#endif
 #define G          6.673E-11  // mks units  
 
 #define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
 #define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
+#define SDL_EVENT_SELECT                 (SDL_EVENT_USER_START + 2)
 #define SDL_EVENT_SIMPANE_ZOOM_IN        (SDL_EVENT_USER_START + 10)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
@@ -60,6 +67,13 @@
 #ifdef ANDROID
     #define sqrtl sqrt
 #endif
+
+#define LIST_FILES_FREE() \
+    do { \
+        list_files_free(max_select_filenames, select_filenames); \
+        max_select_filenames = 0; \
+        select_filenames = NULL; \
+    } while (0)
 
 //
 // typedefs
@@ -113,6 +127,8 @@ int32_t sim_gravity_init(void);
 void sim_gravity_terminate(void);
 void sim_gravity_set_object_diameters(void);
 bool sim_gravity_display(void);
+bool sim_gravity_display_simulation(void);
+bool sim_gravity_display_selection(void);
 void * sim_gravity_thread(void * cx);
 
 // -----------------  MAIN  -----------------------------------------------------
@@ -354,7 +370,28 @@ void sim_gravity_set_object_diameters(void)
 
 // -----------------  DISPLAY  --------------------------------------------------
 
+// XXX move
+static int32_t       max_select_filenames;
+char              ** select_filenames;
+int32_t              curr_display;
+
+#define CURR_DISPLAY_SIMULATION 0
+#define CURR_DISPLAY_SELECTION  1
+
 bool sim_gravity_display(void)
+{
+    bool done;
+
+    if (curr_display == CURR_DISPLAY_SIMULATION) {
+        done = sim_gravity_display_simulation();
+    } else {
+        done = sim_gravity_display_selection();
+    }
+
+    return done;
+}
+
+bool sim_gravity_display_simulation(void)
 {
     #define IN_RECT(X,Y,RECT) \
         ((X) >= (RECT).x && (X) < (RECT).x + (RECT).w && \
@@ -523,10 +560,11 @@ bool sim_gravity_display(void)
     sdl_render_text_font0(&ctl_pane,  0,15,  "BACK",    SDL_EVENT_BACK);
     sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",     SDL_EVENT_RUN);
     sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",    SDL_EVENT_STOP);
+    sdl_render_text_font0(&ctl_pane,  4, 0,  "SELECT",  SDL_EVENT_SELECT);
 
     // display status lines
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim->sim_time));
-    sdl_render_text_font0(&ctl_pane, 4, 0, str, SDL_EVENT_NONE);
+    sdl_render_text_font0(&ctl_pane, 6, 0, str, SDL_EVENT_NONE);
 
     //
     // present the display
@@ -551,6 +589,13 @@ bool sim_gravity_display(void)
     case SDL_EVENT_BACK: 
     case SDL_EVENT_QUIT:
         done = true;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT:
+        state = STATE_STOP;
+        list_files("sim_gravity", &max_select_filenames, &select_filenames);
+        curr_display = CURR_DISPLAY_SELECTION;
+        // XXX error on failure
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_IN:
@@ -598,6 +643,84 @@ bool sim_gravity_display(void)
         break;
     default:
         break;
+    }
+
+    // return done flag
+    return done;
+}
+
+bool sim_gravity_display_selection(void)
+{
+    SDL_Rect      title_line_pane;
+    SDL_Rect      selection_pane;
+    int32_t       title_line_pane_height, i, selection;
+    sdl_event_t * event;
+    bool          done = false;
+
+// XXX list the files in here on first call, instead of in other routine
+
+    //
+    // short delay
+    //
+
+    usleep(1000);
+
+    //
+    // init
+    //
+
+    title_line_pane_height = sdl_font[0].char_height * 2;
+    SDL_INIT_PANE(title_line_pane, 
+                  0, 0,  
+                  sdl_win_width, title_line_pane_height);
+    SDL_INIT_PANE(selection_pane, 
+                  0, title_line_pane_height,
+                  sdl_win_width, sdl_win_height - title_line_pane_height);
+    sdl_event_init();
+
+    //
+    // clear window
+    //
+
+    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(sdl_renderer);
+
+    //
+    //  XXX
+    //
+
+    sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY SELECTION", SDL_EVENT_NONE);
+    sdl_render_text_font0(&title_line_pane, 0, SDL_PANE_COLS(&title_line_pane,0)-4, "BACK", SDL_EVENT_BACK);
+
+    for (i = 0; i < max_select_filenames; i++) {
+        sdl_render_text_font0(&selection_pane, 2*i, 0, select_filenames[i], SDL_EVENT_USER_START+i);
+    }
+
+    //
+    // present the display
+    //
+
+    SDL_RenderPresent(sdl_renderer);
+
+    //
+    // handle events
+    //
+
+    event = sdl_poll_event();
+    if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_select_filenames) {
+        sdl_play_event_sound();
+        selection = event->event - SDL_EVENT_USER_START;
+        INFO("XXX GOT SELECTION %d\n", selection);
+        LIST_FILES_FREE();
+        curr_display = CURR_DISPLAY_SIMULATION;
+    } else if (event->event == SDL_EVENT_BACK) {
+        sdl_play_event_sound();
+        LIST_FILES_FREE();
+        curr_display = CURR_DISPLAY_SIMULATION;
+    } else if (event->event == SDL_EVENT_QUIT) {
+        sdl_play_event_sound();
+        LIST_FILES_FREE();
+        done = true;
     }
 
     // return done flag

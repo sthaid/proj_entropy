@@ -222,7 +222,7 @@ char * dur2str(char * str, int64_t duration);
 // -----------------  LIST FILES IN DIRECTORY  ---------------------------------------
 
 void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg);
-void list_files_free(int32_t max, char ** files);
+void list_files_free(int32_t max_arg, char ** filenames_arg);
 
 // -----------------  MISC  ----------------------------------------------------------
 

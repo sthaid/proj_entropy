@@ -53,7 +53,7 @@ int32_t main(int32_t argc, char **argv)
     logmsg_init(CONFIG_DEBUG == 'Y' ? "stderr" : "none");
     INFO("STARTING %s\n", argv[0]);
 
-#if 1 // XXX test
+#if 0 // XXX test
     int32_t max_files, i;
     char ** filenames;
     list_files("sim_gravity", &max_files, &filenames);
