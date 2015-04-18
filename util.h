@@ -219,6 +219,11 @@ uint64_t get_real_time_us(void);
 char * time2str(char * str, time_t time, bool gmt);
 char * dur2str(char * str, int64_t duration);
 
+// -----------------  LIST FILES IN DIRECTORY  ---------------------------------------
+
+void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg);
+void list_files_free(int32_t max, char ** files);
+
 // -----------------  MISC  ----------------------------------------------------------
 
 int32_t random_uniform(int32_t low, int32_t high);

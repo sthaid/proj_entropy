@@ -1,6 +1,12 @@
 #include "util.h"
 #include "button_sound.h"
 
+#ifndef ANDROID
+#include <dirent.h>
+#else
+#include <android/asset_manager_jni.h>
+#endif
+
 // -----------------  SDL SUPPORT  ---------------------------------------
 
 // window init
@@ -63,61 +69,22 @@ void sdl_init(uint32_t w, uint32_t h)
     }
     Mix_VolumeChunk(sdl_button_sound,MIX_MAX_VOLUME/2);
 
-#ifdef ANDROID
-    // on Android copy the font from assets to the internal storage directory
-    SDL_RWops * rw;
-    int         size, len, fd;
-    void      * buff;
-    char        filename[200];
-   
-    // - read the font from asset
-    rw = SDL_RWFromFile("FreeMonoBold.ttf", "r");
-    if (rw == NULL) {
-        FATAL("asset FreeMonoBold.ttf not found\n");
-    }
-    size = rw->size(rw);
-    buff = malloc(size);
-    len = rw->read(rw, buff, 1, size);
-    if (len != size) {
-        FATAL("asset FreeMonoBold.ttf read failed, len=%d siz%d\n", len, size);
-    }
-    rw->close(rw);
-
-    // - write font to internal storage diretory
-    sprintf(filename, "%s/%s", SDL_AndroidGetInternalStoragePath(), "FreeMonoBold.ttf");
-    fd = open(filename, O_RDWR|O_TRUNC|O_CREAT, 0666);
-    if (fd < 0) {
-        FATAL("open %s\n", filename);
-    }
-    len = write(fd, buff, size);
-    if (len != size) {
-        FATAL("write %s, len=%d size=%d\n", filename, len, size);
-    }
-    close(fd);
-    free(buff);
-
-    // - describe fonts for the following section
-    font0_path = filename;
-    font0_ptsize = 40;
-    font1_path = filename;
-    font1_ptsize = 60;
-#else
-    // on Linux describe fonts
-    font0_path = "/usr/share/fonts/gnu-free/FreeMonoBold.ttf";
-    font0_ptsize = 40;
-    font1_path = "/usr/share/fonts/gnu-free/FreeMonoBold.ttf";
-    font1_ptsize = 60;
-#endif
-
     // initialize True Type Font
     if (TTF_Init() < 0) {
         FATAL("TTF_Init failed\n");
     }
+
+    font0_path = "fonts/FreeMonoBold.ttf";
+    font0_ptsize = 40;
+    font1_path = "fonts/FreeMonoBold.ttf";
+    font1_ptsize = 60;
+
     sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
         FATAL("failed TTF_OpenFont %s\n", font0_path);
     }
     TTF_SizeText(sdl_font[0].font, "X", &sdl_font[0].char_width, &sdl_font[0].char_height);
+
     sdl_font[1].font = TTF_OpenFont(font1_path, font1_ptsize);
     if (sdl_font[1].font == NULL) {
         FATAL("failed TTF_OpenFont %s\n", font1_path);
@@ -1142,8 +1109,121 @@ char * dur2str(char * str, int64_t duration)
     minutes = duration / 60;
     duration -= minutes * 60;
 
-    sprintf(str, "%5ld %2.2ld:%2.2ld", days, hours, minutes);
+    sprintf(str, "%5d %2.2d:%2.2d", (int32_t)days, (int32_t)hours, (int32_t)minutes);
     return str;
+}
+
+// -----------------  LIST FILES IN DIRECTORY  ----------------------------
+
+#ifndef ANDROID
+
+// XXX this section needs work
+
+void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
+{
+    DIR * dir;
+    struct dirent * dirent;
+    char ** filenames;
+    int32_t max = 0, ret;
+    struct stat buf;
+    char path[300];
+
+    *max_arg = 0;
+    *filenames_arg = NULL;
+
+    dir = opendir(dirname);
+    if (dir == NULL) {
+        return;
+    }
+
+    filenames = malloc(1000); //XXX
+
+    while ((dirent = readdir(dir)) != NULL) {
+        sprintf(path, "%s/%s", dirname, dirent->d_name);
+        ret = stat(path, &buf);
+        if (ret != 0 || !S_ISREG(buf.st_mode)) {
+            continue;
+        }
+
+        filenames[max] = malloc(strlen(dirent->d_name)+1);
+        strcpy(filenames[max], dirent->d_name);
+        max++;
+    }
+
+    closedir(dir);
+
+    *max_arg = max;
+    *filenames_arg = filenames;
+}
+
+#else
+
+JNIEnv* Android_JNI_GetEnv(void);
+extern jclass mActivityClass;
+
+void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
+{
+    jmethodID mid;
+    jobject context;
+    jobject java_asset_manager;
+    AAssetManager * asset_manager;
+    AAssetDir * asset_dir;
+    char ** filenames;
+    const char * fn;
+    int32_t max = 0;
+    JNIEnv *mEnv = Android_JNI_GetEnv();
+
+    // preset returns
+    *max_arg = 0;
+    *filenames_arg = NULL;
+
+    // XXX comments
+    // src/core/android/SDL_android.c
+
+    // XXX 
+    (*mEnv)->PushLocalFrame(mEnv, 16);
+
+    // context = SDLActivity.getContext(); 
+    mid = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,   // XXX mActivityClass
+            "getContext","()Landroid/content/Context;");
+    context = (*mEnv)->CallStaticObjectMethod(mEnv, mActivityClass, mid);
+
+    // asset_manager = context.getAssets();
+    mid = (*mEnv)->GetMethodID(mEnv, (*mEnv)->GetObjectClass(mEnv, context),
+            "getAssets", "()Landroid/content/res/AssetManager;");
+    java_asset_manager = (*mEnv)->CallObjectMethod(mEnv, context, mid);
+
+    // XXX
+    asset_manager = AAssetManager_fromJava(mEnv, java_asset_manager);
+
+    // XXX
+    filenames = malloc(1000); //XXX
+    asset_dir = AAssetManager_openDir(asset_manager, dirname);  //XXX 
+    while ((fn = AAssetDir_getNextFileName(asset_dir)) != NULL) {
+        filenames[max] = malloc(strlen(fn)+1);
+        strcpy(filenames[max], fn);
+        max++;
+    }
+    AAssetDir_close(asset_dir);
+
+    // XXX
+    (*mEnv)->PopLocalFrame(mEnv, NULL);
+
+    // XXX 
+    *max_arg = max;
+    *filenames_arg = filenames;
+}
+
+#endif
+
+void list_files_free(int32_t max, char ** filenames)
+{
+    int32_t i;
+
+    for (i = 0; i < max; i++) {
+        free(filenames[i]);
+    }
+    free(filenames);
 }
 
 // -----------------  MISC UTILS  -----------------------------------------

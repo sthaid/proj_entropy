@@ -34,7 +34,7 @@
 
 #define MAX_THREAD 16
 #define TWO_PI     (2.0*M_PI)
-#define DT         1.0        // second
+#define DT         100.0        // second XXX was 1
 #define G          6.673E-11  // mks units  
 
 #define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
