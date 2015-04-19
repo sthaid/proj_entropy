@@ -36,12 +36,13 @@
 
 #define MAX_THREAD 16
 #define TWO_PI     (2.0*M_PI)
-#ifndef ANDROID
-#define DT         1.0        // second XXX was 1
-#else
-#define DT         5.0        // second XXX was 1
-#endif
 #define G          6.673E-11  // mks units  
+
+#ifndef ANDROID
+  #define DT       1.0    
+#else
+  #define DT       5.0   
+#endif
 
 #define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
 #define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
@@ -64,16 +65,12 @@
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
 
+#define CURR_DISPLAY_SIMULATION 0
+#define CURR_DISPLAY_SELECTION  1
+
 #ifdef ANDROID
     #define sqrtl sqrt
 #endif
-
-#define LIST_FILES_FREE() \
-    do { \
-        list_files_free(max_select_filenames, select_filenames); \
-        max_select_filenames = 0; \
-        select_filenames = NULL; \
-    } while (0)
 
 //
 // typedefs
@@ -119,6 +116,8 @@ static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
 static pthread_barrier_t barrier;
 
+static int32_t           curr_display;
+
 // 
 // prototypes
 //
@@ -127,8 +126,8 @@ int32_t sim_gravity_init(void);
 void sim_gravity_terminate(void);
 void sim_gravity_set_object_diameters(void);
 bool sim_gravity_display(void);
-bool sim_gravity_display_simulation(void);
-bool sim_gravity_display_selection(void);
+bool sim_gravity_display_simulation(bool new_display);
+bool sim_gravity_display_selection(bool new_display);
 void * sim_gravity_thread(void * cx);
 
 // -----------------  MAIN  -----------------------------------------------------
@@ -370,28 +369,28 @@ void sim_gravity_set_object_diameters(void)
 
 // -----------------  DISPLAY  --------------------------------------------------
 
-// XXX move
-static int32_t       max_select_filenames;
-char              ** select_filenames;
-int32_t              curr_display;
-
-#define CURR_DISPLAY_SIMULATION 0
-#define CURR_DISPLAY_SELECTION  1
-
 bool sim_gravity_display(void)
 {
-    bool done;
+    bool done, new_display;
+    static int32_t curr_display_last = -1;
+
+    new_display = (curr_display != curr_display_last);
+    curr_display_last = curr_display;
 
     if (curr_display == CURR_DISPLAY_SIMULATION) {
-        done = sim_gravity_display_simulation();
+        done = sim_gravity_display_simulation(new_display);
     } else {
-        done = sim_gravity_display_selection();
+        done = sim_gravity_display_selection(new_display);
+    }
+
+    if (done) {
+        curr_display_last = -1;
     }
 
     return done;
 }
 
-bool sim_gravity_display_simulation(void)
+bool sim_gravity_display_simulation(bool new_display)
 {
     #define IN_RECT(X,Y,RECT) \
         ((X) >= (RECT).x && (X) < (RECT).x + (RECT).w && \
@@ -409,7 +408,19 @@ bool sim_gravity_display_simulation(void)
     static SDL_Texture * circle_texture_tbl[MAX_CIRCLE_RADIUS][MAX_CIRCLE_COLOR];
 
     //
-    // INIT
+    // if this display has just been activated then 
+    // nothing to do here 
+    //
+
+    if (new_display) {
+        ;
+    }
+
+    //
+    // initialize the pane locations:
+    // - sim_pane: the main simulation display area
+    // - tracker_pane: the tracker display area
+    // - ctl_pane: the controls display area
     //
 
     if (sdl_win_width > sdl_win_height) {
@@ -593,9 +604,7 @@ bool sim_gravity_display_simulation(void)
         break;
     case SDL_EVENT_SELECT:
         state = STATE_STOP;
-        list_files("sim_gravity", &max_select_filenames, &select_filenames);
         curr_display = CURR_DISPLAY_SELECTION;
-        // XXX error on failure
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_IN:
@@ -649,15 +658,33 @@ bool sim_gravity_display_simulation(void)
     return done;
 }
 
-bool sim_gravity_display_selection(void)
+bool sim_gravity_display_selection(bool new_display)
 {
-    SDL_Rect      title_line_pane;
-    SDL_Rect      selection_pane;
-    int32_t       title_line_pane_height, i, selection;
-    sdl_event_t * event;
-    bool          done = false;
+    SDL_Rect       title_line_pane;
+    SDL_Rect       selection_pane;
+    int32_t        title_line_pane_height, i, selection;
+    sdl_event_t  * event;
+    bool           done = false;
 
-// XXX list the files in here on first call, instead of in other routine
+    static int32_t max_select_filenames;
+    static char ** select_filenames;
+
+    #define LIST_FILES_FREE() \
+        do { \
+            list_files_free(max_select_filenames, select_filenames); \
+            max_select_filenames = 0; \
+            select_filenames = NULL; \
+        } while (0)
+
+    //
+    // if this display has just been activated then 
+    // obtain list of files in the sim_gravity directory
+    //
+
+    if (new_display) {
+        list_files("sim_gravity", &max_select_filenames, &select_filenames);
+        INFO("XXX max_select_filenames %d\n", max_select_filenames);
+    }
 
     //
     // short delay
@@ -666,7 +693,9 @@ bool sim_gravity_display_selection(void)
     usleep(1000);
 
     //
-    // init
+    // this display has 2 panes
+    // - title_line_pane: the top 2 lines
+    // - selection_pane: the remainder
     //
 
     title_line_pane_height = sdl_font[0].char_height * 2;
@@ -686,7 +715,7 @@ bool sim_gravity_display_selection(void)
     SDL_RenderClear(sdl_renderer);
 
     //
-    //  XXX
+    // render the title line and selection lines
     //
 
     sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY SELECTION", SDL_EVENT_NONE);
