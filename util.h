@@ -112,6 +112,16 @@ typedef struct {
 #define RED     4
 #define WHITE   5
 #define MAX_COLOR 5
+
+#define COLOR_STR_TO_COLOR(cs) \
+    (strcmp((cs), "PURPLE") == 0 ? PURPLE : \
+     strcmp((cs), "BLUE")   == 0 ? BLUE   : \
+     strcmp((cs), "GREEN")  == 0 ? GREEN  : \
+     strcmp((cs), "YELLOW") == 0 ? YELLOW : \
+     strcmp((cs), "RED")    == 0 ? RED    : \
+     strcmp((cs), "WHITE")  == 0 ? WHITE   \
+                                 : WHITE)
+
 extern uint32_t sdl_pixel_rgba[];
 
 // sdl support: prototypes

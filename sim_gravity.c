@@ -1,3 +1,22 @@
+// XXX otimize
+// - multiple threads,
+// - don't use barrier
+// - if forces are not significant then don't inspect every time
+// - enable / disable display track
+// - select DT
+// - include DT in file too, with different values for android
+
+// XXX hover on planet to diplay name, or enable tracking, or enable trails
+
+// XXX add other stars
+
+// XXX display width in light minutes or seconds
+
+// XXX use different colors for planets
+
+// XXX add more moons
+
+// 
 // xxx DELETE
 // Distance to Pluto = 
 //   13 light hours
@@ -39,7 +58,7 @@
 #define G          6.673E-11  // mks units  
 
 #ifndef ANDROID
-  #define DT       1.0    
+  #define DT       5.0    
 #else
   #define DT       5.0   
 #endif
@@ -72,6 +91,8 @@
     #define sqrtl sqrt
 #endif
 
+#define long   //XXX temp
+
 //
 // typedefs
 //
@@ -82,22 +103,16 @@ typedef struct {
     long double VX;       // meters/secod xxx maybe use int64_t
     long double VY;
     long double MASS;     // kg
+    long double RADIUS;   // meters
     int32_t     DISP_COLOR;
     int32_t     DISP_R; 
 } object_t; 
 
 typedef struct {
-    int64_t sim_alloc_size; 
     long double sim_time;
-    int32_t max_object;
-    object_t object[0];
+    int32_t     max_object;
+    object_t    object[0];
 } sim_t;
-
-typedef struct {
-    int32_t id;
-    int32_t first_obj;
-    int32_t last_obj;
-} thread_cx_t;
 
 //
 // variables
@@ -112,9 +127,11 @@ static long double       sim_y;
 static long double       tracker_width;
 static int32_t           tracker_obj;
 
+static long double       run_start_sim_time;
+static long double       run_start_wall_time;
+
 static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
-static pthread_barrier_t barrier;
 
 static int32_t           curr_display;
 
@@ -124,11 +141,13 @@ static int32_t           curr_display;
 
 int32_t sim_gravity_init(void);
 void sim_gravity_terminate(void);
-void sim_gravity_set_object_diameters(void);
+int32_t sim_gravity_init_sim_from_file(char * filename);
+void sim_gravity_set_obj_disp_r(sim_t * new_sim);
 bool sim_gravity_display(void);
 bool sim_gravity_display_simulation(bool new_display);
 bool sim_gravity_display_selection(bool new_display);
 void * sim_gravity_thread(void * cx);
+int32_t sim_gravity_rendezvoud(int32_t thread_id);
 
 // -----------------  MAIN  -----------------------------------------------------
 
@@ -154,80 +173,22 @@ int32_t sim_gravity_init(void)
 {
     #define SIM_ALLOC_SIZE(n) (sizeof(sim_t) + (n) * sizeof(object_t))
 
-    int32_t i, num_proc;
-    int64_t sim_alloc_size;
+    int32_t i, num_proc, ret;
 
     // print info msg
     INFO("initialize start\n");
 
     #define MAX_OBJECT 4
 
-    // allocate sim
-    free(sim);
-    sim_alloc_size = SIM_ALLOC_SIZE(MAX_OBJECT);
-    sim = calloc(1, sim_alloc_size);
-    if (sim == NULL) {
-        return -1;
-    }
-
     // init sim  
-    //
-    // XXX the following section is TBD, need to use a file or 
-    //     another better way to init the simulation
-    object_t sun, venus, earth, moon;
+    ret = sim_gravity_init_sim_from_file("solar_system");  // xxx DEFAULT_SIM_FILE
+    INFO("XXX RET %d\n", ret);
+    // exit(1); //XXX
 
-    #define AU             1.495978707E11       // meters 
-    #define M_SUN          1.989E30             // kg
-    #define M_EARTH        5.972E24             // kg
-    #define R_EARTH        AU                   // orbit radius in meters
-    #define T_EARTH        (365.256*86400)      // orbit time in seconds
-    #define M_MOON         7.347E22             // kg
-    #define R_MOON         3.844E8              // orbit radius in meters
-    #define T_MOON         (27.3217*86400)      // orbit time in seconds
-    #define M_VENUS        4.867E24             // kg
-    #define R_VENUS        1.0821E11            // orbit radius in meters
-    #define T_VENUS        (224.701*86400)      // orbit time in seconds
-
-    sun.X     = 0;
-    sun.Y     = 0;
-    sun.VX    = 0;
-    sun.VY    = 0;
-    sun.MASS  = M_SUN;
-    sun.DISP_COLOR = YELLOW;
-
-    venus.X     = R_VENUS;
-    venus.Y     = 0;
-    venus.VX    = 0;
-    venus.VY    = TWO_PI * R_VENUS / T_VENUS;
-    venus.MASS  = M_VENUS;
-    venus.DISP_COLOR = WHITE;
-
-    earth.X     = R_EARTH;
-    earth.Y     = 0;
-    earth.VX    = 0;
-    earth.VY    = TWO_PI * R_EARTH / T_EARTH;
-    earth.MASS  = M_EARTH;
-    earth.DISP_COLOR = GREEN;
-
-    moon.X    = earth.X + R_MOON;
-    moon.Y    = earth.Y;
-    moon.VX   = 0;
-    moon.VY   = earth.VY + TWO_PI * R_MOON / T_MOON;
-    moon.MASS = M_MOON;
-    moon.DISP_COLOR = WHITE;
-
-    sim->object[0] = sun;
-    sim->object[1] = venus;
-    sim->object[2] = earth;
-    sim->object[3] = moon;
-
-    sim->sim_alloc_size = sim_alloc_size;
-    sim->sim_time  = 0;
-    sim->max_object = MAX_OBJECT;
-
-    sim_gravity_set_object_diameters();
 
     // init control variables
+    // XXX include sim_width and tracker_width in file, and sim_x, sim_y, tracker_obj
+    #define AU 1.495978707E11       // meters  XXX delete
     state = STATE_STOP;
     sim_width = 2.1 * AU;
     sim_x = 0;
@@ -237,15 +198,11 @@ int32_t sim_gravity_init(void)
 
     // create worker threads
     num_proc = sysconf(_SC_NPROCESSORS_ONLN);
-    max_thread = 1;  // xxx tbd
+    //max_thread = 2;  // xxx tbd
+    max_thread = num_proc - 1;
     INFO("max_thread=%d num_proc=%d\n", max_thread, num_proc);
-    pthread_barrier_init(&barrier,NULL,max_thread);
     for (i = 0; i < max_thread; i++) {
-        thread_cx_t * cx = malloc(sizeof(thread_cx_t));
-        cx->id        = i;
-        cx->first_obj = 0;
-        cx->last_obj  = sim->max_object-1;
-        pthread_create(&thread_id[i], NULL, sim_gravity_thread, cx);
+        pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(int64_t)i);
     }
 
     // success
@@ -270,7 +227,6 @@ void sim_gravity_terminate(void)
     }
 
     // free allocations 
-    pthread_barrier_destroy(&barrier);
     free(sim);
     sim = NULL;
 
@@ -278,9 +234,171 @@ void sim_gravity_terminate(void)
     INFO("terminate complete\n");
 }
 
-void sim_gravity_set_object_diameters(void)
+// -----------------  SIM GRAVITY INIT  -----------------------------------------
+
+int32_t sim_gravity_init_sim_from_file(char * filename) 
 {
-    long double radius_raw[sim->max_object]; 
+    #define MAX_BUFF 1000000  //xxx get real filesize
+    #define MAX_RELTO 10      //xxx check overflow
+
+    typedef struct {
+        long double X;
+        long double Y;
+        long double VX;
+        long double VY;
+    } relto_t;
+
+    char        pathname[200];
+    int32_t     len, i, cnt;
+    char      * s, * s_next, * tmp;
+    relto_t     relto[MAX_RELTO];
+    long double X, Y, VX, VY, MASS, RADIUS;
+    char        NAME[100], COLOR[100];
+
+    SDL_RWops * rw = NULL;
+    char      * buff = NULL;
+    int32_t     ret = 0;
+    int32_t     line = 0;
+    sim_t     * new_sim = NULL;
+    int32_t     max_object = 0;
+    int32_t     alloced_object = 0;
+    int32_t     idx = 0;
+    int32_t     last_idx = 0;
+
+    bzero(relto, sizeof(relto));
+
+    // read file to memory buffer
+    buff = malloc(MAX_BUFF);
+    bzero(buff, MAX_BUFF);
+    sprintf(pathname, "%s/%s", "sim_gravity", filename);
+    rw = SDL_RWFromFile(pathname, "r");
+    if (rw == NULL) {
+        ERROR("open %s, %s\n", pathname, SDL_GetError());
+        ret = -1;
+        goto done;
+    }
+    len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
+    if (len == 0) {
+        ERROR("read %s, %s\n", pathname, SDL_GetError());
+        ret = -1;
+        goto done;
+    }
+
+    // read lines from buff
+    for (s = buff; *s; s = s_next) {
+        // find newline and replace with 0, and set s_next
+        tmp = strchr(s, '\n');
+        if (tmp != NULL) {
+            *tmp = 0;
+            s_next = tmp + 1;
+        } else {
+            s_next = s + strlen(s);
+        }
+        line++;
+
+        // if line begins with '#', or is blank then skip
+        if (s[0] == '#') {
+            continue;
+        }
+        for (i = 0; s[i] == ' '; i++) {
+            ;
+        }
+        if (s[i] == '\0') {
+            continue;
+        }
+
+        // scan this line
+        cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s",
+                     NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR);
+        if (cnt != 8) {
+            ERROR("line %d invalid in file %s\n", line, filename);
+            ret = -1;
+            goto done;
+        }
+        // INFO("XXX - %s %lf %lf %lf %lf %lf %lf %s",
+             // NAME, X, Y, VX, VY, MASS, RADIUS, COLOR);
+
+        // allocate more memory for new_sim, if needed
+        max_object++;
+        if (max_object >= alloced_object) {
+            alloced_object += 100;
+            new_sim = realloc(new_sim, SIM_ALLOC_SIZE(alloced_object));
+            if (new_sim == NULL) {
+                ERROR("failed realloc new_sim, alloced_object %d\n", alloced_object);
+                ret = -1;
+                goto done;
+            }
+        }
+
+        // determine idx for accessing relative_to[]
+        for (idx = 0; s[idx] == ' '; idx++) ;
+        idx++;
+        if (idx > last_idx+1) {
+            ERROR("invalid idx %d, last_idx=%d line=%d\n", idx, last_idx, line);
+            ret = -1;
+            goto done;
+        }
+        last_idx = idx;
+        INFO("XXX %s %d\n", NAME, idx);
+
+        // initialize new_sim->object
+        // XXX make use of name
+        object_t * obj = &new_sim->object[max_object-1];
+        obj->X          = X + relto[idx-1].X;
+        obj->Y          = Y + relto[idx-1].Y;
+        obj->VX         = VX + relto[idx-1].VX;
+        obj->VY         = VY + relto[idx-1].VY;
+        obj->MASS       = MASS;
+        obj->RADIUS     = RADIUS;
+        obj->DISP_COLOR = COLOR_STR_TO_COLOR(COLOR);
+        obj->DISP_R     = 5;  // filled in by call to  sim_gravity_set_obj_disp_r below
+
+        // save new relto
+        relto[idx].X  = obj->X;
+        relto[idx].Y  = obj->Y;
+        relto[idx].VX = obj->VX;
+        relto[idx].VY = obj->VY;
+    }
+
+    // fill in new_sim header fields
+    new_sim->sim_time = 0;
+    new_sim->max_object = max_object;
+
+    // fill in DISP_R fields
+    // XXX this should be changed to use RADIUS
+    // XXX better name for vvv
+    sim_gravity_set_obj_disp_r(new_sim);
+
+    // XXX prints
+    INFO("-----------------------\n");
+    for (i = 0; i < new_sim->max_object; i++) {
+        object_t * obj = new_sim->object+i;
+        INFO("X=%lf Y=%lf XV=%lf YV=%lf MAAA=%lf RADIUS=%lf DISP_COLOR=%d DIR_R=%d\n",
+            obj->X, obj->Y, obj->VX, obj->VY, obj->MASS, obj->RADIUS, obj->DISP_COLOR, obj->DISP_R);
+    }
+    INFO("-----------------------\n");
+
+    // success
+    free(sim);
+    sim = new_sim;
+    ret = 0;
+
+done:
+    // cleanup and return
+    if (rw != NULL) {
+        SDL_RWclose(rw);
+    }
+    if (ret != 0) {
+        free(new_sim);
+    }
+    free(buff);
+
+    return ret;
+}
+
+void sim_gravity_set_obj_disp_r(sim_t * new_sim)
+{
+    long double radius_raw[new_sim->max_object]; 
     long double min_radius_raw, max_radius_raw, min_disp_r, max_disp_r, delta;
     int32_t i;
 
@@ -291,14 +409,14 @@ void sim_gravity_set_object_diameters(void)
     #define CENTER_DISP_R ((MAX_DISP_R + MIN_DISP_R) / 2.)
 
     // fill in radius raw values with cube root of mass
-    for (i = 0; i < sim->max_object; i++) {
-        radius_raw[i] = exp(log(sim->object[i].MASS) / 3);
+    for (i = 0; i < new_sim->max_object; i++) {
+        radius_raw[i] = exp(log(new_sim->object[i].MASS) / 3);
     }
 
     // determine min and max raw radius values
     min_radius_raw = 1E99;
     max_radius_raw = -1E99;
-    for (i = 0; i < sim->max_object; i++) {
+    for (i = 0; i < new_sim->max_object; i++) {
         if (radius_raw[i] < min_radius_raw) {
             min_radius_raw = radius_raw[i];
         }
@@ -306,14 +424,14 @@ void sim_gravity_set_object_diameters(void)
             max_radius_raw = radius_raw[i];
         }
     }
-    INFO("MIN/MAX RADIUS RAW  %Lf %Lf\n", min_radius_raw, max_radius_raw);  // xxx delete prints in here
+    INFO("MIN/MAX RADIUS RAW  %lf %lf\n", min_radius_raw, max_radius_raw);  // xxx delete prints in here
 
     // if min and max equal then
     //   set obj_radius to CENTER_DISP_R
     if (min_radius_raw == max_radius_raw) {
         INFO("CASE 1 - EQUAL\n");
-        for (i = 0; i < sim->max_object; i++) {
-            sim->object[i].DISP_R = CENTER_DISP_R;
+        for (i = 0; i < new_sim->max_object; i++) {
+            new_sim->object[i].DISP_R = CENTER_DISP_R;
         }
 
     // else if max / min < 5 then
@@ -326,8 +444,8 @@ void sim_gravity_set_object_diameters(void)
         min_disp_r = CENTER_DISP_R - delta;
         max_disp_r = CENTER_DISP_R + delta;
 
-        for (i = 0; i < sim->max_object; i++) {
-            sim->object[i].DISP_R = (max_disp_r - min_disp_r) / (max_radius_raw - min_radius_raw) * 
+        for (i = 0; i < new_sim->max_object; i++) {
+            new_sim->object[i].DISP_R = (max_disp_r - min_disp_r) / (max_radius_raw - min_radius_raw) * 
                                     (radius_raw[i] - min_radius_raw ) + min_disp_r;
         }
 
@@ -336,16 +454,16 @@ void sim_gravity_set_object_diameters(void)
     //   map these new raw radius values to MIN_DISP_R to MAX_DISP_R
     } else {
         INFO("CASE 3 - \n");
-        for (i = 0; i < sim->max_object; i++) {
+        for (i = 0; i < new_sim->max_object; i++) {
             radius_raw[i] = log(radius_raw[i]);
         }
-        for (i = 0; i < sim->max_object; i++) {
-            INFO("NEW %d = %LF\n", i, radius_raw[i]);
+        for (i = 0; i < new_sim->max_object; i++) {
+            INFO("NEW %d = %lf\n", i, radius_raw[i]);
         }
 
         min_radius_raw = 1E99;
         max_radius_raw = -1E99;
-        for (i = 0; i < sim->max_object; i++) {
+        for (i = 0; i < new_sim->max_object; i++) {
             if (radius_raw[i] < min_radius_raw) {
                 min_radius_raw = radius_raw[i];
             }
@@ -353,17 +471,17 @@ void sim_gravity_set_object_diameters(void)
                 max_radius_raw = radius_raw[i];
             }
         }
-        INFO("NEW MIN/MAX RADIUS RAW  %Lf %Lf\n", min_radius_raw, max_radius_raw);
+        // XXX INFO("NEW MIN/MAX RADIUS RAW  %lf %lf\n", min_radius_raw, max_radius_raw);
 
-        for (i = 0; i < sim->max_object; i++) {
-            sim->object[i].DISP_R = (MAX_DISP_R - MIN_DISP_R) / (max_radius_raw - min_radius_raw) * 
+        for (i = 0; i < new_sim->max_object; i++) {
+            new_sim->object[i].DISP_R = (MAX_DISP_R - MIN_DISP_R) / (max_radius_raw - min_radius_raw) * 
                                     (radius_raw[i] - min_radius_raw) + MIN_DISP_R;
         }
     }
 
     // xxx, and search for too many other INOFO prints
-    for (i = 0; i < sim->max_object; i++) {
-        INFO("RESULT %d = %d\n", i, sim->object[i].DISP_R);
+    for (i = 0; i < new_sim->max_object; i++) {
+        INFO("RESULT %d = %d\n", i, new_sim->object[i].DISP_R);
     }
 }
 
@@ -451,9 +569,9 @@ bool sim_gravity_display_simulation(bool new_display)
     // if in stopped state then delay a bit, to reduce cpu usage
     //
 
-    if (state == STATE_STOP) {
-        usleep(1000);
-    }
+    //if (state == STATE_STOP) {  //XXX
+        usleep(5000);
+    //}
 
     //
     // clear window
@@ -496,7 +614,7 @@ bool sim_gravity_display_simulation(bool new_display)
     }
 
     // display sim_pane title
-    sprintf(str, "WIDTH %0.2Lf AU", sim_width/AU);
+    sprintf(str, "WIDTH %0.2lf AU", sim_width/AU);
     sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
 
     // register sim_pane controls
@@ -552,7 +670,7 @@ bool sim_gravity_display_simulation(bool new_display)
     sdl_render_text_font0(&tracker_pane,  2, col,  "-", SDL_EVENT_TRACKERPANE_ZOOM_OUT);
 
     // display tracker_pane title
-    sprintf(str, "WIDTH %0.2Lf AU", tracker_width/AU);
+    sprintf(str, "WIDTH %0.2lf AU", tracker_width/AU);
     sdl_render_text_font0(&tracker_pane,  0, 0,  str, SDL_EVENT_NONE);
 
     // draw trakerpane border
@@ -577,6 +695,12 @@ bool sim_gravity_display_simulation(bool new_display)
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim->sim_time));
     sdl_render_text_font0(&ctl_pane, 6, 0, str, SDL_EVENT_NONE);
 
+    if (state == STATE_RUN) {
+        int32_t perf = (sim->sim_time - run_start_sim_time) / ((long double)microsec_timer()/1000000.0 - run_start_wall_time);
+        sprintf(str, "%d", perf);
+        sdl_render_text_font0(&ctl_pane, 4, 9, str, SDL_EVENT_NONE);
+    }
+
     //
     // present the display
     //
@@ -591,6 +715,8 @@ bool sim_gravity_display_simulation(bool new_display)
     switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
+        run_start_sim_time = sim->sim_time;
+        run_start_wall_time = (long double)microsec_timer() / 1000000.0;
         sdl_play_event_sound();
         break;
     case SDL_EVENT_STOP:
@@ -758,42 +884,20 @@ bool sim_gravity_display_selection(bool new_display)
 
 // -----------------  THREAD  ---------------------------------------------------
 
-void * sim_gravity_thread(void * cx_arg)
+void * sim_gravity_thread(void * cx)
 {
-    thread_cx_t     cx = *(thread_cx_t*)cx_arg;
-
-    static int32_t  curr_state;
-
-    // a copy of cx_arg has been made, so free cx_arg
-    free(cx_arg);
+    int32_t thread_id = (int64_t)cx;
+    int32_t local_state;
 
     // all threads print starting message
-    INFO("thread starting, id=%d first_obj=%d last_obj=%d\n", cx.id, cx.first_obj, cx.last_obj);
-
-    // thread 0 initializes
-    if (cx.id == 0) {
-        curr_state = STATE_STOP;
-    }
-    if (max_thread > 1) {
-        pthread_barrier_wait(&barrier);
-    }
+    INFO("thread starting, thread_id=%d\n", thread_id);
 
     while (true) {
-        // thread id 0 performs control functions
-        // - determine current state
-        if (cx.id == 0) {
-            curr_state = state;
-        }
+        // rendezvous
+        local_state = sim_gravity_rendezvoud(thread_id);
 
-        // all threads rendezvous here
-        if (max_thread > 1) {
-            pthread_barrier_wait(&barrier);
-        }
-
-        // process based on curr_state
-        if (curr_state == STATE_RUN) {
-            int32_t i, k;
-
+        // process based on state
+        if (local_state == STATE_RUN) {
             // These are the simulation equations for updating an objects X position 
             // and X component of velocity. Similar equations are implemented in the 
             // following code for Y position and velocity.
@@ -826,15 +930,24 @@ void * sim_gravity_thread(void * cx_arg)
             // MYOBJ.VX = V2X
             //
 
-            for (k = cx.first_obj; k <= cx.last_obj; k++) {
-                object_t * EVALOBJ = &sim->object[k];
-                long double SUMX, SUMY, Mi, XDISTi, YDISTi, Ri, AX, AY, DX, DY, V1X, V1Y, V2X, V2Y, tmp;
+            int32_t i, k;
+            long double SUMX, SUMY, Mi, XDISTi, YDISTi, Ri, AX, AY, DX, DY, V1X, V1Y, V2X, V2Y, tmp;
+            object_t * EVALOBJ, * OTHEROBJ;
+
+            if (thread_id == 0) {
+                sim->sim_time += DT;
+            }
+
+            // XXX integer math?
+            // XXX don't use long double
+            for (k = thread_id; k < sim->max_object; k += max_thread) {
+                EVALOBJ = &sim->object[k];
 
                 SUMX = SUMY = 0;
                 for (i = 0; i < sim->max_object; i++) {
                     if (i == k) continue;
 
-                    object_t * OTHEROBJ = &sim->object[i];
+                    OTHEROBJ = &sim->object[i];
 
                     Mi      = OTHEROBJ->MASS;
                     XDISTi  = OTHEROBJ->X - EVALOBJ->X;
@@ -863,29 +976,115 @@ void * sim_gravity_thread(void * cx_arg)
                 EVALOBJ->VY = DY < 0 ? -V2Y : V2Y;
             }
 
-            // all threads rendezvous here
-            if (max_thread > 1) {
-                pthread_barrier_wait(&barrier);
-            }
-
-            // all particles have been updated, thread 0 does post processing
-            // - update sim_time
-            if (cx.id == 0) {
-                sim->sim_time += DT;
-            }
-
-        } else if (curr_state == STATE_TERMINATE_THREADS) {
-            break;
-
-        } else {
-            // the STOP states
+        } else if (local_state == STATE_STOP) {
             usleep(50000);
+
+        } else {  // local_state == STATE_TERMINATE_THREADS
+            break;
         }
     }
 
-    if (max_thread > 1) {
-        pthread_barrier_wait(&barrier);
-    }
-    INFO("thread terminating, id=%d\n", cx.id);
+    INFO("thread terminating, thread_id=%d\n", thread_id);
     return NULL;
 }
+
+int32_t sim_gravity_rendezvoud(int32_t thread_id)
+{
+    static volatile int32_t count[MAX_THREAD];
+    static volatile int32_t go_count;
+    static volatile int32_t ret_state;
+
+    int32_t my_count, i;
+
+    // just return if max_thread is 1
+    if (max_thread == 1) {
+        return state;
+    }
+
+    // increment count for calling thread_id
+    count[thread_id]++;
+
+    // XXX comments
+    my_count = count[thread_id];
+
+    if (thread_id == 0) {
+        while (true) {
+            for (i = 0; i < max_thread; i++) {
+                if (count[i] != my_count) {
+                    break;
+                }
+            }
+            if (i == max_thread) {
+                break;
+            }
+            asm volatile("pause\n": : :"memory");
+        }
+        ret_state = state;
+        asm volatile("" ::: "memory");
+        go_count = my_count;
+    } else {
+        while (my_count != go_count) {
+            asm volatile("pause\n": : :"memory");
+        }
+    }
+
+    return ret_state;
+}        
+
+//asm volatile("pause\n": : :"memory");
+//__builtin_ia32_pause
+
+
+#if 0 //XXX delete
+    object_t sun, venus, earth, moon;
+
+    #define M_SUN          1.989E30             // kg
+    #define M_EARTH        5.972E24             // kg
+    #define R_EARTH        AU                   // orbit radius in meters
+    #define T_EARTH        (365.256*86400)      // orbit time in seconds
+    #define M_MOON         7.347E22             // kg
+    #define R_MOON         3.844E8              // orbit radius in meters
+    #define T_MOON         (27.3217*86400)      // orbit time in seconds
+    #define M_VENUS        4.867E24             // kg
+    #define R_VENUS        1.0821E11            // orbit radius in meters
+    #define T_VENUS        (224.701*86400)      // orbit time in seconds
+
+    sun.X     = 0;
+    sun.Y     = 0;
+    sun.VX    = 0;
+    sun.VY    = 0;
+    sun.MASS  = M_SUN;
+    sun.DISP_COLOR = YELLOW;
+
+    venus.X     = R_VENUS;
+    venus.Y     = 0;
+    venus.VX    = 0;
+    venus.VY    = TWO_PI * R_VENUS / T_VENUS;
+    venus.MASS  = M_VENUS;
+    venus.DISP_COLOR = WHITE;
+
+    earth.X     = R_EARTH;
+    earth.Y     = 0;
+    earth.VX    = 0;
+    earth.VY    = TWO_PI * R_EARTH / T_EARTH;
+    earth.MASS  = M_EARTH;
+    earth.DISP_COLOR = GREEN;
+
+    moon.X    = earth.X + R_MOON;
+    moon.Y    = earth.Y;
+    moon.VX   = 0;
+    moon.VY   = earth.VY + TWO_PI * R_MOON / T_MOON;
+    moon.MASS = M_MOON;
+    moon.DISP_COLOR = WHITE;
+
+    sim->object[0] = sun;
+    sim->object[1] = venus;
+    sim->object[2] = earth;
+    sim->object[3] = moon;
+
+    sim->sim_time  = 0;
+    sim->max_object = MAX_OBJECT;
+
+    sim_gravity_set_obj_disp_r();
+#endif
+
