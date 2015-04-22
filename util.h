@@ -105,22 +105,30 @@ typedef struct {
 } sdl_event_t;
 
 // colors
-#define PURPLE  0 
-#define BLUE    1
-#define GREEN   2
-#define YELLOW  3
-#define RED     4
-#define WHITE   5
-#define MAX_COLOR 5
+#define PURPLE     0 
+#define BLUE       1
+#define LIGHT_BLUE 2
+#define GREEN      3
+#define YELLOW     4
+#define ORANGE     5
+#define RED        6
+#define GRAY       7
+#define PINK       8
+#define WHITE      9
+#define MAX_COLOR  10
 
 #define COLOR_STR_TO_COLOR(cs) \
-    (strcmp((cs), "PURPLE") == 0 ? PURPLE : \
-     strcmp((cs), "BLUE")   == 0 ? BLUE   : \
-     strcmp((cs), "GREEN")  == 0 ? GREEN  : \
-     strcmp((cs), "YELLOW") == 0 ? YELLOW : \
-     strcmp((cs), "RED")    == 0 ? RED    : \
-     strcmp((cs), "WHITE")  == 0 ? WHITE   \
-                                 : WHITE)
+    (strcmp((cs), "PURPLE")     == 0 ? PURPLE     : \
+     strcmp((cs), "BLUE")       == 0 ? BLUE       : \
+     strcmp((cs), "LIGHT_BLUE") == 0 ? LIGHT_BLUE : \
+     strcmp((cs), "GREEN")      == 0 ? GREEN      : \
+     strcmp((cs), "YELLOW")     == 0 ? YELLOW     : \
+     strcmp((cs), "ORANGE")     == 0 ? ORANGE     : \
+     strcmp((cs), "RED")        == 0 ? RED        : \
+     strcmp((cs), "GRAY")       == 0 ? GRAY       : \
+     strcmp((cs), "PINK")       == 0 ? PINK       : \
+     strcmp((cs), "WHITE")      == 0 ? WHITE        \
+                                     : WHITE)
 
 extern uint32_t sdl_pixel_rgba[];
 

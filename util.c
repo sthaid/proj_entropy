@@ -30,11 +30,15 @@ static sdl_event_reg_t sdl_event_reg_tbl[SDL_EVENT_MAX];
 // xxx add more colors 
 uint32_t sdl_pixel_rgba[] = {
     //    red           green          blue    alpha
-       (255 << 24) |               (255 << 8) | 255,     // PURPLE
+       (127 << 24) |               (255 << 8) | 255,     // PURPLE
                                    (255 << 8) | 255,     // BLUE
+                     (255 << 16) | (255 << 8) | 255,     // LIGHT_BLUE
                      (255 << 16)              | 255,     // GREEN
        (255 << 24) | (255 << 16)              | 255,     // YELLOW
+       (255 << 24) | (128 << 16)              | 255,     // ORANGE
        (255 << 24)                            | 255,     // RED         
+       (224 << 24) | (224 << 16) | (224 << 8) | 255,     // GRAY        
+       (255 << 24) | (105 << 16) | (180 << 8) | 255,     // PINK 
        (255 << 24) | (255 << 16) | (255 << 8) | 255,     // WHITE       
                                         };
 

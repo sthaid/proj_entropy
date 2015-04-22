@@ -223,9 +223,7 @@ bool sim_container_display(void)
     bool          done = false;
 
     static int32_t       win_r_last = -1;
-    static SDL_Texture * circle_texture[RED-PURPLE+1];
-
-    _Static_assert(PURPLE==0, "purple");
+    static SDL_Texture * circle_texture[MAX_COLOR];       
     
     // init
     if (sdl_win_width > sdl_win_height) {
@@ -246,7 +244,7 @@ bool sim_container_display(void)
         win_r = 1;
     }
     if (win_r != win_r_last) {
-        for (color = PURPLE; color <= RED; color++) {
+        for (color = 0; color < MAX_COLOR; color++) {
             if (circle_texture[color] != NULL) {
                 SDL_DestroyTexture(circle_texture[color]);
                 circle_texture[color] = NULL;
