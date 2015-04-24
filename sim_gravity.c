@@ -1,3 +1,5 @@
+//XXX dt rate
+//XXX include doube in position_t
 /**
 
     SOLAR_SYSTEM   
@@ -117,17 +119,24 @@ RATE  500000000:1
 // typedefs
 //
 
+// XXX range for X,Y,SIM_WIDTH
+
+typedef struct {
+    int64_t METERS;
+    int64_t NANOMETERS;
+} position_t;
+
 typedef struct {
     char        NAME[MAX_NAME];
-    long double X;             // meters
-    long double Y;
+    position_t  X;             // meters
+    position_t  Y;
     double      VX;            // meters/secod
     double      VY;
     double      MASS;          // kg
-    double      RADIUS;        // meters
+    int64_t     RADIUS;        // meters
 
-    long double NEXT_X; 
-    long double NEXT_Y;
+    position_t  NEXT_X; 
+    position_t  NEXT_Y;
     double      NEXT_VX; 
     double      NEXT_VY;
 
@@ -137,14 +146,14 @@ typedef struct {
     int32_t MAX_PATH;
     int32_t PATH_TAIL;
     struct path_s {
-        double X;
-        double Y;
+        int64_t X_METERS;
+        int64_t Y_METERS;
     } PATH[0];
 } object_t; 
 
 typedef struct {
     char       sim_name[MAX_NAME];
-    double     sim_time;
+    int64_t    sim_time;
     int32_t    max_object;
     object_t * object[MAX_OBJECT];
 } sim_t;
@@ -156,14 +165,14 @@ typedef struct {
 static sim_t        sim;
 
 static int32_t      state; 
-static double       sim_width;
-static double       sim_x;
-static double       sim_y;
-static double       DT;
+static int64_t      sim_width;  //xxx searhch  XXX check for max
+static int64_t      sim_x;  //xxx searhch
+static int64_t      sim_y;  //xxx searhch
+static int32_t      DT;
 static int32_t      tracker_obj;
 
-static double       run_start_sim_time;
-static double       run_start_wall_time;
+static int64_t      run_start_sim_time;
+static int64_t      run_start_wall_time;
 
 static int32_t      max_thread;
 static pthread_t    thread_id[MAX_THREAD];
@@ -183,6 +192,7 @@ bool sim_gravity_display_simulation(bool new_display);
 bool sim_gravity_display_selection(bool new_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
+position_t sim_gravity_position_add(position_t x, double v);
 
 // -----------------  MAIN  -----------------------------------------------------
 
@@ -372,8 +382,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         // xxx check alloc
         object_t * obj = calloc(1,OBJ_ALLOC_SIZE(MAX_PATH));
         strncpy(obj->NAME, NAME, MAX_NAME-1);
-        obj->X          = X + relto[idx-1].X;
-        obj->Y          = Y + relto[idx-1].Y;
+        obj->X.METERS   = X + relto[idx-1].X;
+        obj->Y.METERS   = Y + relto[idx-1].Y;
         obj->VX         = VX + relto[idx-1].VX;
         obj->VY         = VY + relto[idx-1].VY;
         obj->MASS       = MASS;
@@ -382,8 +392,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         obj->MAX_PATH   = MAX_PATH;
 
         // save new relto
-        relto[idx].X  = obj->X;
-        relto[idx].Y  = obj->Y;
+        relto[idx].X  = obj->X.METERS;
+        relto[idx].Y  = obj->Y.METERS;
         relto[idx].VX = obj->VX;
         relto[idx].VY = obj->VY;
 
@@ -418,8 +428,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     // xxx tbd, init from file
     state = STATE_STOP; 
     sim_width = SIM_WIDTH_INITIAL;
-    sim_x = 0;
-    sim_y = 0;
+    sim_x = 2.88E16; //XXX
+    sim_y = 2.88E16;
     tracker_obj = -1;
 
     ret = 0;
@@ -431,8 +441,9 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
          // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------
     for (i = 0; i < sim.max_object; i++) {
         obj = sim.object[i];
-        PRINTF("%-12s %12Lg %12Lg %12lg %12lg %12lg %12lg %12d %12d %12d\n",
-            obj->NAME, obj->X, obj->Y, obj->VX, obj->VY, obj->MASS, obj->RADIUS, obj->DISP_COLOR, obj->DISP_R, obj->MAX_PATH);
+        PRINTF("%-12s %12lg %12lg %12lg %12lg %12lg %12lg %12d %12d %12d\n",
+            obj->NAME, (double)obj->X.METERS, (double)obj->Y.METERS, obj->VX, obj->VY, 
+            obj->MASS, (double)obj->RADIUS, obj->DISP_COLOR, obj->DISP_R, obj->MAX_PATH);
     }
     // xxx also print other settings
     PRINTF("-------------------------\n");   
@@ -557,7 +568,8 @@ bool sim_gravity_display_simulation(bool new_display)
     #define MAX_CIRCLE_RADIUS 51
 
     SDL_Rect       ctl_pane, sim_pane;
-    int32_t        sim_pane_width, i, col;
+    int32_t        i, col;
+    double         sim_pane_width;
     sdl_event_t *  event;
     char           str[100], str1[100];
     bool           done = false;
@@ -617,7 +629,7 @@ bool sim_gravity_display_simulation(bool new_display)
         object_t * obj_tracker;
         int32_t    disp_x, disp_y, disp_r, disp_color;
         int32_t    obj_idx, tracker_idx, idx_step, count, total, max_path;
-        double     X, Y, X_ORIGIN, Y_ORIGIN;
+        int64_t    X, Y, X_ORIGIN, Y_ORIGIN;
         SDL_Point  points[1000]; //xxx
 
         // display the object ...
@@ -627,16 +639,16 @@ bool sim_gravity_display_simulation(bool new_display)
             X_ORIGIN = sim_x;
             Y_ORIGIN = sim_y;
         } else {
-            X_ORIGIN = sim.object[tracker_obj]->X;
-            Y_ORIGIN = sim.object[tracker_obj]->Y;
+            X_ORIGIN = sim.object[tracker_obj]->X.METERS;
+            Y_ORIGIN = sim.object[tracker_obj]->Y.METERS;
         }
 
         // determine object's display info
         // - position: disp_x, disp_y
         // - radius: disp_r
         // - color: disp_color
-        disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-        disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_x = sim_pane.x + (obj->X.METERS - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_y = sim_pane.y + (obj->Y.METERS - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
         disp_r = (obj->DISP_R < 1 ? 1 : obj->DISP_R >= MAX_CIRCLE_RADIUS ? MAX_CIRCLE_RADIUS-1 : obj->DISP_R);
         disp_color = (i != tracker_obj ? obj->DISP_COLOR : PINK);
 
@@ -680,15 +692,15 @@ bool sim_gravity_display_simulation(bool new_display)
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
             } else {
-                X_ORIGIN = obj_tracker->PATH[tracker_idx].X;
-                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y;
+                X_ORIGIN = obj_tracker->PATH[tracker_idx].X_METERS;
+                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y_METERS;
                 if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
                     break;
                 }
             }
 
-            X = obj->PATH[obj_idx].X;
-            Y = obj->PATH[obj_idx].Y;
+            X = obj->PATH[obj_idx].X_METERS;
+            Y = obj->PATH[obj_idx].Y_METERS;
             if (X == 0 && Y == 0) {
                 break;
             }
@@ -728,23 +740,6 @@ bool sim_gravity_display_simulation(bool new_display)
     // CTLPANE ...
     //
 
-#if 0 //XXX
-    SOLAR_SYSTEM   
-
-RUN              STOP
-
-DT+              DT-
-
-SELECT
-
-RUN xxxx xx:xx:xx
-
-DT  5.0 SEC
-
-RATE  500000000:1
-#endif
-
-
     // clear ctl_pane
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(sdl_renderer, &ctl_pane);
@@ -763,11 +758,11 @@ RATE  500000000:1
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
     sdl_render_text_font0(&ctl_pane, 8, 0, str, SDL_EVENT_NONE);
 
-    sprintf(str, "DT   %0.1f", DT);
+    sprintf(str, "DT   %d SECS", DT);
     sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
 
     if (state == STATE_RUN) {
-        int32_t perf = (sim.sim_time - run_start_sim_time) / ((double)microsec_timer()/1000000.0 - run_start_wall_time);
+        int32_t perf = (sim.sim_time - run_start_sim_time) / (microsec_timer()/1000000.0 - run_start_wall_time);
         sprintf(str, "RATE %d:1", perf);
         sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
     }
@@ -787,7 +782,7 @@ RATE  500000000:1
     case SDL_EVENT_RUN:
         state = STATE_RUN;
         run_start_sim_time = sim.sim_time;
-        run_start_wall_time = (double)microsec_timer() / 1000000.0;
+        run_start_wall_time = microsec_timer() / 1000000.0;
         sdl_play_event_sound();
         break;
     case SDL_EVENT_STOP:
@@ -827,18 +822,18 @@ RATE  500000000:1
         for (i = 0; i < sim.max_object; i++) {
             object_t * obj = sim.object[i];
             int32_t disp_x, disp_y;
-            double X_ORIGIN, Y_ORIGIN;
+            int64_t X_ORIGIN, Y_ORIGIN;
 
             if (tracker_obj == -1) {
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
             } else {
-                X_ORIGIN = sim.object[tracker_obj]->X;
-                Y_ORIGIN = sim.object[tracker_obj]->Y;
+                X_ORIGIN = sim.object[tracker_obj]->X.METERS;
+                Y_ORIGIN = sim.object[tracker_obj]->Y.METERS;
             }
 
-            disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_x = sim_pane.x + (obj->X.METERS - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_y = sim_pane.y + (obj->Y.METERS - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
 
             if (disp_x >= event->mouse_click.x - 15 &&
                 disp_x <= event->mouse_click.x + 15 &&
@@ -1028,8 +1023,8 @@ void * sim_gravity_thread(void * cx)
                     OTHEROBJ = sim.object[i];
 
                     Mi      = OTHEROBJ->MASS;
-                    XDISTi  = OTHEROBJ->X - EVALOBJ->X;
-                    YDISTi  = OTHEROBJ->Y - EVALOBJ->Y;
+                    XDISTi  = (double)OTHEROBJ->X.METERS - (double)EVALOBJ->X.METERS;
+                    YDISTi  = (double)OTHEROBJ->Y.METERS - (double)EVALOBJ->Y.METERS;
                     Ri      = sqrt(XDISTi * XDISTi + YDISTi * YDISTi);
                     if (Ri == 0) {
                         continue;
@@ -1037,29 +1032,6 @@ void * sim_gravity_thread(void * cx)
                     tmp     = Mi / (Ri * Ri * Ri);
                     SUMX    = SUMX + tmp * XDISTi;
                     SUMY    = SUMY + tmp * YDISTi;
-
-#if 0
-                    // XXX temp
-                    if (k == 3 && i == 4) {
-                        static double MINRI = 1E20;
-                        static double MAXRI = 0;
-                        static int32_t last_print_orbit;
-                        int32_t orbit;
-                        if (Ri < MINRI) {
-                            // INFO("NEW MIN %lf\n", Ri);
-                            MINRI = Ri;
-                        }
-                        if (Ri > MAXRI) {
-                            // INFO("NEW MAX %lf\n", Ri);
-                            MAXRI = Ri;
-                        }
-                        orbit = sim.sim_time / 86400 / 28;
-                        if (orbit > last_print_orbit) {
-                            INFO("%f %f - %f %f\n", MINRI, MAXRI, sim_x, sim_y);
-                        }
-                        last_print_orbit = orbit;
-                    }
-#endif
                 }
 
                 AX = G * SUMX;
@@ -1073,8 +1045,13 @@ void * sim_gravity_thread(void * cx)
                 V2X = V1X + AX * DT;
                 V2Y = V1Y + AY * DT;
 
+#if 1
+                EVALOBJ->NEXT_X = sim_gravity_position_add(EVALOBJ->X, DX);
+                EVALOBJ->NEXT_Y = sim_gravity_position_add(EVALOBJ->Y, DY);
+#else
                 EVALOBJ->NEXT_X  = EVALOBJ->X + DX;
                 EVALOBJ->NEXT_Y  = EVALOBJ->Y + DY;
+#endif
                 EVALOBJ->NEXT_VX = V2X;
                 EVALOBJ->NEXT_VY = V2Y;
             }
@@ -1094,11 +1071,8 @@ void * sim_gravity_thread(void * cx)
                     // XXX more work here
                     if (day != last_day) {
                         int32_t idx = obj->PATH_TAIL;
-                        obj->PATH[idx].X = obj->X;
-                        obj->PATH[idx].Y = obj->Y;
-                        //if (k == 3) {
-                            //PRINTF("DAY CHANGE, idx %d  XY %lf %lf\n", idx, obj->X, obj->Y);
-                        //}
+                        obj->PATH[idx].X_METERS = obj->X.METERS;
+                        obj->PATH[idx].Y_METERS = obj->Y.METERS;
                         asm volatile("" ::: "memory");
                         obj->PATH_TAIL = (idx == obj->MAX_PATH - 1 ? 0 : idx + 1);
                     }
@@ -1169,3 +1143,37 @@ int32_t sim_gravity_barrier(int32_t thread_id)
     return ret_state;
 }        
 
+position_t sim_gravity_position_add(position_t x, double v)
+{
+    int64_t meters, nanometers;
+    position_t result;
+
+    if (v == 0) {
+        return x;
+    }
+
+    if (v > 0) {
+        meters = (int64_t)floor(v);
+        nanometers = (v - meters) * 1000000000;
+
+        result.NANOMETERS = x.NANOMETERS + nanometers;
+        result.METERS     = x.METERS + meters;
+        if (result.NANOMETERS >= 1000000000) {
+            result.NANOMETERS -= 1000000000;
+            result.METERS++;
+        }
+    } else {
+        v = -v;
+        meters = (int64_t)floor(v);
+        nanometers = (v - meters) * 1000000000;
+
+        result.NANOMETERS = x.NANOMETERS - nanometers;
+        result.METERS     = x.METERS - meters;
+        if (result.NANOMETERS < 0) {
+            result.NANOMETERS += 1000000000;
+            result.METERS--;
+        }
+    }
+
+    return result;
+}

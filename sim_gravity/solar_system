@@ -1,0 +1,22 @@
+# SOLAR SYSTEM
+
+# Units: MKS
+ 
+#                                                               Min Orbital
+#               Aphelion                                        Velocity
+# NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR           MAX_PATH (days)
+
+sun             0               0               0               0               1989000E24      695800.0E3      YELLOW          100000
+ mercury        69.82E9         0               0               38.86E3         0.3301E24       2439.7E3        ORANGE          88
+ venus         -108.94E9        0               0              -34.79E3         4.8676E24       6051.8E3        WHITE           225
+ earth          152.10E9        0               0               29.29E3         5.9726E24       6378.1E3        LIGHT_BLUE      366
+  moon          0.4055E9        0               0               0.964E3         0.07342E24      1738.1E3        WHITE           28
+ mars          -249.23E9        0               0              -21.97E3         0.64174E24      3396.2E3        RED             687
+ jupiter        816.62E9        0               0               12.44E3         1898.3E24       71492.0E3       YELLOW          4331
+ saturn        -1514.50E9       0               0              -9.09E3          568.36E24       60268.0E3       YELLOW          10747
+ uranus         3003.62E9       0               0               6.49E3          86.816E24       25559.0E3       YELLOW          30589
+ neptune       -4545.67E9       0               0              -5.37E3          102.42E24       24764.0E3       PURPLE          59800
+ pluto          7375.93E9       0               0               3.71E3          0.0131E24       1195.0E3        GRAY            90588
+
+AlphaCentA      2.88E16         2.88E16         0              -2.0E3           2000000E24      700000E3        YELLOW          40000
+ AlphaCentB     7000E9          0               0               4.0E3           2000000E24      700000E3        YELLOW          40000

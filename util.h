@@ -225,7 +225,7 @@ int config_write(char * filename, config_t * config);
 
 void logmsg_init(char * logmsg_file);
 void logmsg(char * lvl, const char * func, char * fmt, ...) __attribute__ ((format (printf, 3, 4)));
-void printmsg(char *fmt, ...);
+void printmsg(char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 // -----------------  TIME  ----------------------------------------------------------
 
