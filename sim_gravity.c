@@ -21,21 +21,13 @@ RATE  500000000:1
 **/
 
 // XXX display width in light minutes or seconds
-
 // XXX arrange initial solor_system for minimal sun velocity
-
 // XXX add more moons, on jupiter
-
 // XXX hover on planet to diplay name
-
 // XXX stabilize moon
-
 // XXX select and display DT
-
 // XXX include DT in file too, with different values for android
-
 // XXX add other stars
-
 // XXX reset simpane to center and also default width ??
 
 // DONE
@@ -76,9 +68,15 @@ RATE  500000000:1
 // defines
 //
 
-#define TWO_PI     (2.0*M_PI)
-#define G          6.673E-11       // mks units  
-#define AU         1.495978707E11  // meters
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+#define TWO_PI   (2.0*M_PI)
+#define G        6.673E-11       // mks units  
+#define AU       1.495978707E11  // meters
+
+#define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
+#define ZOOM_FACTOR                  (exp(log(10)/5))
+#define SIM_WIDTH_INITIAL            (AU * ZOOM_FACTOR * ZOOM_FACTOR)
 
 #define MAX_OBJECT  1000
 #define MAX_THREAD  16
@@ -104,26 +102,21 @@ RATE  500000000:1
      (s) == STATE_RUN               ? "RUN"               : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
-
 #define CURR_DISPLAY_SIMULATION 0
 #define CURR_DISPLAY_SELECTION  1
 
-#define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
-
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-
-#define ZOOM_FACTOR (exp(log(10)/5))
-#define SIM_WIDTH_INITIAL (AU * ZOOM_FACTOR * ZOOM_FACTOR)
+#define POS_ADD    sim_gravity_position_add
+#define POS_TO_DBL sim_gravity_cvt_position_to_double
+#define DBL_TO_POS sim_gravity_cvt_double_to_position
 
 //
 // typedefs
 //
 
-// XXX range for X,Y,SIM_WIDTH
-
 typedef struct {
-    int64_t METERS;
-    int64_t NANOMETERS;
+    double   private1;
+    int64_t  private2;
+    int64_t  private3;
 } position_t;
 
 typedef struct {
@@ -133,7 +126,7 @@ typedef struct {
     double      VX;            // meters/secod
     double      VY;
     double      MASS;          // kg
-    int64_t     RADIUS;        // meters
+    double      RADIUS;        // meters
 
     position_t  NEXT_X; 
     position_t  NEXT_Y;
@@ -146,8 +139,8 @@ typedef struct {
     int32_t MAX_PATH;
     int32_t PATH_TAIL;
     struct path_s {
-        int64_t X_METERS;
-        int64_t Y_METERS;
+        double X;
+        double Y;
     } PATH[0];
 } object_t; 
 
@@ -165,9 +158,9 @@ typedef struct {
 static sim_t        sim;
 
 static int32_t      state; 
-static int64_t      sim_width;  //xxx searhch  XXX check for max
-static int64_t      sim_x;  //xxx searhch
-static int64_t      sim_y;  //xxx searhch
+static double       sim_width;
+static double       sim_x;
+static double       sim_y;
 static int32_t      DT;
 static int32_t      tracker_obj;
 
@@ -192,7 +185,9 @@ bool sim_gravity_display_simulation(bool new_display);
 bool sim_gravity_display_selection(bool new_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
-position_t sim_gravity_position_add(position_t x, double v);
+position_t sim_gravity_position_add(position_t * x, double y);
+double sim_gravity_cvt_position_to_double(position_t * x);
+position_t sim_gravity_cvt_double_to_position(double x);
 
 // -----------------  MAIN  -----------------------------------------------------
 
@@ -382,8 +377,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         // xxx check alloc
         object_t * obj = calloc(1,OBJ_ALLOC_SIZE(MAX_PATH));
         strncpy(obj->NAME, NAME, MAX_NAME-1);
-        obj->X.METERS   = X + relto[idx-1].X;
-        obj->Y.METERS   = Y + relto[idx-1].Y;
+        obj->X          = DBL_TO_POS(X + relto[idx-1].X);
+        obj->Y          = DBL_TO_POS(Y + relto[idx-1].Y);
         obj->VX         = VX + relto[idx-1].VX;
         obj->VY         = VY + relto[idx-1].VY;
         obj->MASS       = MASS;
@@ -392,8 +387,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         obj->MAX_PATH   = MAX_PATH;
 
         // save new relto
-        relto[idx].X  = obj->X.METERS;
-        relto[idx].Y  = obj->Y.METERS;
+        relto[idx].X  = POS_TO_DBL(&obj->X);
+        relto[idx].Y  = POS_TO_DBL(&obj->Y);
         relto[idx].VX = obj->VX;
         relto[idx].VY = obj->VY;
 
@@ -428,8 +423,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     // xxx tbd, init from file
     state = STATE_STOP; 
     sim_width = SIM_WIDTH_INITIAL;
-    sim_x = 2.88E16; //XXX
-    sim_y = 2.88E16;
+    sim_x = 0;  // XXX 2.88E16; //XXX
+    sim_y = 0;  // XXX 2.88E16;
     tracker_obj = -1;
 
     ret = 0;
@@ -442,8 +437,16 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     for (i = 0; i < sim.max_object; i++) {
         obj = sim.object[i];
         PRINTF("%-12s %12lg %12lg %12lg %12lg %12lg %12lg %12d %12d %12d\n",
-            obj->NAME, (double)obj->X.METERS, (double)obj->Y.METERS, obj->VX, obj->VY, 
-            obj->MASS, (double)obj->RADIUS, obj->DISP_COLOR, obj->DISP_R, obj->MAX_PATH);
+            obj->NAME, 
+            POS_TO_DBL(&obj->X),
+            POS_TO_DBL(&obj->Y),
+            obj->VX, 
+            obj->VY, 
+            obj->MASS, 
+            obj->RADIUS, 
+            obj->DISP_COLOR, 
+            obj->DISP_R, 
+            obj->MAX_PATH);
     }
     // xxx also print other settings
     PRINTF("-------------------------\n");   
@@ -629,7 +632,7 @@ bool sim_gravity_display_simulation(bool new_display)
         object_t * obj_tracker;
         int32_t    disp_x, disp_y, disp_r, disp_color;
         int32_t    obj_idx, tracker_idx, idx_step, count, total, max_path;
-        int64_t    X, Y, X_ORIGIN, Y_ORIGIN;
+        double     X, Y, X_ORIGIN, Y_ORIGIN;
         SDL_Point  points[1000]; //xxx
 
         // display the object ...
@@ -639,16 +642,16 @@ bool sim_gravity_display_simulation(bool new_display)
             X_ORIGIN = sim_x;
             Y_ORIGIN = sim_y;
         } else {
-            X_ORIGIN = sim.object[tracker_obj]->X.METERS;
-            Y_ORIGIN = sim.object[tracker_obj]->Y.METERS;
+            X_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->X);
+            Y_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->Y);
         }
 
         // determine object's display info
         // - position: disp_x, disp_y
         // - radius: disp_r
         // - color: disp_color
-        disp_x = sim_pane.x + (obj->X.METERS - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-        disp_y = sim_pane.y + (obj->Y.METERS - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_x = sim_pane.x + (POS_TO_DBL(&obj->X) - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_y = sim_pane.y + (POS_TO_DBL(&obj->Y) - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
         disp_r = (obj->DISP_R < 1 ? 1 : obj->DISP_R >= MAX_CIRCLE_RADIUS ? MAX_CIRCLE_RADIUS-1 : obj->DISP_R);
         disp_color = (i != tracker_obj ? obj->DISP_COLOR : PINK);
 
@@ -692,15 +695,15 @@ bool sim_gravity_display_simulation(bool new_display)
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
             } else {
-                X_ORIGIN = obj_tracker->PATH[tracker_idx].X_METERS;
-                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y_METERS;
+                X_ORIGIN = obj_tracker->PATH[tracker_idx].X;
+                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y;
                 if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
                     break;
                 }
             }
 
-            X = obj->PATH[obj_idx].X_METERS;
-            Y = obj->PATH[obj_idx].Y_METERS;
+            X = obj->PATH[obj_idx].X;
+            Y = obj->PATH[obj_idx].Y;
             if (X == 0 && Y == 0) {
                 break;
             }
@@ -715,10 +718,12 @@ bool sim_gravity_display_simulation(bool new_display)
 
             obj_idx = (obj_idx-idx_step < 0 ? obj_idx-idx_step+obj->MAX_PATH : obj_idx-idx_step);
             if (obj_tracker != NULL) {
-                tracker_idx = (tracker_idx-idx_step < 0 ? tracker_idx-idx_step+obj_tracker->MAX_PATH : tracker_idx-idx_step);
+                tracker_idx = (tracker_idx-idx_step < 0 
+                               ? tracker_idx-idx_step+obj_tracker->MAX_PATH 
+                               : tracker_idx-idx_step);
             }
         }
-        SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255); //XXX
+        SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255);
         SDL_RenderDrawLines(sdl_renderer, points, count);
     }
 
@@ -822,18 +827,18 @@ bool sim_gravity_display_simulation(bool new_display)
         for (i = 0; i < sim.max_object; i++) {
             object_t * obj = sim.object[i];
             int32_t disp_x, disp_y;
-            int64_t X_ORIGIN, Y_ORIGIN;
+            double X_ORIGIN, Y_ORIGIN;
 
             if (tracker_obj == -1) {
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
             } else {
-                X_ORIGIN = sim.object[tracker_obj]->X.METERS;
-                Y_ORIGIN = sim.object[tracker_obj]->Y.METERS;
+                X_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->X);
+                Y_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->Y);
             }
 
-            disp_x = sim_pane.x + (obj->X.METERS - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            disp_y = sim_pane.y + (obj->Y.METERS - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_x = sim_pane.x + (POS_TO_DBL(&obj->X) - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_y = sim_pane.y + (POS_TO_DBL(&obj->Y) - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
 
             if (disp_x >= event->mouse_click.x - 15 &&
                 disp_x <= event->mouse_click.x + 15 &&
@@ -1023,8 +1028,8 @@ void * sim_gravity_thread(void * cx)
                     OTHEROBJ = sim.object[i];
 
                     Mi      = OTHEROBJ->MASS;
-                    XDISTi  = (double)OTHEROBJ->X.METERS - (double)EVALOBJ->X.METERS;
-                    YDISTi  = (double)OTHEROBJ->Y.METERS - (double)EVALOBJ->Y.METERS;
+                    XDISTi  = POS_TO_DBL(&OTHEROBJ->X) - POS_TO_DBL(&EVALOBJ->X);
+                    YDISTi  = POS_TO_DBL(&OTHEROBJ->Y) - POS_TO_DBL(&EVALOBJ->Y);
                     Ri      = sqrt(XDISTi * XDISTi + YDISTi * YDISTi);
                     if (Ri == 0) {
                         continue;
@@ -1045,13 +1050,8 @@ void * sim_gravity_thread(void * cx)
                 V2X = V1X + AX * DT;
                 V2Y = V1Y + AY * DT;
 
-#if 1
-                EVALOBJ->NEXT_X = sim_gravity_position_add(EVALOBJ->X, DX);
-                EVALOBJ->NEXT_Y = sim_gravity_position_add(EVALOBJ->Y, DY);
-#else
-                EVALOBJ->NEXT_X  = EVALOBJ->X + DX;
-                EVALOBJ->NEXT_Y  = EVALOBJ->Y + DY;
-#endif
+                EVALOBJ->NEXT_X = POS_ADD(&EVALOBJ->X, DX);
+                EVALOBJ->NEXT_Y = POS_ADD(&EVALOBJ->Y, DY);
                 EVALOBJ->NEXT_VX = V2X;
                 EVALOBJ->NEXT_VY = V2Y;
             }
@@ -1071,8 +1071,8 @@ void * sim_gravity_thread(void * cx)
                     // XXX more work here
                     if (day != last_day) {
                         int32_t idx = obj->PATH_TAIL;
-                        obj->PATH[idx].X_METERS = obj->X.METERS;
-                        obj->PATH[idx].Y_METERS = obj->Y.METERS;
+                        obj->PATH[idx].X = POS_TO_DBL(&obj->X);
+                        obj->PATH[idx].Y = POS_TO_DBL(&obj->Y);
                         asm volatile("" ::: "memory");
                         obj->PATH_TAIL = (idx == obj->MAX_PATH - 1 ? 0 : idx + 1);
                     }
@@ -1143,37 +1143,78 @@ int32_t sim_gravity_barrier(int32_t thread_id)
     return ret_state;
 }        
 
-position_t sim_gravity_position_add(position_t x, double v)
+position_t sim_gravity_position_add(position_t * x, double y)
 {
-    int64_t meters, nanometers;
+    #define DOUBLE private1
+
     position_t result;
 
-    if (v == 0) {
-        return x;
+    result.DOUBLE = x->DOUBLE + y;
+    result.private2 = 0;
+    result.private3 = 0;
+    
+    return result;
+#if 0
+    #define METERS       private2
+    #define NANOMETERS   private3
+
+    int64_t meters;
+    int64_t nanometers;
+
+    if (y == 0) {
+        *result = *x;
+        return 
     }
 
-    if (v > 0) {
-        meters = (int64_t)floor(v);
-        nanometers = (v - meters) * 1000000000;
+    if (y > 0) {
+        meters = (int64_t)floor(y);
+        nanometers = (y - meters) * 1000000000;
 
-        result.NANOMETERS = x.NANOMETERS + nanometers;
-        result.METERS     = x.METERS + meters;
-        if (result.NANOMETERS >= 1000000000) {
-            result.NANOMETERS -= 1000000000;
-            result.METERS++;
+        result->NANOMETERS = x->NANOMETERS + nanometers;
+        result->METERS     = x->METERS + meters;
+        if (result->NANOMETERS >= 1000000000) {
+            result->NANOMETERS -= 1000000000;
+            result->METERS++;
         }
     } else {
-        v = -v;
-        meters = (int64_t)floor(v);
-        nanometers = (v - meters) * 1000000000;
+        y = -y;
+        meters = (int64_t)floor(y);
+        nanometers = (y - meters) * 1000000000;
 
-        result.NANOMETERS = x.NANOMETERS - nanometers;
-        result.METERS     = x.METERS - meters;
-        if (result.NANOMETERS < 0) {
-            result.NANOMETERS += 1000000000;
-            result.METERS--;
+        result->NANOMETERS = x->NANOMETERS - nanometers;
+        result->METERS     = x->METERS - meters;
+        if (result->NANOMETERS < 0) {
+            result->NANOMETERS += 1000000000;
+            result->METERS--;
         }
     }
 
+    result->DOUBLE = result->METERS + result->NANOMETERS / 1000000000.0;
+#endif
+}
+
+double sim_gravity_cvt_position_to_double(position_t * x)
+{
+    return x->DOUBLE;
+}
+
+position_t sim_gravity_cvt_double_to_position(double x)
+{
+    position_t result;
+
+    result.DOUBLE = x;
+    result.private2 = 0;
+    result.private3 = 0;
+
     return result;
+#if 0
+    if (x >= 0) {
+        result.METERS = (int64_t)floor(x);
+        result.NANOMETERS = (x - meters) * 1000000000;
+    } else {
+        x = -x;
+        result.METERS = -(int64_t)floor(x);
+        result.NANOMETERS = -(x - meters) * 1000000000;
+    }
+#endif
 }
