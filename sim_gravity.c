@@ -82,15 +82,11 @@ RATE  500000000:1
 #define MAX_THREAD  16
 #define MAX_NAME    32
 
-#ifndef ANDROID
-  #define DT       5.0
-#else
-  #define DT       5.0   
-#endif
-
 #define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
 #define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
-#define SDL_EVENT_SELECT                 (SDL_EVENT_USER_START + 2)
+#define SDL_EVENT_DT_PLUS                (SDL_EVENT_USER_START + 2)
+#define SDL_EVENT_DT_MINUS               (SDL_EVENT_USER_START + 3)
+#define SDL_EVENT_SELECT                 (SDL_EVENT_USER_START + 4)
 #define SDL_EVENT_SIMPANE_ZOOM_IN        (SDL_EVENT_USER_START + 10)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
@@ -147,6 +143,7 @@ typedef struct {
 } object_t; 
 
 typedef struct {
+    char       sim_name[MAX_NAME];
     double     sim_time;
     int32_t    max_object;
     object_t * object[MAX_OBJECT];
@@ -162,6 +159,7 @@ static int32_t      state;
 static double       sim_width;
 static double       sim_x;
 static double       sim_y;
+static double       DT;
 static int32_t      tracker_obj;
 
 static double       run_start_sim_time;
@@ -219,6 +217,9 @@ int32_t sim_gravity_init(void)
     sim_x = 0;
     sim_y = 0;
     tracker_obj = -1;
+
+    strncpy(sim.sim_name, "GRAVITY", sizeof(sim.sim_name)-1);
+    DT = 5;
 
     // init sim  
     sim_gravity_init_sim_from_file(DEFAULT_SIM_GRAVITY_FILENAME);
@@ -403,6 +404,10 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     bzero(&sim,sizeof(sim));
 
     // incorporate new objects into sim
+    strncpy(sim.sim_name, filename, sizeof(sim.sim_name)-1);
+    for (i = 0; sim.sim_name[i]; i++) {
+        sim.sim_name[i] = toupper(sim.sim_name[i]);
+    }
     sim.sim_time = 0;
     sim.max_object = max_object;
     for (i = 0; i < sim.max_object; i++) {
@@ -723,25 +728,48 @@ bool sim_gravity_display_simulation(bool new_display)
     // CTLPANE ...
     //
 
+#if 0 //XXX
+    SOLAR_SYSTEM   
+
+RUN              STOP
+
+DT+              DT-
+
+SELECT
+
+RUN xxxx xx:xx:xx
+
+DT  5.0 SEC
+
+RATE  500000000:1
+#endif
+
+
     // clear ctl_pane
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(sdl_renderer, &ctl_pane);
 
     // display controls  
-    sdl_render_text_font0(&ctl_pane,  0, 0,  "GRAVITY", SDL_EVENT_NONE);
-    sdl_render_text_font0(&ctl_pane,  0,15,  "BACK",    SDL_EVENT_BACK);
+    sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
+                       SDL_FIELD_COLS_UNLIMITTED, true, 0);
     sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",     SDL_EVENT_RUN);
     sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",    SDL_EVENT_STOP);
-    sdl_render_text_font0(&ctl_pane,  4, 0,  "SELECT",  SDL_EVENT_SELECT);
+    sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",     SDL_EVENT_DT_PLUS);
+    sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",     SDL_EVENT_DT_MINUS);
+    sdl_render_text_font0(&ctl_pane,  6, 0,  "SELECT",  SDL_EVENT_SELECT);
+    sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",    SDL_EVENT_BACK);
 
     // display status lines
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
-    sdl_render_text_font0(&ctl_pane, 6, 0, str, SDL_EVENT_NONE);
+    sdl_render_text_font0(&ctl_pane, 8, 0, str, SDL_EVENT_NONE);
+
+    sprintf(str, "DT   %0.1f", DT);
+    sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
 
     if (state == STATE_RUN) {
         int32_t perf = (sim.sim_time - run_start_sim_time) / ((double)microsec_timer()/1000000.0 - run_start_wall_time);
-        sprintf(str, "%d", perf);
-        sdl_render_text_font0(&ctl_pane, 4, 9, str, SDL_EVENT_NONE);
+        sprintf(str, "RATE %d:1", perf);
+        sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
     }
 
     //
@@ -769,6 +797,16 @@ bool sim_gravity_display_simulation(bool new_display)
     case SDL_EVENT_BACK: 
     case SDL_EVENT_QUIT:
         done = true;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_DT_PLUS:
+        DT += 1;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_DT_MINUS:
+        if (DT > 1.1) {
+            DT -= 1;
+        }
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SELECT:

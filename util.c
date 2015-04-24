@@ -1113,7 +1113,7 @@ char * dur2str(char * str, int64_t duration)
     minutes = duration / 60;
     duration -= minutes * 60;
 
-    sprintf(str, "%5d %2.2d:%2.2d", (int32_t)days, (int32_t)hours, (int32_t)minutes);
+    sprintf(str, "%d %2.2d:%2.2d", (int32_t)days, (int32_t)hours, (int32_t)minutes);
     return str;
 }
 
