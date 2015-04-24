@@ -1,5 +1,3 @@
-//XXX dt rate
-//XXX include doube in position_t
 /**
 
     SOLAR_SYSTEM   
@@ -20,6 +18,8 @@ RATE  500000000:1
                    BACK
 **/
 
+// XXX dt rate  1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,120,... 
+// XXX sim_width zoom and initial value,   1,3,10,30,100, ....
 // XXX display width in light minutes or seconds
 // XXX arrange initial solor_system for minimal sun velocity
 // XXX add more moons, on jupiter
@@ -105,18 +105,17 @@ RATE  500000000:1
 #define CURR_DISPLAY_SIMULATION 0
 #define CURR_DISPLAY_SELECTION  1
 
-#define POS_ADD    sim_gravity_position_add
 #define POS_TO_DBL sim_gravity_cvt_position_to_double
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
+#define POS_ADD    sim_gravity_position_add
+#define POS_SUB    sim_gravity_position_sub
 
 //
 // typedefs
 //
 
 typedef struct {
-    double   private1;
-    int64_t  private2;
-    int64_t  private3;
+    __int128_t private;
 } position_t;
 
 typedef struct {
@@ -185,9 +184,10 @@ bool sim_gravity_display_simulation(bool new_display);
 bool sim_gravity_display_selection(bool new_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
-position_t sim_gravity_position_add(position_t * x, double y);
 double sim_gravity_cvt_position_to_double(position_t * x);
 position_t sim_gravity_cvt_double_to_position(double x);
+position_t sim_gravity_position_add(position_t * x, double y);
+double sim_gravity_position_sub(position_t * x, position_t * y);
 
 // -----------------  MAIN  -----------------------------------------------------
 
@@ -1028,8 +1028,8 @@ void * sim_gravity_thread(void * cx)
                     OTHEROBJ = sim.object[i];
 
                     Mi      = OTHEROBJ->MASS;
-                    XDISTi  = POS_TO_DBL(&OTHEROBJ->X) - POS_TO_DBL(&EVALOBJ->X);
-                    YDISTi  = POS_TO_DBL(&OTHEROBJ->Y) - POS_TO_DBL(&EVALOBJ->Y);
+                    XDISTi  = POS_SUB(&OTHEROBJ->X, &EVALOBJ->X);
+                    YDISTi  = POS_SUB(&OTHEROBJ->Y, &EVALOBJ->Y);
                     Ri      = sqrt(XDISTi * XDISTi + YDISTi * YDISTi);
                     if (Ri == 0) {
                         continue;
@@ -1143,6 +1143,37 @@ int32_t sim_gravity_barrier(int32_t thread_id)
     return ret_state;
 }        
 
+double sim_gravity_cvt_position_to_double(position_t * x)
+{
+    return x->private / 1000000000.0;
+}
+
+position_t sim_gravity_cvt_double_to_position(double x)
+{
+    position_t result;
+
+    result.private = x * 1000000000.0;
+    return result;
+}
+
+position_t sim_gravity_position_add(position_t * x, double y)
+{
+    position_t result;
+
+    result.private = x->private + y * 1000000000.0;
+    return result;
+}
+
+double sim_gravity_position_sub(position_t * x, position_t * y)
+{
+    return (x->private - y->private) / 1000000000.0;
+}
+
+
+
+
+
+#if 0
 position_t sim_gravity_position_add(position_t * x, double y)
 {
     #define DOUBLE private1
@@ -1218,3 +1249,4 @@ position_t sim_gravity_cvt_double_to_position(double x)
     }
 #endif
 }
+#endif
