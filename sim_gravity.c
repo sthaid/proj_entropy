@@ -1,23 +1,47 @@
-// XXX use different colors for planets
-// XXX add more moons
-// XXX display track
+/**
 
-// XXX arrange initial solor_system for minimal sun velocity
+    SOLAR_SYSTEM   
 
-// XXX otimize
-// - if forces are not significant then don't inspect every time
-// - select and display DT
-// - include DT in file too, with different values for android
+RUN              STOP
 
-// XXX hover on planet to diplay name, or enable tracking, or enable trails
+DT+              DT-
 
-// XXX add other stars
+SELECT
+
+RUN xxxx xx:xx:xx
+
+DT  5.0 SEC
+
+RATE  500000000:1
+
+
+                   BACK
+**/
 
 // XXX display width in light minutes or seconds
 
+// XXX arrange initial solor_system for minimal sun velocity
+
+// XXX add more moons, on jupiter
+
+// XXX hover on planet to diplay name
+
+// XXX stabilize moon
+
+// XXX select and display DT
+
+// XXX include DT in file too, with different values for android
+
+// XXX add other stars
+
 // XXX reset simpane to center and also default width ??
 
-// XXX make use of name
+// DONE
+// - use different colors for planets
+// - display track
+
+// NOT PLANNED
+// - if forces are not significant then don't inspect every time
 
 // ----------------------------------------------------------------------------------------------------
 // -----------------  BEGIN  --------------------------------------------------------------------------
@@ -42,16 +66,21 @@
 //     13 light hours
 //     1.4E13 meters
 //
+// * example of compile time assert
+//    _Static_assert(PURPLE==0, "purple");
+//
 
 //
 // defines
 //
 
 #define TWO_PI     (2.0*M_PI)
-#define G          6.673E-11  // mks units  
+#define G          6.673E-11       // mks units  
+#define AU         1.495978707E11  // meters
 
-#define MAX_THREAD 16
-#define MAX_NAME   32
+#define MAX_OBJECT  1000
+#define MAX_THREAD  16
+#define MAX_NAME    32
 
 #ifndef ANDROID
   #define DT       5.0
@@ -66,8 +95,6 @@
 #define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
 #define SDL_EVENT_SIMPANE_MOUSE_MOTION   (SDL_EVENT_USER_START + 13)
-#define SDL_EVENT_TRACKERPANE_ZOOM_IN    (SDL_EVENT_USER_START + 20)
-#define SDL_EVENT_TRACKERPANE_ZOOM_OUT   (SDL_EVENT_USER_START + 21)
 #define SDL_EVENT_BACK                   (SDL_EVENT_USER_START + 30)
 
 #define STATE_STOP               0
@@ -85,6 +112,11 @@
 
 #define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+#define ZOOM_FACTOR (exp(log(10)/5))
+#define SIM_WIDTH_INITIAL (AU * ZOOM_FACTOR * ZOOM_FACTOR)
+
 //
 // typedefs
 //
@@ -97,31 +129,39 @@ typedef struct {
     double      VY;
     double      MASS;          // kg
     double      RADIUS;        // meters
-    int32_t     DISP_COLOR;
-    int32_t     DISP_R; 
+
     long double NEXT_X; 
     long double NEXT_Y;
     double      NEXT_VX; 
     double      NEXT_VY;
+
+    int32_t DISP_COLOR;
+    int32_t DISP_R; 
+
+    int32_t MAX_PATH;
+    int32_t PATH_TAIL;
+    struct path_s {
+        double X;
+        double Y;
+    } PATH[0];
 } object_t; 
 
 typedef struct {
-    double      sim_time;
-    int32_t     max_object;
-    object_t    object[0];
+    double     sim_time;
+    int32_t    max_object;
+    object_t * object[MAX_OBJECT];
 } sim_t;
 
 //
 // variables
 //
 
-static sim_t      * sim;
+static sim_t        sim;
 
 static int32_t      state; 
 static double       sim_width;
 static double       sim_x;
 static double       sim_y;
-static double       tracker_width;
 static int32_t      tracker_obj;
 
 static double       run_start_sim_time;
@@ -139,7 +179,7 @@ static int32_t      curr_display;
 int32_t sim_gravity_init(void);
 void sim_gravity_terminate(void);
 int32_t sim_gravity_init_sim_from_file(char * filename);
-void sim_gravity_set_obj_disp_r(sim_t * new_sim);
+void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object);
 bool sim_gravity_display(void);
 bool sim_gravity_display_simulation(bool new_display);
 bool sim_gravity_display_selection(bool new_display);
@@ -173,18 +213,15 @@ int32_t sim_gravity_init(void)
     // print info msg
     INFO("initialize start\n");
 
-    // init sim  
-    sim_gravity_init_sim_from_file(DEFAULT_SIM_GRAVITY_FILENAME);
-
-    // init control variables
-    // XXX include sim_width and tracker_width in file, and sim_x, sim_y, tracker_obj
-    #define AU 1.495978707E11       // meters  XXX delete
-    state = STATE_STOP;
-    sim_width = 2.1 * AU;
+    // xxx tbd
+    state = STATE_STOP; 
+    sim_width = SIM_WIDTH_INITIAL;
     sim_x = 0;
     sim_y = 0;
-    tracker_width = 2000000000; 
     tracker_obj = -1;
+
+    // init sim  
+    sim_gravity_init_sim_from_file(DEFAULT_SIM_GRAVITY_FILENAME);
 
     // create worker threads
 #ifndef ANDROID
@@ -224,8 +261,10 @@ void sim_gravity_terminate(void)
     }
 
     // free allocations 
-    free(sim);
-    sim = NULL;
+    for (i = 0; i < sim.max_object; i++) {
+        free(sim.object[i]);
+    }
+    bzero(&sim, sizeof(sim));
 
     // done
     INFO("terminate complete\n");
@@ -237,7 +276,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
 {
     #define MAX_BUFF  1000000
     #define MAX_RELTO 100
-    #define SIM_ALLOC_SIZE(n) (sizeof(sim_t) + (n) * sizeof(object_t))
+
+    #define OBJ_ALLOC_SIZE(max_path) (sizeof(object_t) + (max_path) * sizeof(struct path_s))
 
     typedef struct {
         double X;
@@ -246,23 +286,26 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         double VY;
     } relto_t;
 
+    object_t  * object[MAX_OBJECT];
+
     char        pathname[200];
     int32_t     len, i, cnt;
     char      * s, * s_next, * tmp;
+    object_t  * obj;
     relto_t     relto[MAX_RELTO];
     double      X, Y, VX, VY, MASS, RADIUS;
     char        NAME[100], COLOR[100];
+    int32_t     MAX_PATH;
 
     SDL_RWops * rw = NULL;
     char      * buff = NULL;
     int32_t     ret = 0;
     int32_t     line = 0;
-    sim_t     * new_sim = NULL;
-    int32_t     max_object = 0;
-    int32_t     alloced_object = 0;
     int32_t     idx = 0;
     int32_t     last_idx = 0;
+    int32_t     max_object = 0;
 
+    bzero(object, sizeof(object));
     bzero(relto, sizeof(relto));
 
     // read file to memory buffer
@@ -306,24 +349,12 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         }
 
         // scan this line
-        cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s",
-                     NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR);
-        if (cnt != 8) {
+        cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s %d",
+                     NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR, &MAX_PATH);
+        if (cnt != 9) {
             ERROR("line %d invalid in file %s\n", line, filename);
             ret = -1;
             goto done;
-        }
-
-        // allocate more memory for new_sim, if needed
-        max_object++;
-        if (max_object >= alloced_object) {
-            alloced_object += 100;
-            new_sim = realloc(new_sim, SIM_ALLOC_SIZE(alloced_object));
-            if (new_sim == NULL) {
-                ERROR("failed realloc new_sim, alloced_object %d\n", alloced_object);
-                ret = -1;
-                goto done;
-            }
         }
 
         // determine idx for accessing relative_to[]
@@ -336,9 +367,9 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         }
         last_idx = idx;
 
-        // initialize new_sim->object
-        object_t * obj = &new_sim->object[max_object-1];
-        bzero(obj, sizeof(object_t));
+        // initialize obj, note DISP_R field is initialized by call to sim_gravity_set_obj_disp_r below
+        // xxx check alloc
+        object_t * obj = calloc(1,OBJ_ALLOC_SIZE(MAX_PATH));
         strncpy(obj->NAME, NAME, MAX_NAME-1);
         obj->X          = X + relto[idx-1].X;
         obj->Y          = Y + relto[idx-1].Y;
@@ -347,56 +378,77 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         obj->MASS       = MASS;
         obj->RADIUS     = RADIUS;
         obj->DISP_COLOR = COLOR_STR_TO_COLOR(COLOR);
-        obj->DISP_R     = 5;  // filled in by call to  sim_gravity_set_obj_disp_r below
+        obj->MAX_PATH   = MAX_PATH;
 
         // save new relto
         relto[idx].X  = obj->X;
         relto[idx].Y  = obj->Y;
         relto[idx].VX = obj->VX;
         relto[idx].VY = obj->VY;
+
+        // save the new obj in object array
+        object[max_object++] = obj;
     }
 
-    // fill in new_sim header fields
-    new_sim->sim_time = 0;
-    new_sim->max_object = max_object;
-
     // fill in DISP_R fields
-    sim_gravity_set_obj_disp_r(new_sim);
+    sim_gravity_set_obj_disp_r(object, max_object);
+
+    // success ...
+    // xxx stop all threads when this is being run
+
+    // free existing sim objects 
+    for (i = 0; i < sim.max_object; i++) {
+        free(sim.object[i]);
+    }
+    bzero(&sim,sizeof(sim));
+
+    // incorporate new objects into sim
+    sim.sim_time = 0;
+    sim.max_object = max_object;
+    for (i = 0; i < sim.max_object; i++) {
+        sim.object[i] = object[i];
+        object[i] = NULL;
+    }
+
+    // xxx tbd, init from file
+    state = STATE_STOP; 
+    sim_width = SIM_WIDTH_INITIAL;
+    sim_x = 0;
+    sim_y = 0;
+    tracker_obj = -1;
+
+    ret = 0;
 
 #if 1
     // print simulation config
     PRINTF("------ FILENAME %s ------\n", filename);   
-    PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R\n");
-         // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ 
-    for (i = 0; i < new_sim->max_object; i++) {
-        object_t * obj = new_sim->object+i;
-        PRINTF("%-12s %12Lg %12Lg %12lg %12lg %12lg %12lg %12d %12d\n",
-            obj->NAME, obj->X, obj->Y, obj->VX, obj->VY, obj->MASS, obj->RADIUS, obj->DISP_COLOR, obj->DISP_R);
+    PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R     MAX_PATH\n");
+         // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------
+    for (i = 0; i < sim.max_object; i++) {
+        obj = sim.object[i];
+        PRINTF("%-12s %12Lg %12Lg %12lg %12lg %12lg %12lg %12d %12d %12d\n",
+            obj->NAME, obj->X, obj->Y, obj->VX, obj->VY, obj->MASS, obj->RADIUS, obj->DISP_COLOR, obj->DISP_R, obj->MAX_PATH);
     }
+    // xxx also print other settings
     PRINTF("-------------------------\n");   
 #endif
-
-    // success
-    free(sim);
-    sim = new_sim;
-    ret = 0;
 
 done:
     // cleanup and return
     if (rw != NULL) {
         SDL_RWclose(rw);
     }
-    if (ret != 0) {
-        free(new_sim);
+    for (i = 0; i < MAX_OBJECT; i++) {
+        free(object[i]);
     }
     free(buff);
 
     return ret;
 }
 
-void sim_gravity_set_obj_disp_r(sim_t * new_sim)
+void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
 {
-    double radius[new_sim->max_object]; 
+    double radius[max_object]; 
     double min_radius, max_radius, min_disp_r, max_disp_r, delta;
     int32_t i;
 
@@ -405,14 +457,14 @@ void sim_gravity_set_obj_disp_r(sim_t * new_sim)
     #define CENTER_DISP_R ((MAX_DISP_R + MIN_DISP_R) / 2.)
 
     // fill in radius raw values with cube root of mass
-    for (i = 0; i < new_sim->max_object; i++) {
-        radius[i] = new_sim->object[i].RADIUS;
+    for (i = 0; i < max_object; i++) {
+        radius[i] = obj[i]->RADIUS;
     }
 
     // determine min and max raw radius values
     min_radius = 1E99;
     max_radius = -1E99;
-    for (i = 0; i < new_sim->max_object; i++) {
+    for (i = 0; i < max_object; i++) {
         if (radius[i] < min_radius) {
             min_radius = radius[i];
         }
@@ -424,8 +476,8 @@ void sim_gravity_set_obj_disp_r(sim_t * new_sim)
     // if min and max equal then
     //   set obj_radius to CENTER_DISP_R
     if (min_radius == max_radius) {
-        for (i = 0; i < new_sim->max_object; i++) {
-            new_sim->object[i].DISP_R = CENTER_DISP_R;
+        for (i = 0; i < max_object; i++) {
+            obj[i]->DISP_R = CENTER_DISP_R;
         }
 
     // else if max / min < 5 then
@@ -437,22 +489,22 @@ void sim_gravity_set_obj_disp_r(sim_t * new_sim)
         min_disp_r = CENTER_DISP_R - delta;
         max_disp_r = CENTER_DISP_R + delta;
 
-        for (i = 0; i < new_sim->max_object; i++) {
-            new_sim->object[i].DISP_R = (max_disp_r - min_disp_r) / (max_radius - min_radius) * 
-                                    (radius[i] - min_radius ) + min_disp_r;
+        for (i = 0; i < max_object; i++) {
+            obj[i]->DISP_R = (max_disp_r - min_disp_r) / (max_radius - min_radius) * 
+                             (radius[i] - min_radius ) + min_disp_r;
         }
 
     // else 
     //   convert raw radius values to log scale
     //   map these new raw radius values to MIN_DISP_R to MAX_DISP_R
     } else {
-        for (i = 0; i < new_sim->max_object; i++) {
+        for (i = 0; i < max_object; i++) {
             radius[i] = log(radius[i]);
         }
 
         min_radius = 1E99;
         max_radius = -1E99;
-        for (i = 0; i < new_sim->max_object; i++) {
+        for (i = 0; i < max_object; i++) {
             if (radius[i] < min_radius) {
                 min_radius = radius[i];
             }
@@ -461,9 +513,9 @@ void sim_gravity_set_obj_disp_r(sim_t * new_sim)
             }
         }
 
-        for (i = 0; i < new_sim->max_object; i++) {
-            new_sim->object[i].DISP_R = (MAX_DISP_R - MIN_DISP_R) / (max_radius - min_radius) * 
-                                    (radius[i] - min_radius) + MIN_DISP_R;
+        for (i = 0; i < max_object; i++) {
+            obj[i]->DISP_R = (MAX_DISP_R - MIN_DISP_R) / (max_radius - min_radius) * 
+                             (radius[i] - min_radius) + MIN_DISP_R;
         }
     }
 }
@@ -498,15 +550,14 @@ bool sim_gravity_display_simulation(bool new_display)
          (Y) >= (RECT).y && (Y) < (RECT).y + (RECT).h)
 
     #define MAX_CIRCLE_RADIUS 51
-    #define MAX_CIRCLE_COLOR  (MAX_COLOR+1)
 
-    SDL_Rect       ctl_pane, sim_pane, tracker_pane;
-    int32_t        sim_pane_width, tracker_pane_width, i, row, col;
+    SDL_Rect       ctl_pane, sim_pane;
+    int32_t        sim_pane_width, i, col;
     sdl_event_t *  event;
     char           str[100], str1[100];
     bool           done = false;
 
-    static SDL_Texture * circle_texture_tbl[MAX_CIRCLE_RADIUS][MAX_CIRCLE_COLOR];
+    static SDL_Texture * circle_texture_tbl[MAX_CIRCLE_RADIUS][MAX_COLOR];
 
     //
     // if this display has just been activated then 
@@ -520,30 +571,20 @@ bool sim_gravity_display_simulation(bool new_display)
     //
     // initialize the pane locations:
     // - sim_pane: the main simulation display area
-    // - tracker_pane: the tracker display area
     // - ctl_pane: the controls display area
     //
 
     if (sdl_win_width > sdl_win_height) {
-        int32_t ctl_pane_width, ctl_pane_height;
         sim_pane_width = sdl_win_height;
-        ctl_pane_width = sdl_win_width - sim_pane_width, 
-        ctl_pane_height = sdl_win_height - ctl_pane_width;
-        tracker_pane_width = ctl_pane_width;
         SDL_INIT_PANE(sim_pane, 
                       0, 0,  
                       sim_pane_width, sim_pane_width);
-        SDL_INIT_PANE(tracker_pane, 
-                      sim_pane_width, ctl_pane_height,
-                      tracker_pane_width, tracker_pane_width);
         SDL_INIT_PANE(ctl_pane, 
                       sim_pane_width, 0, 
-                      ctl_pane_width, ctl_pane_height);
+                      sdl_win_width-sim_pane_width, sdl_win_height);
     } else {
         sim_pane_width = sdl_win_width;
-        tracker_pane_width = 0;
         SDL_INIT_PANE(sim_pane, 0, 0,  sim_pane_width, sim_pane_width);
-        SDL_INIT_PANE(tracker_pane, 0, 0, 0, 0);
         SDL_INIT_PANE(ctl_pane, 0, 0, 0, 0);
     }
     sdl_event_init();
@@ -566,32 +607,102 @@ bool sim_gravity_display_simulation(bool new_display)
     //
 
     // draw sim_pane objects 
-    for (i = 0; i < sim->max_object; i++) {
-        object_t * p = &sim->object[i];
+    for (i = 0; i < sim.max_object; i++) {
+        object_t * obj = sim.object[i];
+        object_t * obj_tracker;
         int32_t    disp_x, disp_y, disp_r, disp_color;
+        int32_t    obj_idx, tracker_idx, idx_step, count, total, max_path;
+        double     X, Y, X_ORIGIN, Y_ORIGIN;
+        SDL_Point  points[1000]; //xxx
 
-        disp_x     = sim_pane.x + (p->X - sim_x + sim_width/2) * (sim_pane_width / sim_width);
-        disp_y     = sim_pane.y + (p->Y - sim_y + sim_width/2) * (sim_pane_width / sim_width);
-        disp_r     = p->DISP_R;
-        disp_color = p->DISP_COLOR;
+        // display the object ...
 
-        if (i == tracker_obj) { 
-            disp_color = PINK;
+        // determine display origin
+        if (tracker_obj == -1) {
+            X_ORIGIN = sim_x;
+            Y_ORIGIN = sim_y;
+        } else {
+            X_ORIGIN = sim.object[tracker_obj]->X;
+            Y_ORIGIN = sim.object[tracker_obj]->Y;
         }
 
-        if (IN_RECT(disp_x, disp_y, sim_pane) == false) {
-            continue;
-        }
+        // determine object's display info
+        // - position: disp_x, disp_y
+        // - radius: disp_r
+        // - color: disp_color
+        disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+        disp_r = (obj->DISP_R < 1 ? 1 : obj->DISP_R >= MAX_CIRCLE_RADIUS ? MAX_CIRCLE_RADIUS-1 : obj->DISP_R);
+        disp_color = (i != tracker_obj ? obj->DISP_COLOR : PINK);
 
-        if (disp_r < 1) disp_r = 1;
-        if (disp_r >= MAX_CIRCLE_RADIUS) disp_r = MAX_CIRCLE_RADIUS-1;
-        if (disp_color >= MAX_CIRCLE_COLOR) disp_color = MAX_CIRCLE_COLOR-1;
-
+        // if circle to represent this object has not yet been created then create it
         if (circle_texture_tbl[disp_r][disp_color] == NULL) {
             circle_texture_tbl[disp_r][disp_color] =
                 sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
         }
+
+        // render the circle, representing the object
         sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
+
+        // display object's path ...
+        // xxx clean up and comment
+
+        if (tracker_obj == -1) {
+            obj_tracker = NULL;
+            max_path = obj->MAX_PATH;
+            obj_idx = (obj->PATH_TAIL == 0 ? obj->MAX_PATH-1 : obj->PATH_TAIL-1);
+            tracker_idx = 0;
+        } else {
+            obj_tracker = sim.object[tracker_obj];
+            max_path = MIN(obj->MAX_PATH, obj_tracker->MAX_PATH);
+            if (max_path > 50) {
+                max_path = 50;
+            }
+            obj_idx = (obj->PATH_TAIL == 0 ? obj->MAX_PATH-1 : obj->PATH_TAIL-1);
+            tracker_idx = (obj_tracker->PATH_TAIL == 0 ? obj_tracker->MAX_PATH-1 : obj_tracker->PATH_TAIL-1);
+        }
+
+        if (obj == obj_tracker) {
+            continue;
+        }
+
+        idx_step = (max_path/100 >= 1 ? max_path/100 : 1);
+        total = max_path / idx_step;
+        count = 0;
+
+        while (true) {
+            if (obj_tracker == NULL) {
+                X_ORIGIN = sim_x;
+                Y_ORIGIN = sim_y;
+            } else {
+                X_ORIGIN = obj_tracker->PATH[tracker_idx].X;
+                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y;
+                if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
+                    break;
+                }
+            }
+
+            X = obj->PATH[obj_idx].X;
+            Y = obj->PATH[obj_idx].Y;
+            if (X == 0 && Y == 0) {
+                break;
+            }
+
+            points[count].x = sim_pane.x + (X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            points[count].y = sim_pane.y + (Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            count++;
+
+            if (count == total) {
+                break;
+            }
+
+            obj_idx = (obj_idx-idx_step < 0 ? obj_idx-idx_step+obj->MAX_PATH : obj_idx-idx_step);
+            if (obj_tracker != NULL) {
+                tracker_idx = (tracker_idx-idx_step < 0 ? tracker_idx-idx_step+obj_tracker->MAX_PATH : tracker_idx-idx_step);
+            }
+        }
+        SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255); //XXX
+        SDL_RenderDrawLines(sdl_renderer, points, count);
     }
 
     // display sim_pane title
@@ -609,56 +720,6 @@ bool sim_gravity_display_simulation(bool new_display)
     sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
 
     //
-    // TRACKERPANE ...
-    //
-
-    // draw tracker_pane objects 
-    if (tracker_obj != -1) {
-        double tracker_x = sim->object[tracker_obj].X;
-        double tracker_y = sim->object[tracker_obj].Y;
-
-        for (i = 0; i < sim->max_object; i++) {
-            object_t * p = &sim->object[i];
-            int32_t    disp_x, disp_y, disp_r, disp_color;
-
-            disp_x     = tracker_pane.x + (p->X - tracker_x + tracker_width/2) * (tracker_pane_width / tracker_width);
-            disp_y     = tracker_pane.y + (p->Y - tracker_y + tracker_width/2) * (tracker_pane_width / tracker_width);
-            disp_r     = p->DISP_R;
-            disp_color = p->DISP_COLOR;
-
-            if (IN_RECT(disp_x, disp_y, tracker_pane) == false) {
-                continue;
-            }
-
-            if (disp_r < 1) disp_r = 1;
-            if (disp_r >= MAX_CIRCLE_RADIUS) disp_r = MAX_CIRCLE_RADIUS-1;
-            if (disp_color >= MAX_CIRCLE_COLOR) disp_color = MAX_CIRCLE_COLOR-1;
-
-            if (circle_texture_tbl[disp_r][disp_color] == NULL) {
-                circle_texture_tbl[disp_r][disp_color] =
-                    sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
-            }
-            sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
-        }
-    } else {
-        row = SDL_PANE_ROWS(&tracker_pane,0) / 2 - 1;
-        sdl_render_text_ex(&tracker_pane, row, 0, "NOT", SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
-        sdl_render_text_ex(&tracker_pane, row+1, 0, "SELECTED", SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
-    }
-
-    // register tracker_pane controls
-    col = SDL_PANE_COLS(&tracker_pane,0)-2;
-    sdl_render_text_font0(&tracker_pane,  0, col,  "+", SDL_EVENT_TRACKERPANE_ZOOM_IN);
-    sdl_render_text_font0(&tracker_pane,  2, col,  "-", SDL_EVENT_TRACKERPANE_ZOOM_OUT);
-
-    // display tracker_pane title
-    sprintf(str, "WIDTH %0.2lf AU", tracker_width/AU);
-    sdl_render_text_font0(&tracker_pane,  0, 0,  str, SDL_EVENT_NONE);
-
-    // draw trakerpane border
-    sdl_render_rect(&tracker_pane, 3, sdl_pixel_rgba[GREEN]);
-
-    //
     // CTLPANE ...
     //
 
@@ -674,11 +735,11 @@ bool sim_gravity_display_simulation(bool new_display)
     sdl_render_text_font0(&ctl_pane,  4, 0,  "SELECT",  SDL_EVENT_SELECT);
 
     // display status lines
-    sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim->sim_time));
+    sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
     sdl_render_text_font0(&ctl_pane, 6, 0, str, SDL_EVENT_NONE);
 
     if (state == STATE_RUN) {
-        int32_t perf = (sim->sim_time - run_start_sim_time) / ((double)microsec_timer()/1000000.0 - run_start_wall_time);
+        int32_t perf = (sim.sim_time - run_start_sim_time) / ((double)microsec_timer()/1000000.0 - run_start_wall_time);
         sprintf(str, "%d", perf);
         sdl_render_text_font0(&ctl_pane, 4, 9, str, SDL_EVENT_NONE);
     }
@@ -697,7 +758,7 @@ bool sim_gravity_display_simulation(bool new_display)
     switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
-        run_start_sim_time = sim->sim_time;
+        run_start_sim_time = sim.sim_time;
         run_start_wall_time = (double)microsec_timer() / 1000000.0;
         sdl_play_event_sound();
         break;
@@ -716,26 +777,36 @@ bool sim_gravity_display_simulation(bool new_display)
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_IN:
-        sim_width /= 2;
+        sim_width /= ZOOM_FACTOR;
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_OUT:
-        sim_width *= 2;
+        sim_width *= ZOOM_FACTOR;
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
         int32_t found_obj = -1;
-        for (i = 0; i < sim->max_object; i++) {
-            object_t * p = &sim->object[i];
+        for (i = 0; i < sim.max_object; i++) {
+            object_t * obj = sim.object[i];
             int32_t disp_x, disp_y;
+            double X_ORIGIN, Y_ORIGIN;
 
-            disp_x = sim_pane.x + (p->X - sim_x + sim_width/2) * (sim_pane_width / sim_width);
-            disp_y = sim_pane.y + (p->Y - sim_y + sim_width/2) * (sim_pane_width / sim_width);
+            if (tracker_obj == -1) {
+                X_ORIGIN = sim_x;
+                Y_ORIGIN = sim_y;
+            } else {
+                X_ORIGIN = sim.object[tracker_obj]->X;
+                Y_ORIGIN = sim.object[tracker_obj]->Y;
+            }
+
+            disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+
             if (disp_x >= event->mouse_click.x - 15 &&
                 disp_x <= event->mouse_click.x + 15 &&
                 disp_y >= event->mouse_click.y - 15 &&
                 disp_y <= event->mouse_click.y + 15 &&
-                (found_obj == -1 || sim->object[i].MASS > sim->object[found_obj].MASS))
+                (found_obj == -1 || sim.object[i]->MASS > sim.object[found_obj]->MASS))
             {
                 found_obj = i;
             }
@@ -747,16 +818,10 @@ bool sim_gravity_display_simulation(bool new_display)
         sdl_play_event_sound();
         break; }
     case SDL_EVENT_SIMPANE_MOUSE_MOTION:
-        sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
-        sim_y -= (event->mouse_motion.delta_y * (sim_width / sim_pane_width));
-        break;
-    case SDL_EVENT_TRACKERPANE_ZOOM_IN:
-        tracker_width /= 2;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_TRACKERPANE_ZOOM_OUT:
-        tracker_width *= 2;
-        sdl_play_event_sound();
+        if (tracker_obj == -1) {
+            sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
+            sim_y -= (event->mouse_motion.delta_y * (sim_width / sim_pane_width));
+        }
         break;
     default:
         break;
@@ -915,14 +980,14 @@ void * sim_gravity_thread(void * cx)
             double SUMX, SUMY, Mi, XDISTi, YDISTi, Ri, AX, AY, DX, DY, V1X, V1Y, V2X, V2Y, tmp;
             object_t * EVALOBJ, * OTHEROBJ;
 
-            for (k = thread_id; k < sim->max_object; k += max_thread) {
-                EVALOBJ = &sim->object[k];
+            for (k = thread_id; k < sim.max_object; k += max_thread) {
+                EVALOBJ = sim.object[k];
 
                 SUMX = SUMY = 0;
-                for (i = 0; i < sim->max_object; i++) {
+                for (i = 0; i < sim.max_object; i++) {
                     if (i == k) continue;
 
-                    OTHEROBJ = &sim->object[i];
+                    OTHEROBJ = sim.object[i];
 
                     Mi      = OTHEROBJ->MASS;
                     XDISTi  = OTHEROBJ->X - EVALOBJ->X;
@@ -950,7 +1015,7 @@ void * sim_gravity_thread(void * cx)
                             // INFO("NEW MAX %lf\n", Ri);
                             MAXRI = Ri;
                         }
-                        orbit = sim->sim_time / 86400 / 28;
+                        orbit = sim.sim_time / 86400 / 28;
                         if (orbit > last_print_orbit) {
                             INFO("%f %f - %f %f\n", MINRI, MAXRI, sim_x, sim_y);
                         }
@@ -979,15 +1044,30 @@ void * sim_gravity_thread(void * cx)
             sim_gravity_barrier(thread_id);
 
             if (thread_id == 0) {
-                for (k = 0; k < sim->max_object; k++) {
-                    object_t * obj = &sim->object[k];
+                int32_t day = sim.sim_time/86400;
+                static int32_t last_day;
+                for (k = 0; k < sim.max_object; k++) {
+                    object_t * obj = sim.object[k];
                     obj->X  = obj->NEXT_X;
                     obj->Y  = obj->NEXT_Y;
                     obj->VX = obj->NEXT_VX;
                     obj->VY = obj->NEXT_VY;
-                }
 
-                sim->sim_time += DT;
+                    // XXX more work here
+                    if (day != last_day) {
+                        int32_t idx = obj->PATH_TAIL;
+                        obj->PATH[idx].X = obj->X;
+                        obj->PATH[idx].Y = obj->Y;
+                        //if (k == 3) {
+                            //PRINTF("DAY CHANGE, idx %d  XY %lf %lf\n", idx, obj->X, obj->Y);
+                        //}
+                        asm volatile("" ::: "memory");
+                        obj->PATH_TAIL = (idx == obj->MAX_PATH - 1 ? 0 : idx + 1);
+                    }
+                }
+                last_day = day;
+
+                sim.sim_time += DT;
             }
 
         } else if (local_state == STATE_STOP) {
