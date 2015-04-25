@@ -1145,14 +1145,14 @@ int32_t sim_gravity_barrier(int32_t thread_id)
 
 double sim_gravity_cvt_position_to_double(position_t * x)
 {
-    return x->private / 1000000000.0;
+    return x->private >> 30;
 }
 
 position_t sim_gravity_cvt_double_to_position(double x)
 {
     position_t result;
 
-    result.private = x * 1000000000.0;
+    result.private = (__int128_t)x << 30;
     return result;
 }
 
@@ -1160,13 +1160,13 @@ position_t sim_gravity_position_add(position_t * x, double y)
 {
     position_t result;
 
-    result.private = x->private + y * 1000000000.0;
+    result.private = x->private + ((__int128_t)y << 30);
     return result;
 }
 
 double sim_gravity_position_sub(position_t * x, position_t * y)
 {
-    return (x->private - y->private) / 1000000000.0;
+    return (x->private - y->private) >> 30;
 }
 
 
