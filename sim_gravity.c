@@ -1,38 +1,23 @@
-/**
-
-    SOLAR_SYSTEM   
-
-RUN              STOP
-
-DT+              DT-
-
-SELECT
-
-RUN xxxx xx:xx:xx
-
-DT  5.0 SEC
-
-RATE  500000000:1
 
 
-                   BACK
-**/
-
+// XXX include DT in file too, with different values for android
 // XXX dt rate  1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,120,... 
 // XXX sim_width zoom and initial value,   1,3,10,30,100, ....
-// XXX display width in light minutes or seconds
-// XXX arrange initial solor_system for minimal sun velocity
+// XXX display width in light years or AU
+// XXX add description to file
+// XXX select files
+// XXX add more files
+
 // XXX add more moons, on jupiter
 // XXX hover on planet to diplay name
-// XXX stabilize moon
-// XXX select and display DT
-// XXX include DT in file too, with different values for android
-// XXX add other stars
 // XXX reset simpane to center and also default width ??
 
 // DONE
 // - use different colors for planets
 // - display track
+// - arrange initial solor_system for minimal sun velocity
+// - stabilize moon
+// - add other stars
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -68,15 +53,13 @@ RATE  500000000:1
 // defines
 //
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-
-#define TWO_PI   (2.0*M_PI)
-#define G        6.673E-11       // mks units  
-#define AU       1.495978707E11  // meters
+#define G           6.673E-11       // mks units  
+#define AU          1.495978707E11  // meters
+#define LIGHT_YEAR  9.4605284E15    // meters
 
 #define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
-#define ZOOM_FACTOR                  (exp(log(10)/5))
-#define SIM_WIDTH_INITIAL            (AU * ZOOM_FACTOR * ZOOM_FACTOR)
+#define ZOOM_FACTOR                  (exp(log(10)/5)) //xxx
+#define SIM_WIDTH_DEFAULT            (AU * ZOOM_FACTOR * ZOOM_FACTOR) //xxx
 
 #define MAX_OBJECT  1000
 #define MAX_THREAD  16
@@ -109,6 +92,10 @@ RATE  500000000:1
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
 #define POS_ADD    sim_gravity_position_add
 #define POS_SUB    sim_gravity_position_sub
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+#define MAX_VALID_DT (sizeof(valid_dt)/sizeof(valid_dt[0]))
 
 //
 // typedefs
@@ -171,6 +158,14 @@ static pthread_t    thread_id[MAX_THREAD];
 
 static int32_t      curr_display;
 
+static const int32_t valid_dt[] = {
+                        1,2,3,4,5,6,7,8,9,
+                        10,20,30,40,50,
+                        60,120,180,240,300,360,420,480,540,
+                        600,1200,1800,2400,3000,
+                        3600,2*3600,3*3600,4*3600,5*3600,6*3600,
+                        86400, };
+
 // 
 // prototypes
 //
@@ -216,15 +211,15 @@ int32_t sim_gravity_init(void)
     // print info msg
     INFO("initialize start\n");
 
-    // xxx tbd
-    state = STATE_STOP; 
-    sim_width = SIM_WIDTH_INITIAL;
-    sim_x = 0;
-    sim_y = 0;
-    tracker_obj = -1;
-
+    // initialize control values, the call below to sim_gravity_init_sim_from_file
+    // will also set these if it is successful
     strncpy(sim.sim_name, "GRAVITY", sizeof(sim.sim_name)-1);
-    DT = 5;
+    state       = STATE_STOP; 
+    tracker_obj = -1;
+    sim_x       = 0;
+    sim_y       = 0;
+    sim_width   = SIM_WIDTH_DEFAULT;
+    DT          = 5;
 
     // init sim  
     sim_gravity_init_sim_from_file(DEFAULT_SIM_GRAVITY_FILENAME);
@@ -303,13 +298,15 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     char        NAME[100], COLOR[100];
     int32_t     MAX_PATH;
 
-    SDL_RWops * rw = NULL;
-    char      * buff = NULL;
-    int32_t     ret = 0;
-    int32_t     line = 0;
-    int32_t     idx = 0;
-    int32_t     last_idx = 0;
-    int32_t     max_object = 0;
+    SDL_RWops * rw            = NULL;
+    char      * buff          = NULL;
+    int32_t     ret           = 0;
+    int32_t     line          = 0;
+    int32_t     idx           = 0;
+    int32_t     last_idx      = 0;
+    int32_t     max_object    = 0;
+    double      new_sim_width = sim_width;
+    int32_t     new_dt        = DT;
 
     bzero(object, sizeof(object));
     bzero(relto, sizeof(relto));
@@ -351,6 +348,30 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
             ;
         }
         if (s[i] == '\0') {
+            continue;
+        }
+
+        // if line begins with 'PARAM' then it is a parameter line
+        if (strncmp(s, "PARAM ", 6) == 0) {
+            char param_name[100], param_units[100];
+            double param_value;
+
+            if (sscanf(s+6, "%s %lf %s", param_name, &param_value, param_units) != 3) {
+                ERROR("param line %d invalid in file %s\n", line, filename);
+                ret = -1;
+                goto done;
+            }
+            if (strcmp(param_name, "SIM_WIDTH") == 0 && strcmp(param_units, "AU") == 0) {
+                new_sim_width = param_value * AU;
+            } else if (strcmp(param_name, "SIM_WIDTH") == 0 && strcmp(param_units, "LIGHT_YEAR") == 0) {
+                new_sim_width = param_value * LIGHT_YEAR;
+            } else if (strcmp(param_name, "DT") == 0 && strcmp(param_units, "SEC") == 0) {
+                new_dt = param_value;
+            } else {
+                ERROR("param line %d invalid in file %s\n", line, filename);
+                ret = -1;
+                goto done;
+            }
             continue;
         }
 
@@ -420,13 +441,26 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         object[i] = NULL;
     }
 
-    // xxx tbd, init from file
-    state = STATE_STOP; 
-    sim_width = SIM_WIDTH_INITIAL;
-    sim_x = 0;  // XXX 2.88E16; //XXX
-    sim_y = 0;  // XXX 2.88E16;
-    tracker_obj = -1;
+    // sanitize new_dt
+    for (i = MAX_VALID_DT-1; i >= 0; i--) {
+        if (new_dt >= valid_dt[i]) {
+            new_dt = valid_dt[i];
+            break;
+        }
+    }
+    if (i == -1) {
+        new_dt = valid_dt[0];
+    }
 
+    // update control variables
+    state       = STATE_STOP; 
+    tracker_obj = -1;
+    sim_x       = 0;
+    sim_y       = 0;
+    sim_width   = new_sim_width;
+    DT          = new_dt;
+
+    // set success return status
     ret = 0;
 
 #if 1
@@ -448,7 +482,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
             obj->DISP_R, 
             obj->MAX_PATH);
     }
-    // xxx also print other settings
+    PRINTF("SIM_WIDTH %lf AU\n", sim_width/AU);
+    PRINTF("DT        %d  SEC\n", DT);
     PRINTF("-------------------------\n");   
 #endif
 
@@ -763,13 +798,22 @@ bool sim_gravity_display_simulation(bool new_display)
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
     sdl_render_text_font0(&ctl_pane, 8, 0, str, SDL_EVENT_NONE);
 
-    sprintf(str, "DT   %d SECS", DT);
+    if (DT >= 3600) {
+        sprintf(str, "DT   %d HOURS", DT/3600);
+    } else if (DT >= 60) {
+        sprintf(str, "DT   %d MINUTES", DT/60);
+    } else{
+        sprintf(str, "DT   %d SECONDS", DT);
+    }
     sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
+
+    sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "off");
+    sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
 
     if (state == STATE_RUN) {
         int32_t perf = (sim.sim_time - run_start_sim_time) / (microsec_timer()/1000000.0 - run_start_wall_time);
         sprintf(str, "RATE %d:1", perf);
-        sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
     }
 
     //
@@ -800,12 +844,20 @@ bool sim_gravity_display_simulation(bool new_display)
         sdl_play_event_sound();
         break;
     case SDL_EVENT_DT_PLUS:
-        DT += 1;
+        for (i = 0; i < MAX_VALID_DT-1; i++) {
+            if (DT == valid_dt[i]) {
+                DT = valid_dt[i+1];
+                break;
+            }
+        }
         sdl_play_event_sound();
         break;
     case SDL_EVENT_DT_MINUS:
-        if (DT > 1.1) {
-            DT -= 1;
+        for (i = 1; i < MAX_VALID_DT; i++) {
+            if (DT == valid_dt[i]) {
+                DT = valid_dt[i-1];
+                break;
+            }
         }
         sdl_play_event_sound();
         break;
@@ -977,11 +1029,12 @@ void * sim_gravity_thread(void * cx)
     INFO("thread starting, thread_id=%d\n", thread_id);
 
     while (true) {
-        // rendezvous
+        // barrier
         local_state = sim_gravity_barrier(thread_id);
 
         // process based on state
         if (local_state == STATE_RUN) {
+
             // These are the simulation equations for updating an objects X position 
             // and X component of velocity. Similar equations are implemented in the 
             // following code for Y position and velocity.
@@ -1012,14 +1065,19 @@ void * sim_gravity_thread(void * cx)
             // MYOBJ.X  = MYOBJ.X + DX
             // 
             // MYOBJ.VX = V2X
-            //
 
             int32_t i, k;
             double SUMX, SUMY, Mi, XDISTi, YDISTi, Ri, AX, AY, DX, DY, V1X, V1Y, V2X, V2Y, tmp;
+            position_t EVALOBJ_TMP_X, EVALOBJ_TMP_Y;
             object_t * EVALOBJ, * OTHEROBJ;
 
+            // each thread computes next position and next velocity of the objects
+            // for which they are responsible
             for (k = thread_id; k < sim.max_object; k += max_thread) {
                 EVALOBJ = sim.object[k];
+
+                EVALOBJ_TMP_X = POS_ADD(&EVALOBJ->X, EVALOBJ->VX * DT / 2);
+                EVALOBJ_TMP_Y = POS_ADD(&EVALOBJ->Y, EVALOBJ->VY * DT / 2);
 
                 SUMX = SUMY = 0;
                 for (i = 0; i < sim.max_object; i++) {
@@ -1028,8 +1086,8 @@ void * sim_gravity_thread(void * cx)
                     OTHEROBJ = sim.object[i];
 
                     Mi      = OTHEROBJ->MASS;
-                    XDISTi  = POS_SUB(&OTHEROBJ->X, &EVALOBJ->X);
-                    YDISTi  = POS_SUB(&OTHEROBJ->Y, &EVALOBJ->Y);
+                    XDISTi  = POS_SUB(&OTHEROBJ->X, &EVALOBJ_TMP_X);
+                    YDISTi  = POS_SUB(&OTHEROBJ->Y, &EVALOBJ_TMP_Y);
                     Ri      = sqrt(XDISTi * XDISTi + YDISTi * YDISTi);
                     if (Ri == 0) {
                         continue;
@@ -1056,19 +1114,25 @@ void * sim_gravity_thread(void * cx)
                 EVALOBJ->NEXT_VY = V2Y;
             }
 
+            // wait for all threads to finish updating the objects for which
+            // they are responsible
             sim_gravity_barrier(thread_id);
 
+            // thread zero does the final work
             if (thread_id == 0) {
                 int32_t day = sim.sim_time/86400;
                 static int32_t last_day;
+
                 for (k = 0; k < sim.max_object; k++) {
                     object_t * obj = sim.object[k];
+
+                    // store the object's new position and velocity
                     obj->X  = obj->NEXT_X;
                     obj->Y  = obj->NEXT_Y;
                     obj->VX = obj->NEXT_VX;
                     obj->VY = obj->NEXT_VY;
 
-                    // XXX more work here
+                    // if day has changed then save next entry in object's path
                     if (day != last_day) {
                         int32_t idx = obj->PATH_TAIL;
                         obj->PATH[idx].X = POS_TO_DBL(&obj->X);
@@ -1079,6 +1143,7 @@ void * sim_gravity_thread(void * cx)
                 }
                 last_day = day;
 
+                // update simulation time
                 sim.sim_time += DT;
             }
 
