@@ -1,9 +1,9 @@
-# SOLAR SYSTEM
+# SOLAR_SYSTEM
 
-# units for SIM_WIDTH are 'AU' or 'LIGHT_YEAR'
+# units for SIM_WIDTH are 'AU' or '"LY"'
 # units for DT is SEC
 
-PARAM SIM_WIDTH 2.5 AU
+PARAM SIM_WIDTH 3.0 AU
 PARAM DT        10 SEC 
 
 #                                                               Min Orbital

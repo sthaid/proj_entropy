@@ -83,6 +83,7 @@ int32_t main(int32_t argc, char **argv)
     }
 
     // exit 
+    // XXX core dump here, argv corrupt
     INFO("TERMINATING %s\n", argv[0]);
     sdl_terminate();
     return 0;

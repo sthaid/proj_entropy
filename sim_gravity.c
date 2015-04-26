@@ -1,9 +1,6 @@
+// XXX display error if bad file
 
-
-// XXX include DT in file too, with different values for android
-// XXX dt rate  1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,120,... 
-// XXX sim_width zoom and initial value,   1,3,10,30,100, ....
-// XXX display width in light years or AU
+// XXX different dt values for androoid
 // XXX add description to file
 // XXX select files
 // XXX add more files
@@ -12,12 +9,15 @@
 // XXX hover on planet to diplay name
 // XXX reset simpane to center and also default width ??
 
+// XXX display ceneter xy
+
 // DONE
 // - use different colors for planets
 // - display track
 // - arrange initial solor_system for minimal sun velocity
 // - stabilize moon
 // - add other stars
+// - is zoom in and out backwards
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -53,13 +53,12 @@
 // defines
 //
 
-#define G           6.673E-11       // mks units  
-#define AU          1.495978707E11  // meters
-#define LIGHT_YEAR  9.4605284E15    // meters
+#define G   6.673E-11       // mks units  
+#define AU  1.495978707E11  // meters
+#define LY  9.4605284E15    // meters
 
 #define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
-#define ZOOM_FACTOR                  (exp(log(10)/5)) //xxx
-#define SIM_WIDTH_DEFAULT            (AU * ZOOM_FACTOR * ZOOM_FACTOR) //xxx
+#define SIM_WIDTH_DEFAULT            (3*AU)
 
 #define MAX_OBJECT  1000
 #define MAX_THREAD  16
@@ -96,6 +95,9 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 #define MAX_VALID_DT (sizeof(valid_dt)/sizeof(valid_dt[0]))
+#define MAX_VALID_SIM_WIDTH (sizeof(valid_sim_width)/sizeof(valid_sim_width[0]))
+
+#define IS_CLOSE(a,b) ((a) >= 0.999*(b) && (a) <= 1.001*(b))
 
 //
 // typedefs
@@ -166,13 +168,23 @@ static const int32_t valid_dt[] = {
                         3600,2*3600,3*3600,4*3600,5*3600,6*3600,
                         86400, };
 
+static const double valid_sim_width[] = {
+                        .01*AU, .03*AU,
+                        .1*AU, .3*AU,
+                        1*AU, 3*AU,
+                        10*AU, 30*AU,
+                        100*AU, 300*AU,
+                        1000*AU, 3000*AU,
+                        10000*AU, 30000*AU,
+                        100000*AU, 300000*AU,
+                        1000000*AU, 3000000*AU, };
+
 // 
 // prototypes
 //
 
-int32_t sim_gravity_init(void);
+int32_t sim_gravity_init(char * filename);
 void sim_gravity_terminate(void);
-int32_t sim_gravity_init_sim_from_file(char * filename);
 void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object);
 bool sim_gravity_display(void);
 bool sim_gravity_display_simulation(bool new_display);
@@ -188,9 +200,7 @@ double sim_gravity_position_sub(position_t * x, position_t * y);
 
 void sim_gravity(void) 
 {
-    if (sim_gravity_init() != 0) {
-        return;
-    }
+    sim_gravity_init(DEFAULT_SIM_GRAVITY_FILENAME);
 
     while (true) {
         bool done = sim_gravity_display();
@@ -204,76 +214,7 @@ void sim_gravity(void)
 
 // -----------------  INIT & TERMINATE  -----------------------------------------
 
-int32_t sim_gravity_init(void) 
-{
-    int32_t i;
-
-    // print info msg
-    INFO("initialize start\n");
-
-    // initialize control values, the call below to sim_gravity_init_sim_from_file
-    // will also set these if it is successful
-    strncpy(sim.sim_name, "GRAVITY", sizeof(sim.sim_name)-1);
-    state       = STATE_STOP; 
-    tracker_obj = -1;
-    sim_x       = 0;
-    sim_y       = 0;
-    sim_width   = SIM_WIDTH_DEFAULT;
-    DT          = 5;
-
-    // init sim  
-    sim_gravity_init_sim_from_file(DEFAULT_SIM_GRAVITY_FILENAME);
-
-    // create worker threads
-#ifndef ANDROID
-    max_thread = sysconf(_SC_NPROCESSORS_ONLN) - 1;
-    if (max_thread == 0) {
-        max_thread = 1;
-    } else if (max_thread > MAX_THREAD) {
-        max_thread = MAX_THREAD;
-    }
-#else
-    max_thread = 1;
-#endif
-    INFO("max_thread=%d\n", max_thread);
-    for (i = 0; i < max_thread; i++) {
-        pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(int64_t)i);
-    }
-
-    // success
-    INFO("initialize complete\n");
-    return 0;
-}
-
-void sim_gravity_terminate(void)
-{
-    int32_t i;
-
-    // print info msg
-    INFO("terminate start\n");
-
-    // terminate threads
-    state = STATE_TERMINATE_THREADS;
-    for (i = 0; i < max_thread; i++) {
-        if (thread_id[i]) {
-            pthread_join(thread_id[i], NULL);
-            thread_id[i] = 0;
-        }
-    }
-
-    // free allocations 
-    for (i = 0; i < sim.max_object; i++) {
-        free(sim.object[i]);
-    }
-    bzero(&sim, sizeof(sim));
-
-    // done
-    INFO("terminate complete\n");
-}
-
-// -----------------  SIM GRAVITY INIT  -----------------------------------------
-
-int32_t sim_gravity_init_sim_from_file(char * filename) 
+int32_t sim_gravity_init(char * filename) 
 {
     #define MAX_BUFF  1000000
     #define MAX_RELTO 100
@@ -311,6 +252,32 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     bzero(object, sizeof(object));
     bzero(relto, sizeof(relto));
 
+    // print info msg
+    INFO("initialize start, filename %s\n", filename);
+
+    // terminate threads
+    state = STATE_TERMINATE_THREADS;
+    for (i = 0; i < max_thread; i++) {
+        if (thread_id[i]) {
+            pthread_join(thread_id[i], NULL);
+            thread_id[i] = 0;
+        }
+    }
+    max_thread = 0;
+
+    // reset variables  
+    for (i = 0; i < sim.max_object; i++) {
+        free(sim.object[i]);
+    }
+    bzero(&sim, sizeof(sim));
+    strncpy(sim.sim_name, "GRAVITY", sizeof(sim.sim_name)-1);
+    state       = STATE_STOP; 
+    tracker_obj = -1;
+    sim_x       = 0;
+    sim_y       = 0;
+    sim_width   = SIM_WIDTH_DEFAULT;
+    DT          = 1;
+
     // read file to memory buffer
     buff = malloc(MAX_BUFF);
     bzero(buff, MAX_BUFF);
@@ -323,7 +290,7 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     }
     len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
     if (len == 0) {
-        ERROR("read %s, %s\n", pathname, SDL_GetError());
+        ERROR("read %s, len=%d\n", pathname, len);
         ret = -1;
         goto done;
     }
@@ -361,12 +328,30 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
                 ret = -1;
                 goto done;
             }
-            if (strcmp(param_name, "SIM_WIDTH") == 0 && strcmp(param_units, "AU") == 0) {
-                new_sim_width = param_value * AU;
-            } else if (strcmp(param_name, "SIM_WIDTH") == 0 && strcmp(param_units, "LIGHT_YEAR") == 0) {
-                new_sim_width = param_value * LIGHT_YEAR;
+            if ((strcmp(param_name, "SIM_WIDTH") == 0) && 
+                (strcmp(param_units, "AU") == 0 || strcmp(param_units, "LY") == 0))
+            {
+                new_sim_width = param_value * (strcmp(param_units, "AU")==0 ? AU : LY);
+                for (i = MAX_VALID_SIM_WIDTH-1; i >= 0; i--) {
+                    if (new_sim_width >= valid_sim_width[i]) {
+                        new_sim_width = valid_sim_width[i];
+                        break;
+                    }
+                }
+                if (i == -1) {
+                    new_sim_width = valid_sim_width[0];
+                }
             } else if (strcmp(param_name, "DT") == 0 && strcmp(param_units, "SEC") == 0) {
                 new_dt = param_value;
+                for (i = MAX_VALID_DT-1; i >= 0; i--) {
+                    if (new_dt >= valid_dt[i]) {
+                        new_dt = valid_dt[i];
+                        break;
+                    }
+                }
+                if (i == -1) {
+                    new_dt = valid_dt[0];
+                }
             } else {
                 ERROR("param line %d invalid in file %s\n", line, filename);
                 ret = -1;
@@ -395,8 +380,12 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         last_idx = idx;
 
         // initialize obj, note DISP_R field is initialized by call to sim_gravity_set_obj_disp_r below
-        // xxx check alloc
         object_t * obj = calloc(1,OBJ_ALLOC_SIZE(MAX_PATH));
+        if (obj == NULL) {
+            ERROR("calloc obj failed, size %d\n", (int32_t)OBJ_ALLOC_SIZE(MAX_PATH));
+            ret = -1;
+            goto done;
+        }
         strncpy(obj->NAME, NAME, MAX_NAME-1);
         obj->X          = DBL_TO_POS(X + relto[idx-1].X);
         obj->Y          = DBL_TO_POS(Y + relto[idx-1].Y);
@@ -421,15 +410,8 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
     sim_gravity_set_obj_disp_r(object, max_object);
 
     // success ...
-    // xxx stop all threads when this is being run
 
-    // free existing sim objects 
-    for (i = 0; i < sim.max_object; i++) {
-        free(sim.object[i]);
-    }
-    bzero(&sim,sizeof(sim));
-
-    // incorporate new objects into sim
+    // init sim
     strncpy(sim.sim_name, filename, sizeof(sim.sim_name)-1);
     for (i = 0; sim.sim_name[i]; i++) {
         sim.sim_name[i] = toupper(sim.sim_name[i]);
@@ -440,28 +422,28 @@ int32_t sim_gravity_init_sim_from_file(char * filename)
         sim.object[i] = object[i];
         object[i] = NULL;
     }
-
-    // sanitize new_dt
-    for (i = MAX_VALID_DT-1; i >= 0; i--) {
-        if (new_dt >= valid_dt[i]) {
-            new_dt = valid_dt[i];
-            break;
-        }
-    }
-    if (i == -1) {
-        new_dt = valid_dt[0];
-    }
-
-    // update control variables
-    state       = STATE_STOP; 
-    tracker_obj = -1;
-    sim_x       = 0;
-    sim_y       = 0;
     sim_width   = new_sim_width;
     DT          = new_dt;
 
-    // set success return status
-    ret = 0;
+    // create worker threads
+#ifndef ANDROID
+    if (sim.max_object >= 10) {
+        max_thread = sysconf(_SC_NPROCESSORS_ONLN) - 1;
+        if (max_thread == 0) {
+            max_thread = 1;
+        } else if (max_thread > MAX_THREAD) {
+            max_thread = MAX_THREAD;
+        }
+    } else {
+        max_thread = 1;
+    }
+#else
+    max_thread = 1;
+#endif
+    INFO("max_thread=%d\n", max_thread);
+    for (i = 0; i < max_thread; i++) {
+        pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(int64_t)i);
+    }
 
 #if 1
     // print simulation config
@@ -497,7 +479,36 @@ done:
     }
     free(buff);
 
+    // success
+    INFO("initialize complete, ret=%d\n", ret);
     return ret;
+}
+
+void sim_gravity_terminate(void)
+{
+    int32_t i;
+
+    // print info msg
+    INFO("terminate start\n");
+
+    // terminate threads
+    state = STATE_TERMINATE_THREADS;
+    for (i = 0; i < max_thread; i++) {
+        if (thread_id[i]) {
+            pthread_join(thread_id[i], NULL);
+            thread_id[i] = 0;
+        }
+    }
+    max_thread = 0;
+
+    // free allocations 
+    for (i = 0; i < sim.max_object; i++) {
+        free(sim.object[i]);
+    }
+    bzero(&sim, sizeof(sim));
+
+    // done
+    INFO("terminate complete\n");
 }
 
 void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
@@ -668,7 +679,7 @@ bool sim_gravity_display_simulation(bool new_display)
         int32_t    disp_x, disp_y, disp_r, disp_color;
         int32_t    obj_idx, tracker_idx, idx_step, count, total, max_path;
         double     X, Y, X_ORIGIN, Y_ORIGIN;
-        SDL_Point  points[1000]; //xxx
+        SDL_Point  points[120];
 
         // display the object ...
 
@@ -700,8 +711,8 @@ bool sim_gravity_display_simulation(bool new_display)
         sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
 
         // display object's path ...
-        // xxx clean up and comment
 
+        // initialize 
         if (tracker_obj == -1) {
             obj_tracker = NULL;
             max_path = obj->MAX_PATH;
@@ -716,15 +727,17 @@ bool sim_gravity_display_simulation(bool new_display)
             obj_idx = (obj->PATH_TAIL == 0 ? obj->MAX_PATH-1 : obj->PATH_TAIL-1);
             tracker_idx = (obj_tracker->PATH_TAIL == 0 ? obj_tracker->MAX_PATH-1 : obj_tracker->PATH_TAIL-1);
         }
-
-        if (obj == obj_tracker) {
-            continue;
-        }
-
         idx_step = (max_path/100 >= 1 ? max_path/100 : 1);
         total = max_path / idx_step;
         count = 0;
 
+        // if the object being displayed is the tracker object then 
+        // there is no path, so continue
+        if (obj == obj_tracker) {
+            continue;
+        }
+
+        // loop over path points, constructing the points[] array
         while (true) {
             if (obj_tracker == NULL) {
                 X_ORIGIN = sim_x;
@@ -758,12 +771,17 @@ bool sim_gravity_display_simulation(bool new_display)
                                : tracker_idx-idx_step);
             }
         }
+
+        // display the lines that connect the points[] array
         SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255);
         SDL_RenderDrawLines(sdl_renderer, points, count);
     }
 
     // display sim_pane title
     sprintf(str, "WIDTH %0.2lf AU", sim_width/AU);
+    if (sim_width >= 999*AU) {
+        sprintf(str+strlen(str), " %0.2lf LY", sim_width/LY);
+    }
     sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
 
     // register sim_pane controls
@@ -811,8 +829,8 @@ bool sim_gravity_display_simulation(bool new_display)
     sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
 
     if (state == STATE_RUN) {
-        int32_t perf = (sim.sim_time - run_start_sim_time) / (microsec_timer()/1000000.0 - run_start_wall_time);
-        sprintf(str, "RATE %d:1", perf);
+        double perf = (sim.sim_time * 1000000 - run_start_sim_time) / (microsec_timer() - run_start_wall_time);
+        sprintf(str, "RATE %0.3lE", perf);
         sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
     }
 
@@ -830,8 +848,8 @@ bool sim_gravity_display_simulation(bool new_display)
     switch (event->event) {
     case SDL_EVENT_RUN:
         state = STATE_RUN;
-        run_start_sim_time = sim.sim_time;
-        run_start_wall_time = microsec_timer() / 1000000.0;
+        run_start_sim_time = sim.sim_time * 1000000;
+        run_start_wall_time = microsec_timer();
         sdl_play_event_sound();
         break;
     case SDL_EVENT_STOP:
@@ -866,12 +884,22 @@ bool sim_gravity_display_simulation(bool new_display)
         curr_display = CURR_DISPLAY_SELECTION;
         sdl_play_event_sound();
         break;
-    case SDL_EVENT_SIMPANE_ZOOM_IN:
-        sim_width /= ZOOM_FACTOR;
+    case SDL_EVENT_SIMPANE_ZOOM_OUT:
+        for (i = 0; i < MAX_VALID_SIM_WIDTH-1; i++) {
+            if (IS_CLOSE(sim_width, valid_sim_width[i])) {
+                sim_width = valid_sim_width[i+1];
+                break;
+            }
+        }
         sdl_play_event_sound();
         break;
-    case SDL_EVENT_SIMPANE_ZOOM_OUT:
-        sim_width *= ZOOM_FACTOR;
+    case SDL_EVENT_SIMPANE_ZOOM_IN:
+        for (i = 1; i < MAX_VALID_SIM_WIDTH; i++) {
+            if (IS_CLOSE(sim_width, valid_sim_width[i])) {
+                sim_width = valid_sim_width[i-1];
+                break;
+            }
+        }
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
@@ -932,6 +960,7 @@ bool sim_gravity_display_selection(bool new_display)
     static int32_t max_select_filenames;
     static char ** select_filenames;
 
+    // XXX maybe this causes the core dump
     #define LIST_FILES_FREE() \
         do { \
             list_files_free(max_select_filenames, select_filenames); \
@@ -1001,7 +1030,7 @@ bool sim_gravity_display_selection(bool new_display)
     if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_select_filenames) {
         sdl_play_event_sound();
         selection = event->event - SDL_EVENT_USER_START;
-        INFO("xxx GOT SELECTION %d\n", selection);
+        sim_gravity_init(select_filenames[selection]);
         LIST_FILES_FREE();
         curr_display = CURR_DISPLAY_SIMULATION;
     } else if (event->event == SDL_EVENT_BACK) {
