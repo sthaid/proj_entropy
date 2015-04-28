@@ -15,10 +15,10 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
                     $(LOCAL_PATH)/$(SDL_MIXER_PATH) 
 
 LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.c \
-                   main.c util.c sim_container.c 
+                   main.c util.c sim_container.c sim_gravity.c
 
 LOCAL_SHARED_LIBRARIES := SDL2 SDL2_ttf SDL2_mixer 
 
-LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -llog
+LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -llog -landroid
 
 include $(BUILD_SHARED_LIBRARY)

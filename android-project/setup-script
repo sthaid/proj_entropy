@@ -82,6 +82,7 @@ sed -i.orig \
 ln -s ../../../main.c           jni/src
 ln -s ../../../util.c           jni/src
 ln -s ../../../sim_container.c  jni/src
+ln -s ../../../sim_gravity.c    jni/src
 ln -s ../../../util.h           jni/src
 ln -s ../../../button_sound.h   jni/src
 
@@ -96,6 +97,11 @@ sed -i.orig \
     -e "/^SUPPORT_MP3_SMPEG/ s/true/false/" \
     -e "/^SUPPORT_OGG/ s/true/false/" \
     jni/SDL2_mixer-2.0.0/Android.mk
+
+# update src/core/android/SDL_android.c, change mActivityClass to external
+sed -i.orig \
+    -e "/static jclass mActivityClass;/ c jclass mActivityClass;" \
+    jni/SDL2-2.0.3/src/core/android/SDL_android.c
 
 # add assets directory, and populate
 mkdir assets
