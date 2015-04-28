@@ -1,15 +1,19 @@
+// XXX fixes to wikiscience
+
+// XXX list files util should sort
 // XXX display error if bad file
-
-// XXX different dt values for androoid
 // XXX add description to file
-// XXX select files
-// XXX add more files
+// XXX select from web
 
+// XXX add more files ...
+// XXX solar_sys plus rouge star
+// XXX 3 body
 // XXX add more moons, on jupiter
-// XXX hover on planet to diplay name
-// XXX reset simpane to center and also default width ??
 
-// XXX display ceneter xy
+// XXX run on android
+// XXX different dt values for androoid
+// XXX hover on planet to diplay name
+
 
 // DONE
 // - use different colors for planets
@@ -18,9 +22,12 @@
 // - stabilize moon
 // - add other stars
 // - is zoom in and out backwards
+// - select files
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
+// - display ceneter xy
+// - reset simpane to center and also default width ??
 
 // ----------------------------------------------------------------------------------------------------
 // -----------------  BEGIN  --------------------------------------------------------------------------
@@ -104,7 +111,11 @@
 //
 
 typedef struct {
+#ifndef ANDROID
     __int128_t private;
+#else
+    double private;
+#endif
 } position_t;
 
 typedef struct {
@@ -442,7 +453,7 @@ int32_t sim_gravity_init(char * filename)
 #endif
     INFO("max_thread=%d\n", max_thread);
     for (i = 0; i < max_thread; i++) {
-        pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(int64_t)i);
+        pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(long)i);
     }
 
 #if 1
@@ -1051,7 +1062,7 @@ bool sim_gravity_display_selection(bool new_display)
 
 void * sim_gravity_thread(void * cx)
 {
-    int32_t thread_id = (int64_t)cx;
+    int32_t thread_id = (long)cx;
     int32_t local_state;
 
     // all threads print starting message
@@ -1188,6 +1199,7 @@ void * sim_gravity_thread(void * cx)
     return NULL;
 }
 
+#ifndef ANDROID
 int32_t sim_gravity_barrier(int32_t thread_id)
 {
     static volatile int32_t count[MAX_THREAD];
@@ -1236,7 +1248,15 @@ int32_t sim_gravity_barrier(int32_t thread_id)
 
     return ret_state;
 }        
+#else
+// XXX ??
+int32_t sim_gravity_barrier(int32_t thread_id)
+{
+    return state;
+}        
+#endif
 
+#ifndef ANDROID
 double sim_gravity_cvt_position_to_double(position_t * x)
 {
     return x->private >> 30;
@@ -1262,6 +1282,34 @@ double sim_gravity_position_sub(position_t * x, position_t * y)
 {
     return (x->private - y->private) >> 30;
 }
+#else
+double sim_gravity_cvt_position_to_double(position_t * x)
+{
+    return x->private;
+}
+
+position_t sim_gravity_cvt_double_to_position(double x)
+{
+    position_t result;
+
+    result.private = x;
+    return result;
+}
+
+position_t sim_gravity_position_add(position_t * x, double y)
+{
+    position_t result;
+
+    result.private = x->private + y;
+    return result;
+}
+
+double sim_gravity_position_sub(position_t * x, position_t * y)
+{
+    return (x->private - y->private);
+}
+
+#endif
 
 
 
