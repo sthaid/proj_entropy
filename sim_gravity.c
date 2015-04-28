@@ -110,6 +110,7 @@
 // typedefs
 //
 
+// XXX don't like this
 typedef struct {
 #ifndef ANDROID
     __int128_t private;
