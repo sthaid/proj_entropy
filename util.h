@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <libgen.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -31,7 +32,7 @@ void sim_gravity(void);
 
 // -----------------  VERSION  ------------------------------------------------------
 
-// xxx use this
+// xxx use this, and build date
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0
 
@@ -144,7 +145,7 @@ void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos);
 sdl_event_t * sdl_poll_event(void);
 void sdl_play_event_sound(void);
 void sdl_get_string(int32_t count, ...);
-void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba);
+void sdl_render_rect(SDL_Rect * rect, int32_t line_width, uint32_t rgba);
 SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba);
 void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture);
 
@@ -237,10 +238,15 @@ uint64_t get_real_time_us(void);
 char * time2str(char * str, time_t time, bool gmt);
 char * dur2str(char * str, int64_t duration);
 
-// -----------------  LIST FILES IN DIRECTORY  ---------------------------------------
+// -----------------  FILE ACCESS  ---------------------------------------------------
 
-void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg);
-void list_files_free(int32_t max_arg, char ** filenames_arg);
+typedef void file_t;
+
+void list_files(char * location, int32_t * max, char *** pathnames);
+void list_files_free(int32_t max, char ** pathnames);
+file_t * open_file(char * pathname);
+char * read_file_line(file_t * file);
+void close_file(file_t * file);
 
 // -----------------  MISC  ----------------------------------------------------------
 

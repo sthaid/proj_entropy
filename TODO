@@ -4,3 +4,9 @@
 - choose a linux font that is universal
 - all other XXX and xxx tagged issued
 
+
+04/27/15 22:08:33 INFO sim_gravity_thread: thread terminating, thread_id=0
+04/27/15 22:08:33 INFO sim_gravity_thread: thread terminating, thread_id=1
+04/27/15 22:08:33 INFO sim_gravity_terminate: terminate complete
+Segmentation fault (core dumped)
+

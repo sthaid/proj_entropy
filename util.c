@@ -27,7 +27,6 @@ typedef struct {
 static sdl_event_reg_t sdl_event_reg_tbl[SDL_EVENT_MAX];
 
 // color to rgba
-// xxx add more colors 
 uint32_t sdl_pixel_rgba[] = {
     //    red           green          blue    alpha
        (127 << 24) |               (255 << 8) | 255,     // PURPLE
@@ -1117,47 +1116,204 @@ char * dur2str(char * str, int64_t duration)
     return str;
 }
 
-// -----------------  LIST FILES IN DIRECTORY  ----------------------------
+// -----------------  FILE ACCESS  ----------------------------------------
+
+// xxx this section needs work
+typedef struct {
+    char * buff;
+    size_t offset;
+} File_t;
+
+static void list_local_files(char * location, int32_t * max, char *** pathnames);
+static void list_cloud_files(char * location, int32_t * max, char *** pathnames);
+
+void list_files(char * location, int32_t * max, char *** pathnames)
+{
+    if (location[strlen(location)-1] != '/') {
+        ERROR("invalid location '%s'\n", location);
+        *max = 0;
+        *pathnames = NULL;
+        return;
+    }
+
+    if (strncmp(location, "http://", 7) != 0) {
+        list_local_files(location, max, pathnames);
+    } else {
+        list_cloud_files(location, max, pathnames);
+    }
+}
+
+void list_files_free(int32_t max, char ** pathnames)
+{
+    int32_t i;
+    for (i = 0; i < max; i++) {
+        free(pathnames[i]);
+    }
+    free(pathnames);
+}
+
+void * open_file(char * pathname)
+{
+    #define MAX_BUFF  1000000 
+
+    File_t * F = NULL;
+    void   * buff;
+
+    buff = calloc(1,MAX_BUFF);
+
+    if (strncmp(pathname, "http://", 7) != 0) {
+        SDL_RWops * rw;
+        size_t      len;
+
+        rw = SDL_RWFromFile(pathname, "r");
+        if (rw == NULL) {
+            ERROR("open %s, %s\n", pathname, SDL_GetError());
+            goto error;
+        }
+
+        len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
+        if (len == 0) {
+            ERROR("read %s, len=%d\n", pathname, (int32_t)len);
+            SDL_RWclose(rw);
+            goto error;
+        }
+
+        SDL_RWclose(rw);
+    } else {
+        char   cmd[200];
+        char   s[200];
+        size_t offset;
+        FILE * fp;
+
+        // xxx check for overun
+        sprintf(cmd, "curl %s 2>/dev/null", pathname); 
+        fp = popen(cmd, "r");
+        if (fp == NULL) {
+            ERROR("popen %s\n", cmd);
+            goto error;
+        }
+
+        offset = 0;
+        while (fgets(s, sizeof(s), fp) != NULL) {
+            strcpy(buff+offset, s);
+            offset += strlen(s);
+        }
+
+        fclose(fp);
+    }
+
+    F = calloc(1,sizeof(file_t));
+    F->buff = buff;
+    F->offset = 0;
+    return F;
+
+error:
+    free(F);
+    free(buff);
+    return NULL;
+}
+
+char * read_file_line(file_t * f)
+{
+    File_t * F = f;
+    char   * s;
+    char   * tmp;
+
+    if (F->buff[F->offset] == '\0') {
+        return NULL;
+    }
+
+    s = &F->buff[F->offset];
+    tmp = strchr(s, '\n');
+    if (tmp != NULL) {
+        *tmp = 0;
+        F->offset = tmp - F->buff + 1;
+    } else {
+        F->offset = s + strlen(s) - F->buff;
+    }
+
+    return s;
+}
+
+void close_file(file_t * f)
+{
+    File_t * F = f;
+
+    if (F == NULL) {
+        return;
+    }
+
+    free(F->buff);
+    free(F);
+}
+
+static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
+{
+    FILE * fp;
+    char * fn, * tmp;
+    char   s[200];
+    char   cmd[200];
+
+    *max = 0;
+    *pathnames = calloc(1000,sizeof(char*)); //xxx
+
+    sprintf(cmd, "curl %s 2>/dev/null", location);  //xxx test on android too
+    fp = popen(cmd, "r");
+    if (fp == NULL) {
+        ERROR("popen %s\n", cmd);
+        return;
+    }
+
+    while (fgets(s, sizeof(s), fp) != NULL) {
+        if (strncmp(s, "<a href=\"", 9) == 0) {
+            fn = s+9;
+            tmp = strchr(fn, '\"');
+            if (tmp == NULL) {
+                ERROR("no closing quote\n");
+                break;
+            }
+            *tmp = '\0';
+
+            (*pathnames)[*max] = malloc(strlen(location)+strlen(fn)+1);
+            sprintf((*pathnames)[*max], "%s%s", location, fn);
+            (*max)++;
+        }
+    }
+
+    fclose(fp);
+}
 
 #ifndef ANDROID
 
-// XXX this section needs work
-
-void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
+static void list_local_files(char * location, int32_t * max, char *** pathnames)
 {
-    DIR * dir;
+    DIR           * dir;
     struct dirent * dirent;
-    char ** filenames;
-    int32_t max = 0, ret;
-    struct stat buf;
-    char path[300];
+    int32_t         ret;
+    struct stat     buf;
+    char            path[300];
 
-    *max_arg = 0;
-    *filenames_arg = NULL;
+    *max = 0;
+    *pathnames = calloc(1000,sizeof(char*)); //xxx
 
-    dir = opendir(dirname);
+    dir = opendir(location);
     if (dir == NULL) {
         return;
     }
 
-    filenames = malloc(1000); //XXX
-
     while ((dirent = readdir(dir)) != NULL) {
-        sprintf(path, "%s/%s", dirname, dirent->d_name);
+        sprintf(path, "%s%s", location, dirent->d_name);
         ret = stat(path, &buf);
         if (ret != 0 || !S_ISREG(buf.st_mode)) {
             continue;
         }
 
-        filenames[max] = malloc(strlen(dirent->d_name)+1);
-        strcpy(filenames[max], dirent->d_name);
-        max++;
+        (*pathnames)[*max] = malloc(strlen(location)+strlen(dirent->d_name)+1);
+        sprintf((*pathnames)[*max], "%s%s", location, dirent->d_name);
+        (*max)++;
     }
 
     closedir(dir);
-
-    *max_arg = max;
-    *filenames_arg = filenames;
 }
 
 #else
@@ -1165,30 +1321,27 @@ void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
 JNIEnv* Android_JNI_GetEnv(void);
 extern jclass mActivityClass;
 
-void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
+static void list_local_files(char * location, int32_t * max, char *** pathnames)
 {
-    jmethodID mid;
-    jobject context;
-    jobject java_asset_manager;
+    jmethodID       mid;
+    jobject         context;
+    jobject         java_asset_manager;
     AAssetManager * asset_manager;
-    AAssetDir * asset_dir;
-    char ** filenames;
-    const char * fn;
-    int32_t max = 0;
-    JNIEnv *mEnv = Android_JNI_GetEnv();
+    AAssetDir     * asset_dir;
+    const char    * fn;
+    JNIEnv        * mEnv = Android_JNI_GetEnv();
 
-    // preset returns
-    *max_arg = 0;
-    *filenames_arg = NULL;
-
-    // XXX comments
+    // xxx comments
     // src/core/android/SDL_android.c
 
-    // XXX 
+    *max = 0;
+    *pathnames = calloc(1000,sizeof(char*)); //xxx
+
+    // xxx 
     (*mEnv)->PushLocalFrame(mEnv, 16);
 
     // context = SDLActivity.getContext(); 
-    mid = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,   // XXX mActivityClass
+    mid = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,   // xxx mActivityClass
             "getContext","()Landroid/content/Context;");
     context = (*mEnv)->CallStaticObjectMethod(mEnv, mActivityClass, mid);
 
@@ -1197,38 +1350,23 @@ void list_files(char * dirname, int32_t * max_arg, char *** filenames_arg)
             "getAssets", "()Landroid/content/res/AssetManager;");
     java_asset_manager = (*mEnv)->CallObjectMethod(mEnv, context, mid);
 
-    // XXX
+    // xxx
     asset_manager = AAssetManager_fromJava(mEnv, java_asset_manager);
 
-    // XXX
-    filenames = malloc(1000); //XXX
-    asset_dir = AAssetManager_openDir(asset_manager, dirname);  //XXX 
+    // xxx
+    asset_dir = AAssetManager_openDir(asset_manager, location);  //xxx 
     while ((fn = AAssetDir_getNextFileName(asset_dir)) != NULL) {
-        filenames[max] = malloc(strlen(fn)+1);
-        strcpy(filenames[max], fn);
-        max++;
+        (*pathnames)[*max] = malloc(strlen(location)+strlen(fn)+1);
+        sprintf((*pathnames)[*max], "%s%s", location, fn);
+        (*max)++;
     }
     AAssetDir_close(asset_dir);
 
-    // XXX
+    // xxx
     (*mEnv)->PopLocalFrame(mEnv, NULL);
-
-    // XXX 
-    *max_arg = max;
-    *filenames_arg = filenames;
 }
 
 #endif
-
-void list_files_free(int32_t max_arg, char ** filenames_arg)
-{
-    int32_t i;
-
-    for (i = 0; i < max_arg; i++) {
-        free(filenames_arg[i]);
-    }
-    free(filenames_arg);
-}
 
 // -----------------  MISC UTILS  -----------------------------------------
 

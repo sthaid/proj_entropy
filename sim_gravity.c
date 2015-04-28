@@ -3,12 +3,11 @@
 // XXX list files util should sort
 // XXX display error if bad file
 // XXX add description to file
-// XXX select from web
 
 // XXX add more files ...
-// XXX solar_sys plus rouge star
-// XXX 3 body
-// XXX add more moons, on jupiter
+// XXX solar_sys plus rouge star    CLOUD
+// XXX 3 body                       LOCAL
+// XXX add more moons, on jupiter   LOCAL
 
 // XXX run on android
 // XXX different dt values for androoid
@@ -23,6 +22,7 @@
 // - add other stars
 // - is zoom in and out backwards
 // - select files
+// - select from web
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -64,7 +64,7 @@
 #define AU  1.495978707E11  // meters
 #define LY  9.4605284E15    // meters
 
-#define DEFAULT_SIM_GRAVITY_FILENAME "solar_system"
+#define DEFAULT_SIM_GRAVITY_PATHNAME "sim_gravity/solar_system"
 #define SIM_WIDTH_DEFAULT            (3*AU)
 
 #define MAX_OBJECT  1000
@@ -75,7 +75,8 @@
 #define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
 #define SDL_EVENT_DT_PLUS                (SDL_EVENT_USER_START + 2)
 #define SDL_EVENT_DT_MINUS               (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_SELECT                 (SDL_EVENT_USER_START + 4)
+#define SDL_EVENT_SELECT_LOCAL           (SDL_EVENT_USER_START + 4)
+#define SDL_EVENT_SELECT_CLOUD           (SDL_EVENT_USER_START + 5)
 #define SDL_EVENT_SIMPANE_ZOOM_IN        (SDL_EVENT_USER_START + 10)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
@@ -91,8 +92,9 @@
      (s) == STATE_RUN               ? "RUN"               : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
-#define CURR_DISPLAY_SIMULATION 0
-#define CURR_DISPLAY_SELECTION  1
+#define CURR_DISPLAY_SIMULATION   0
+#define CURR_DISPLAY_SELECT_LOCAL 1
+#define CURR_DISPLAY_SELECT_CLOUD 2
 
 #define POS_TO_DBL sim_gravity_cvt_position_to_double
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
@@ -110,7 +112,7 @@
 // typedefs
 //
 
-// XXX don't like this
+// xxx don't like this
 typedef struct {
 #ifndef ANDROID
     __int128_t private;
@@ -195,12 +197,12 @@ static const double valid_sim_width[] = {
 // prototypes
 //
 
-int32_t sim_gravity_init(char * filename);
+int32_t sim_gravity_init(char * pathname);
 void sim_gravity_terminate(void);
 void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object);
 bool sim_gravity_display(void);
 bool sim_gravity_display_simulation(bool new_display);
-bool sim_gravity_display_selection(bool new_display);
+bool sim_gravity_display_select(bool new_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
 double sim_gravity_cvt_position_to_double(position_t * x);
@@ -212,7 +214,7 @@ double sim_gravity_position_sub(position_t * x, position_t * y);
 
 void sim_gravity(void) 
 {
-    sim_gravity_init(DEFAULT_SIM_GRAVITY_FILENAME);
+    sim_gravity_init(DEFAULT_SIM_GRAVITY_PATHNAME);
 
     while (true) {
         bool done = sim_gravity_display();
@@ -226,9 +228,8 @@ void sim_gravity(void)
 
 // -----------------  INIT & TERMINATE  -----------------------------------------
 
-int32_t sim_gravity_init(char * filename) 
+int32_t sim_gravity_init(char * pathname) 
 {
-    #define MAX_BUFF  1000000
     #define MAX_RELTO 100
 
     #define OBJ_ALLOC_SIZE(max_path) (sizeof(object_t) + (max_path) * sizeof(struct path_s))
@@ -242,17 +243,15 @@ int32_t sim_gravity_init(char * filename)
 
     object_t  * object[MAX_OBJECT];
 
-    char        pathname[200];
-    int32_t     len, i, cnt;
-    char      * s, * s_next, * tmp;
+    int32_t     i, cnt;
+    char      * s;
     object_t  * obj;
     relto_t     relto[MAX_RELTO];
+    char        shortname[200];
     double      X, Y, VX, VY, MASS, RADIUS;
     char        NAME[100], COLOR[100];
     int32_t     MAX_PATH;
 
-    SDL_RWops * rw            = NULL;
-    char      * buff          = NULL;
     int32_t     ret           = 0;
     int32_t     line          = 0;
     int32_t     idx           = 0;
@@ -260,12 +259,13 @@ int32_t sim_gravity_init(char * filename)
     int32_t     max_object    = 0;
     double      new_sim_width = sim_width;
     int32_t     new_dt        = DT;
+    file_t    * file          = NULL;
 
     bzero(object, sizeof(object));
     bzero(relto, sizeof(relto));
 
     // print info msg
-    INFO("initialize start, filename %s\n", filename);
+    INFO("initialize start, pathname %s\n", pathname);
 
     // terminate threads
     state = STATE_TERMINATE_THREADS;
@@ -290,33 +290,17 @@ int32_t sim_gravity_init(char * filename)
     sim_width   = SIM_WIDTH_DEFAULT;
     DT          = 1;
 
-    // read file to memory buffer
-    buff = malloc(MAX_BUFF);
-    bzero(buff, MAX_BUFF);
-    sprintf(pathname, "%s/%s", "sim_gravity", filename);
-    rw = SDL_RWFromFile(pathname, "r");
-    if (rw == NULL) {
-        ERROR("open %s, %s\n", pathname, SDL_GetError());
+    // open pathname
+    file = open_file(pathname);
+    if (file == NULL) {
+        ERROR("open_file %s\n", pathname);
         ret = -1;
         goto done;
     }
-    len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
-    if (len == 0) {
-        ERROR("read %s, len=%d\n", pathname, len);
-        ret = -1;
-        goto done;
-    }
-
-    // read lines from buff
-    for (s = buff; *s; s = s_next) {
-        // find newline and replace with 0, and set s_next
-        tmp = strchr(s, '\n');
-        if (tmp != NULL) {
-            *tmp = 0;
-            s_next = tmp + 1;
-        } else {
-            s_next = s + strlen(s);
-        }
+        
+    // process the file
+    while ((s = read_file_line(file)) != NULL) {
+        // increment line number
         line++;
 
         // if line begins with '#', or is blank then skip
@@ -336,7 +320,7 @@ int32_t sim_gravity_init(char * filename)
             double param_value;
 
             if (sscanf(s+6, "%s %lf %s", param_name, &param_value, param_units) != 3) {
-                ERROR("param line %d invalid in file %s\n", line, filename);
+                ERROR("param line %d invalid in %s\n", line, pathname);
                 ret = -1;
                 goto done;
             }
@@ -365,7 +349,7 @@ int32_t sim_gravity_init(char * filename)
                     new_dt = valid_dt[0];
                 }
             } else {
-                ERROR("param line %d invalid in file %s\n", line, filename);
+                ERROR("param line %d invalid in %s\n", line, pathname);
                 ret = -1;
                 goto done;
             }
@@ -376,7 +360,7 @@ int32_t sim_gravity_init(char * filename)
         cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s %d",
                      NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR, &MAX_PATH);
         if (cnt != 9) {
-            ERROR("line %d invalid in file %s\n", line, filename);
+            ERROR("line %d invalid in file %s\n", line, pathname);
             ret = -1;
             goto done;
         }
@@ -424,7 +408,8 @@ int32_t sim_gravity_init(char * filename)
     // success ...
 
     // init sim
-    strncpy(sim.sim_name, filename, sizeof(sim.sim_name)-1);
+    strcpy(shortname, pathname);
+    strncpy(sim.sim_name, basename(shortname), sizeof(sim.sim_name)-1);
     for (i = 0; sim.sim_name[i]; i++) {
         sim.sim_name[i] = toupper(sim.sim_name[i]);
     }
@@ -459,7 +444,7 @@ int32_t sim_gravity_init(char * filename)
 
 #if 1
     // print simulation config
-    PRINTF("------ FILENAME %s ------\n", filename);   
+    PRINTF("------ PATHNAME %s ------\n", pathname);   
     PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R     MAX_PATH\n");
          // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------
     for (i = 0; i < sim.max_object; i++) {
@@ -483,13 +468,12 @@ int32_t sim_gravity_init(char * filename)
 
 done:
     // cleanup and return
-    if (rw != NULL) {
-        SDL_RWclose(rw);
+    if (file != NULL) {
+        close_file(file);
     }
     for (i = 0; i < MAX_OBJECT; i++) {
         free(object[i]);
     }
-    free(buff);
 
     // success
     INFO("initialize complete, ret=%d\n", ret);
@@ -609,8 +593,13 @@ bool sim_gravity_display(void)
 
     if (curr_display == CURR_DISPLAY_SIMULATION) {
         done = sim_gravity_display_simulation(new_display);
+    } else if (curr_display == CURR_DISPLAY_SELECT_LOCAL || 
+               curr_display == CURR_DISPLAY_SELECT_CLOUD) 
+    {
+        done = sim_gravity_display_select(new_display);
     } else {
-        done = sim_gravity_display_selection(new_display);
+        ERROR("curr_display %d is invalid\n", curr_display);
+        done = true;
     }
 
     if (done) {
@@ -821,7 +810,8 @@ bool sim_gravity_display_simulation(bool new_display)
     sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",    SDL_EVENT_STOP);
     sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",     SDL_EVENT_DT_PLUS);
     sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",     SDL_EVENT_DT_MINUS);
-    sdl_render_text_font0(&ctl_pane,  6, 0,  "SELECT",  SDL_EVENT_SELECT);
+    sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",   SDL_EVENT_SELECT_LOCAL);
+    sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",   SDL_EVENT_SELECT_CLOUD);
     sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",    SDL_EVENT_BACK);
 
     // display status lines
@@ -891,9 +881,14 @@ bool sim_gravity_display_simulation(bool new_display)
         }
         sdl_play_event_sound();
         break;
-    case SDL_EVENT_SELECT:
+    case SDL_EVENT_SELECT_LOCAL:
         state = STATE_STOP;
-        curr_display = CURR_DISPLAY_SELECTION;
+        curr_display = CURR_DISPLAY_SELECT_LOCAL;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT_CLOUD:
+        state = STATE_STOP;
+        curr_display = CURR_DISPLAY_SELECT_CLOUD;
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_OUT:
@@ -961,32 +956,37 @@ bool sim_gravity_display_simulation(bool new_display)
     return done;
 }
 
-bool sim_gravity_display_selection(bool new_display)
+bool sim_gravity_display_select(bool new_display)
 {
     SDL_Rect       title_line_pane;
     SDL_Rect       selection_pane;
     int32_t        title_line_pane_height, i, selection;
     sdl_event_t  * event;
+    char           shortname[200];
     bool           done = false;
 
-    static int32_t max_select_filenames;
-    static char ** select_filenames;
+    static int32_t max_pathname;
+    static char ** pathname;
 
-    // XXX maybe this causes the core dump
     #define LIST_FILES_FREE() \
         do { \
-            list_files_free(max_select_filenames, select_filenames); \
-            max_select_filenames = 0; \
-            select_filenames = NULL; \
+            list_files_free(max_pathname, pathname); \
+            max_pathname = 0; \
+            pathname = NULL; \
         } while (0)
+
+    // xxx needs scroll up/down
 
     //
     // if this display has just been activated then 
-    // obtain list of files in the sim_gravity directory
+    // obtain list of files from the appropriate location
     //
 
     if (new_display) {
-        list_files("sim_gravity", &max_select_filenames, &select_filenames);
+        char * location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
+                           ? "sim_gravity/" 
+                           : "http://wikiscience137.sthaid.org/public/sim_gravity/");
+        list_files(location, &max_pathname, &pathname);
     }
 
     //
@@ -1021,11 +1021,16 @@ bool sim_gravity_display_selection(bool new_display)
     // render the title line and selection lines
     //
 
-    sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY SELECTION", SDL_EVENT_NONE);
-    sdl_render_text_font0(&title_line_pane, 0, SDL_PANE_COLS(&title_line_pane,0)-4, "BACK", SDL_EVENT_BACK);
+    if (curr_display == CURR_DISPLAY_SELECT_LOCAL) {
+        sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - LOCAL SELECTIONS", SDL_EVENT_NONE);
+    } else {
+        sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - CLOUD SELECTIONS", SDL_EVENT_NONE);
+    }
+    sdl_render_text_font0(&selection_pane, SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-4, "BACK", SDL_EVENT_BACK);
 
-    for (i = 0; i < max_select_filenames; i++) {
-        sdl_render_text_font0(&selection_pane, 2*i, 0, select_filenames[i], SDL_EVENT_USER_START+i);
+    for (i = 0; i < max_pathname; i++) {
+        strcpy(shortname, pathname[i]);
+        sdl_render_text_font0(&selection_pane, 2*i, 0, basename(shortname), SDL_EVENT_USER_START+i);
     }
 
     //
@@ -1039,10 +1044,10 @@ bool sim_gravity_display_selection(bool new_display)
     //
 
     event = sdl_poll_event();
-    if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_select_filenames) {
+    if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_pathname) {
         sdl_play_event_sound();
         selection = event->event - SDL_EVENT_USER_START;
-        sim_gravity_init(select_filenames[selection]);
+        sim_gravity_init(pathname[selection]);
         LIST_FILES_FREE();
         curr_display = CURR_DISPLAY_SIMULATION;
     } else if (event->event == SDL_EVENT_BACK) {
@@ -1250,7 +1255,7 @@ int32_t sim_gravity_barrier(int32_t thread_id)
     return ret_state;
 }        
 #else
-// XXX ??
+// xxx ??
 int32_t sim_gravity_barrier(int32_t thread_id)
 {
     return state;
@@ -1308,88 +1313,5 @@ position_t sim_gravity_position_add(position_t * x, double y)
 double sim_gravity_position_sub(position_t * x, position_t * y)
 {
     return (x->private - y->private);
-}
-
-#endif
-
-
-
-
-
-#if 0
-position_t sim_gravity_position_add(position_t * x, double y)
-{
-    #define DOUBLE private1
-
-    position_t result;
-
-    result.DOUBLE = x->DOUBLE + y;
-    result.private2 = 0;
-    result.private3 = 0;
-    
-    return result;
-#if 0
-    #define METERS       private2
-    #define NANOMETERS   private3
-
-    int64_t meters;
-    int64_t nanometers;
-
-    if (y == 0) {
-        *result = *x;
-        return 
-    }
-
-    if (y > 0) {
-        meters = (int64_t)floor(y);
-        nanometers = (y - meters) * 1000000000;
-
-        result->NANOMETERS = x->NANOMETERS + nanometers;
-        result->METERS     = x->METERS + meters;
-        if (result->NANOMETERS >= 1000000000) {
-            result->NANOMETERS -= 1000000000;
-            result->METERS++;
-        }
-    } else {
-        y = -y;
-        meters = (int64_t)floor(y);
-        nanometers = (y - meters) * 1000000000;
-
-        result->NANOMETERS = x->NANOMETERS - nanometers;
-        result->METERS     = x->METERS - meters;
-        if (result->NANOMETERS < 0) {
-            result->NANOMETERS += 1000000000;
-            result->METERS--;
-        }
-    }
-
-    result->DOUBLE = result->METERS + result->NANOMETERS / 1000000000.0;
-#endif
-}
-
-double sim_gravity_cvt_position_to_double(position_t * x)
-{
-    return x->DOUBLE;
-}
-
-position_t sim_gravity_cvt_double_to_position(double x)
-{
-    position_t result;
-
-    result.DOUBLE = x;
-    result.private2 = 0;
-    result.private3 = 0;
-
-    return result;
-#if 0
-    if (x >= 0) {
-        result.METERS = (int64_t)floor(x);
-        result.NANOMETERS = (x - meters) * 1000000000;
-    } else {
-        x = -x;
-        result.METERS = -(int64_t)floor(x);
-        result.NANOMETERS = -(x - meters) * 1000000000;
-    }
-#endif
 }
 #endif

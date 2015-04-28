@@ -49,22 +49,11 @@ int32_t main(int32_t argc, char **argv)
     // init config
     config_read(".entropy_main", &config);
 
-    // init logging XXX ???
+    // init logging 
+    // XXX maybe always log
+    // XXX may not need config file
     logmsg_init(CONFIG_DEBUG == 'Y' ? "stderr" : "none");
     INFO("STARTING %s\n", argv[0]);
-
-#if 0 // XXX test
-    int32_t max_files, i;
-    char ** filenames;
-    list_files("sim_gravity", &max_files, &filenames);
-    INFO("MAX_FILES %d\n", max_files);
-    for (i = 0; i < max_files; i++) {
-        INFO("FILENAME-%d '%s'\n", i, filenames[i]);
-    }
-    list_files_free(max_files, filenames);
-    exit(1);
-#endif
-
 
     // init sdl
     sdl_init(1280,800);
@@ -84,6 +73,7 @@ int32_t main(int32_t argc, char **argv)
 
     // exit 
     // XXX core dump here, argv corrupt
+    PRINTF("XXX ARGV[0] %p\n", argv[0]);
     INFO("TERMINATING %s\n", argv[0]);
     sdl_terminate();
     return 0;
