@@ -25,7 +25,7 @@ then
 fi
 
 # make sure directory is cleaned before proceeding
-if [ `echo *` != "setup-script" ]
+if [ "`echo *`" != "setup-script" ]
 then
   echo "ERROR can not proceed with setup unless directory has been cleaned"
   exit
