@@ -1129,6 +1129,8 @@ static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
 
 void list_files(char * location, int32_t * max, char *** pathnames)
 {
+    INFO("LIST FILES: '%s'\n", location); //XXX
+
     if (location[strlen(location)-1] != '/') {
         ERROR("invalid location '%s'\n", location);
         *max = 0;
@@ -1330,6 +1332,8 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     AAssetDir     * asset_dir;
     const char    * fn;
     JNIEnv        * mEnv = Android_JNI_GetEnv();
+    char            location_copy[200];
+    int32_t         len;
 
     // xxx comments
     // src/core/android/SDL_android.c
@@ -1354,12 +1358,22 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     asset_manager = AAssetManager_fromJava(mEnv, java_asset_manager);
 
     // xxx
-    asset_dir = AAssetManager_openDir(asset_manager, location);  //xxx 
+    strcpy(location_copy, location);
+    len = strlen(location_copy);
+    if (len > 0 && location_copy[len-1] == '/') {
+        location_copy[len-1] = '\0';
+    }
+    INFO("XXX location_copy '%s'\n", location_copy);
+
+    // xxx
+    asset_dir = AAssetManager_openDir(asset_manager, location_copy);
     while ((fn = AAssetDir_getNextFileName(asset_dir)) != NULL) {
-        (*pathnames)[*max] = malloc(strlen(location)+strlen(fn)+1);
-        sprintf((*pathnames)[*max], "%s%s", location, fn);
+        (*pathnames)[*max] = malloc(strlen(location_copy)+strlen(fn)+2);
+        sprintf((*pathnames)[*max], "%s/%s", location_copy, fn);
         (*max)++;
     }
+
+    // xxx
     AAssetDir_close(asset_dir);
 
     // xxx

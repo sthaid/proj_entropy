@@ -34,9 +34,10 @@ fi
 # make the tmp directory and get the SDL tar files
 mkdir tmp
 cd tmp
-wget http://www.libsdl.org/release/SDL2-2.0.3.tar.gz
-wget https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.12.tar.gz
-wget http://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.0.tar.gz
+#wget http://www.libsdl.org/release/SDL2-2.0.3.tar.gz
+#wget https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.12.tar.gz
+#wget http://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.0.tar.gz
+cp ../.setup/SDL*.tar.gz .
 
 # extract the template android-project and move it, and 
 # remove the SDL2-2.0.3 directory
@@ -105,7 +106,7 @@ sed -i.orig \
 
 # add assets directory, and populate
 mkdir assets
-cp /usr/share/fonts/gnu-free/FreeMonoBold.ttf assets
+cp -r ../fonts ../sim_gravity assets
 
 # copy in script files
 cp .setup/do_* .
@@ -117,6 +118,7 @@ cp .setup/do_* .
 mkdir -p src/org/sthaid/app
 cp .setup/Entropy.java src/org/sthaid/app
 sed -i.orig \
+    -e "/<\/manifest>/ i\    <uses-permission android:name=\"android.permission.INTERNET\" />" \
     -e "/package=/ s/org.libsdl.app/org.sthaid.app/" \
     -e "/android:name=\"SDLActivity\"/ s/SDLActivity/Entropy/" \
     AndroidManifest.xml

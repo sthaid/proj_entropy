@@ -985,7 +985,7 @@ bool sim_gravity_display_select(bool new_display)
     if (new_display) {
         char * location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
                            ? "sim_gravity/" 
-                           : "http://wikiscience137.sthaid.org/public/sim_gravity/");
+                           : "http://wikiscience101.sthaid.org/public/sim_gravity/");
         list_files(location, &max_pathname, &pathname);
     }
 
