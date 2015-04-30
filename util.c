@@ -1103,16 +1103,23 @@ char * time2str(char * str, time_t time, bool gmt)
 
 char * dur2str(char * str, int64_t duration)
 {
-    int64_t days, hours, minutes;
+    #define YEAR_SECS (365.25 * 86400)
 
-    days = duration / 86400;
-    duration -= days * 86400;
-    hours = duration / 3600;
-    duration -= hours * 3600;
-    minutes = duration / 60;
-    duration -= minutes * 60;
+    if (duration < YEAR_SECS) {
+        int64_t days, hours, minutes;
 
-    sprintf(str, "%d %2.2d:%2.2d", (int32_t)days, (int32_t)hours, (int32_t)minutes);
+        days = duration / 86400;
+        duration -= days * 86400;
+        hours = duration / 3600;
+        duration -= hours * 3600;
+        minutes = duration / 60;
+        duration -= minutes * 60;
+
+        sprintf(str, "%d %2.2d:%2.2d", (int32_t)days, (int32_t)hours, (int32_t)minutes);
+    } else {
+        sprintf(str, "%0.3lf YEARS", duration/YEAR_SECS);
+    }
+
     return str;
 }
 

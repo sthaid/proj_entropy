@@ -1,16 +1,15 @@
-// XXX fixes to wikiscience
-
 // XXX list files util should sort
 // XXX display error if bad file
 // XXX add description to file
 
 // XXX add more files ...
-// XXX solar_sys plus rouge star    CLOUD
-// XXX 3 body                       LOCAL
-// XXX add more moons, on jupiter   LOCAL
+//      - globular cluster
+//      -  add more moons, on jupiter
+// XXX put some files on cloud
 
 // XXX run on android
 // XXX different dt values for androoid
+
 // XXX hover on planet to diplay name
 
 
@@ -23,6 +22,9 @@
 // - is zoom in and out backwards
 // - select files
 // - select from web
+// - fixes to wikiscience
+// - solar_sys plus rouge star    CLOUD
+// - 3 body                       LOCAL
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -65,23 +67,29 @@
 #define LY  9.4605284E15    // meters
 
 #define DEFAULT_SIM_GRAVITY_PATHNAME "sim_gravity/solar_system"
-#define SIM_WIDTH_DEFAULT            (3*AU)
 
-#define MAX_OBJECT  1000
-#define MAX_THREAD  16
-#define MAX_NAME    32
+#define MAX_OBJECT          100 
+#define MAX_THREAD          16
+#define MAX_NAME            32
+#define MAX_PATH            (256 * 365 + 256 / 4)
+#define MIN_PATH_DISP_DAYS  (365.25 / 8)
+#define MAX_PATH_DISP_DAYS  MAX_PATH
 
-#define SDL_EVENT_STOP                   (SDL_EVENT_USER_START + 0)
-#define SDL_EVENT_RUN                    (SDL_EVENT_USER_START + 1)
-#define SDL_EVENT_DT_PLUS                (SDL_EVENT_USER_START + 2)
-#define SDL_EVENT_DT_MINUS               (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_SELECT_LOCAL           (SDL_EVENT_USER_START + 4)
-#define SDL_EVENT_SELECT_CLOUD           (SDL_EVENT_USER_START + 5)
-#define SDL_EVENT_SIMPANE_ZOOM_IN        (SDL_EVENT_USER_START + 10)
-#define SDL_EVENT_SIMPANE_ZOOM_OUT       (SDL_EVENT_USER_START + 11)
-#define SDL_EVENT_SIMPANE_MOUSE_CLICK    (SDL_EVENT_USER_START + 12)
-#define SDL_EVENT_SIMPANE_MOUSE_MOTION   (SDL_EVENT_USER_START + 13)
-#define SDL_EVENT_BACK                   (SDL_EVENT_USER_START + 30)
+#define SDL_EVENT_STOP                            (SDL_EVENT_USER_START + 0)
+#define SDL_EVENT_RUN                             (SDL_EVENT_USER_START + 1)
+#define SDL_EVENT_DT_PLUS                         (SDL_EVENT_USER_START + 2)
+#define SDL_EVENT_DT_MINUS                        (SDL_EVENT_USER_START + 3)
+#define SDL_EVENT_SELECT_LOCAL                    (SDL_EVENT_USER_START + 4)
+#define SDL_EVENT_SELECT_CLOUD                    (SDL_EVENT_USER_START + 5)
+#define SDL_EVENT_SELECT_PATH_DISP_DEFAULT        (SDL_EVENT_USER_START + 6)
+#define SDL_EVENT_SELECT_PATH_DISP_OFF            (SDL_EVENT_USER_START + 7)
+#define SDL_EVENT_SELECT_PATH_DISP_PLUS           (SDL_EVENT_USER_START + 8)
+#define SDL_EVENT_SELECT_PATH_DISP_MINUS          (SDL_EVENT_USER_START + 9)
+#define SDL_EVENT_SIMPANE_ZOOM_IN                 (SDL_EVENT_USER_START + 20)
+#define SDL_EVENT_SIMPANE_ZOOM_OUT                (SDL_EVENT_USER_START + 21)
+#define SDL_EVENT_SIMPANE_MOUSE_CLICK             (SDL_EVENT_USER_START + 22)
+#define SDL_EVENT_SIMPANE_MOUSE_MOTION            (SDL_EVENT_USER_START + 23)
+#define SDL_EVENT_BACK                            (SDL_EVENT_USER_START + 30)
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -96,12 +104,10 @@
 #define CURR_DISPLAY_SELECT_LOCAL 1
 #define CURR_DISPLAY_SELECT_CLOUD 2
 
-#define POS_TO_DBL sim_gravity_cvt_position_to_double
+#define POS_TO_DBL sim_gravity_cvt_position_to_double // xxx do we keep these?
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
 #define POS_ADD    sim_gravity_position_add
 #define POS_SUB    sim_gravity_position_sub
-
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 #define MAX_VALID_DT (sizeof(valid_dt)/sizeof(valid_dt[0]))
 #define MAX_VALID_SIM_WIDTH (sizeof(valid_sim_width)/sizeof(valid_sim_width[0]))
@@ -112,7 +118,7 @@
 // typedefs
 //
 
-// xxx don't like this
+// xxx don't like this - check AlphaCentauri on android before eliminating
 typedef struct {
 #ifndef ANDROID
     __int128_t private;
@@ -138,12 +144,11 @@ typedef struct {
     int32_t DISP_COLOR;
     int32_t DISP_R; 
 
-    int32_t MAX_PATH;
-    int32_t PATH_TAIL;
+    int32_t MAX_PATH_DEFAULT; 
     struct path_s {
         double X;
         double Y;
-    } PATH[0];
+    } PATH[MAX_PATH];
 } object_t; 
 
 typedef struct {
@@ -173,6 +178,9 @@ static int32_t      max_thread;
 static pthread_t    thread_id[MAX_THREAD];
 
 static int32_t      curr_display;
+
+static double       path_disp_days = -1;
+static int32_t      path_tail;
 
 static const int32_t valid_dt[] = {
                         1,2,3,4,5,6,7,8,9,
@@ -232,8 +240,6 @@ int32_t sim_gravity_init(char * pathname)
 {
     #define MAX_RELTO 100
 
-    #define OBJ_ALLOC_SIZE(max_path) (sizeof(object_t) + (max_path) * sizeof(struct path_s))
-
     typedef struct {
         double X;
         double Y;
@@ -241,7 +247,7 @@ int32_t sim_gravity_init(char * pathname)
         double VY;
     } relto_t;
 
-    object_t  * object[MAX_OBJECT];
+    object_t  * object[MAX_OBJECT];  //xxx check MAX_OBJECT for overflow
 
     int32_t     i, cnt;
     char      * s;
@@ -250,7 +256,7 @@ int32_t sim_gravity_init(char * pathname)
     char        shortname[200];
     double      X, Y, VX, VY, MASS, RADIUS;
     char        NAME[100], COLOR[100];
-    int32_t     MAX_PATH;
+    int32_t     MAX_PATH_DEFAULT;
 
     int32_t     ret           = 0;
     int32_t     line          = 0;
@@ -284,11 +290,12 @@ int32_t sim_gravity_init(char * pathname)
     bzero(&sim, sizeof(sim));
     strncpy(sim.sim_name, "GRAVITY", sizeof(sim.sim_name)-1);
     state       = STATE_STOP; 
-    tracker_obj = -1;
-    sim_x       = 0;
-    sim_y       = 0;
-    sim_width   = SIM_WIDTH_DEFAULT;
-    DT          = 1;
+    tracker_obj    = -1;
+    sim_x          = 0;
+    sim_y          = 0;
+    sim_width      = 3*AU;
+    DT             = 1;
+    path_disp_days = -1;
 
     // open pathname
     file = open_file(pathname);
@@ -358,11 +365,18 @@ int32_t sim_gravity_init(char * pathname)
 
         // scan this line
         cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s %d",
-                     NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR, &MAX_PATH);
+                     NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR, &MAX_PATH_DEFAULT);
         if (cnt != 9) {
             ERROR("line %d invalid in file %s\n", line, pathname);
             ret = -1;
             goto done;
+        }
+
+        // check MAX_PATH_DEFAULT is in range
+        if (MAX_PATH_DEFAULT < 0) {
+            MAX_PATH_DEFAULT = 0;
+        } else if (MAX_PATH_DEFAULT > MAX_PATH) {
+            MAX_PATH_DEFAULT = MAX_PATH;
         }
 
         // determine idx for accessing relative_to[]
@@ -376,21 +390,21 @@ int32_t sim_gravity_init(char * pathname)
         last_idx = idx;
 
         // initialize obj, note DISP_R field is initialized by call to sim_gravity_set_obj_disp_r below
-        object_t * obj = calloc(1,OBJ_ALLOC_SIZE(MAX_PATH));
+        object_t * obj = calloc(1,sizeof(object_t));
         if (obj == NULL) {
-            ERROR("calloc obj failed, size %d\n", (int32_t)OBJ_ALLOC_SIZE(MAX_PATH));
+            ERROR("calloc obj failed, size %d\n", (int32_t)sizeof(object_t));
             ret = -1;
             goto done;
         }
         strncpy(obj->NAME, NAME, MAX_NAME-1);
-        obj->X          = DBL_TO_POS(X + relto[idx-1].X);
-        obj->Y          = DBL_TO_POS(Y + relto[idx-1].Y);
-        obj->VX         = VX + relto[idx-1].VX;
-        obj->VY         = VY + relto[idx-1].VY;
-        obj->MASS       = MASS;
-        obj->RADIUS     = RADIUS;
-        obj->DISP_COLOR = COLOR_STR_TO_COLOR(COLOR);
-        obj->MAX_PATH   = MAX_PATH;
+        obj->X                = DBL_TO_POS(X + relto[idx-1].X);
+        obj->Y                = DBL_TO_POS(Y + relto[idx-1].Y);
+        obj->VX               = VX + relto[idx-1].VX;
+        obj->VY               = VY + relto[idx-1].VY;
+        obj->MASS             = MASS;
+        obj->RADIUS           = RADIUS;
+        obj->DISP_COLOR       = COLOR_STR_TO_COLOR(COLOR);
+        obj->MAX_PATH_DEFAULT = MAX_PATH_DEFAULT;
 
         // save new relto
         relto[idx].X  = POS_TO_DBL(&obj->X);
@@ -445,7 +459,7 @@ int32_t sim_gravity_init(char * pathname)
 #if 1
     // print simulation config
     PRINTF("------ PATHNAME %s ------\n", pathname);   
-    PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R     MAX_PATH\n");
+    PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R MAX_PATH_DFLT\n");
          // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------
     for (i = 0; i < sim.max_object; i++) {
         obj = sim.object[i];
@@ -459,7 +473,7 @@ int32_t sim_gravity_init(char * pathname)
             obj->RADIUS, 
             obj->DISP_COLOR, 
             obj->DISP_R, 
-            obj->MAX_PATH);
+            obj->MAX_PATH_DEFAULT);
     }
     PRINTF("SIM_WIDTH %lf AU\n", sim_width/AU);
     PRINTF("DT        %d  SEC\n", DT);
@@ -678,9 +692,10 @@ bool sim_gravity_display_simulation(bool new_display)
         object_t * obj = sim.object[i];
         object_t * obj_tracker;
         int32_t    disp_x, disp_y, disp_r, disp_color;
-        int32_t    obj_idx, tracker_idx, idx_step, count, total, max_path;
+        int32_t    path_idx, path_count, path_max;
         double     X, Y, X_ORIGIN, Y_ORIGIN;
-        SDL_Point  points[120];
+
+        static SDL_Point  points[MAX_PATH+10];
 
         // display the object ...
 
@@ -713,69 +728,60 @@ bool sim_gravity_display_simulation(bool new_display)
 
         // display object's path ...
 
-        // initialize 
-        if (tracker_obj == -1) {
-            obj_tracker = NULL;
-            max_path = obj->MAX_PATH;
-            obj_idx = (obj->PATH_TAIL == 0 ? obj->MAX_PATH-1 : obj->PATH_TAIL-1);
-            tracker_idx = 0;
-        } else {
-            obj_tracker = sim.object[tracker_obj];
-            max_path = MIN(obj->MAX_PATH, obj_tracker->MAX_PATH);
-            if (max_path > 50) {
-                max_path = 50;
-            }
-            obj_idx = (obj->PATH_TAIL == 0 ? obj->MAX_PATH-1 : obj->PATH_TAIL-1);
-            tracker_idx = (obj_tracker->PATH_TAIL == 0 ? obj_tracker->MAX_PATH-1 : obj_tracker->PATH_TAIL-1);
-        }
-        idx_step = (max_path/100 >= 1 ? max_path/100 : 1);
-        total = max_path / idx_step;
-        count = 0;
+        // initialize:
+        // - obj_tracker
+        // - path_idx
+        // - pat_max
+        obj_tracker = (tracker_obj != -1 ? sim.object[tracker_obj] : NULL);
 
-        // if the object being displayed is the tracker object then 
-        // there is no path, so continue
-        if (obj == obj_tracker) {
+        path_idx = path_tail - 1;
+        if (path_idx < 0) {
+            path_idx += MAX_PATH;
+        }
+
+        path_max = path_disp_days;
+        if (path_max < 0) {
+            path_max = obj->MAX_PATH_DEFAULT;
+        } 
+        if (path_max > MAX_PATH) {
+            path_max = MAX_PATH;
+        }
+
+        // if no path to display then continue
+        if (path_max == 0 || obj_tracker == obj) {
             continue;
         }
 
         // loop over path points, constructing the points[] array
-        while (true) {
+        path_count = 0;
+        while (path_count < path_max) {
             if (obj_tracker == NULL) {
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
             } else {
-                X_ORIGIN = obj_tracker->PATH[tracker_idx].X;
-                Y_ORIGIN = obj_tracker->PATH[tracker_idx].Y;
+                X_ORIGIN = obj_tracker->PATH[path_idx].X;
+                Y_ORIGIN = obj_tracker->PATH[path_idx].Y;
                 if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
                     break;
                 }
             }
 
-            X = obj->PATH[obj_idx].X;
-            Y = obj->PATH[obj_idx].Y;
+            X = obj->PATH[path_idx].X;
+            Y = obj->PATH[path_idx].Y;
             if (X == 0 && Y == 0) {
                 break;
             }
 
-            points[count].x = sim_pane.x + (X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            points[count].y = sim_pane.y + (Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            count++;
+            points[path_count].x = sim_pane.x + (X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            points[path_count].y = sim_pane.y + (Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            path_count++;
 
-            if (count == total) {
-                break;
-            }
-
-            obj_idx = (obj_idx-idx_step < 0 ? obj_idx-idx_step+obj->MAX_PATH : obj_idx-idx_step);
-            if (obj_tracker != NULL) {
-                tracker_idx = (tracker_idx-idx_step < 0 
-                               ? tracker_idx-idx_step+obj_tracker->MAX_PATH 
-                               : tracker_idx-idx_step);
-            }
+            path_idx = (path_idx == 0 ? MAX_PATH-1 : path_idx-1);
         }
 
         // display the lines that connect the points[] array
         SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255);
-        SDL_RenderDrawLines(sdl_renderer, points, count);
+        SDL_RenderDrawLines(sdl_renderer, points, path_count);
     }
 
     // display sim_pane title
@@ -806,17 +812,21 @@ bool sim_gravity_display_simulation(bool new_display)
     // display controls  
     sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
                        SDL_FIELD_COLS_UNLIMITTED, true, 0);
-    sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",     SDL_EVENT_RUN);
-    sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",    SDL_EVENT_STOP);
-    sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",     SDL_EVENT_DT_PLUS);
-    sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",     SDL_EVENT_DT_MINUS);
-    sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",   SDL_EVENT_SELECT_LOCAL);
-    sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",   SDL_EVENT_SELECT_CLOUD);
-    sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",    SDL_EVENT_BACK);
+    sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
+    sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+    sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
+    sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
+    sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
+    sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
+    sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_SELECT_PATH_DISP_DEFAULT);
+    sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_SELECT_PATH_DISP_OFF);
+    sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_SELECT_PATH_DISP_PLUS);
+    sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_SELECT_PATH_DISP_MINUS);
+    sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",      SDL_EVENT_BACK);
 
     // display status lines
     sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
-    sdl_render_text_font0(&ctl_pane, 8, 0, str, SDL_EVENT_NONE);
+    sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
 
     if (DT >= 3600) {
         sprintf(str, "DT   %d HOURS", DT/3600);
@@ -825,15 +835,28 @@ bool sim_gravity_display_simulation(bool new_display)
     } else{
         sprintf(str, "DT   %d SECONDS", DT);
     }
-    sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
-
-    sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "off");
     sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
+
+    sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "OFF");
+    sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
+
+    if (path_disp_days == 0) {
+        sdl_render_text_font0(&ctl_pane, 16, 0, "PATH OFF", SDL_EVENT_NONE);
+    } else if (path_disp_days < 0) {
+        sdl_render_text_font0(&ctl_pane, 16, 0, "PATH DEFAULT", SDL_EVENT_NONE);
+    } else {
+        if (path_disp_days < 365.25) {
+            sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
+        } else {
+            sprintf(str, "PATH %0.0lf YEARS", path_disp_days/365.25);
+        }
+        sdl_render_text_font0(&ctl_pane, 16, 0, str, SDL_EVENT_NONE);
+    }
 
     if (state == STATE_RUN) {
         double perf = (sim.sim_time * 1000000 - run_start_sim_time) / (microsec_timer() - run_start_wall_time);
-        sprintf(str, "RATE %0.3lE", perf);
-        sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "RATE %0.1lE", perf);
+        sdl_render_text_font0(&ctl_pane, 18, 0, str, SDL_EVENT_NONE);
     }
 
     //
@@ -889,6 +912,40 @@ bool sim_gravity_display_simulation(bool new_display)
     case SDL_EVENT_SELECT_CLOUD:
         state = STATE_STOP;
         curr_display = CURR_DISPLAY_SELECT_CLOUD;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT_PATH_DISP_DEFAULT:
+        path_disp_days = -1;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT_PATH_DISP_OFF:
+        path_disp_days = 0;
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT_PATH_DISP_PLUS:
+        if (path_disp_days <= 0) {
+            path_disp_days = MIN_PATH_DISP_DAYS;
+        } else  {
+            path_disp_days *= 2;
+        }
+        if (path_disp_days < MIN_PATH_DISP_DAYS) {
+            path_disp_days = MIN_PATH_DISP_DAYS;
+        } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
+            path_disp_days = MAX_PATH_DISP_DAYS;
+        }
+        sdl_play_event_sound();
+        break;
+    case SDL_EVENT_SELECT_PATH_DISP_MINUS:
+        if (path_disp_days <= 0) {
+            path_disp_days = MAX_PATH_DISP_DAYS;
+        } else  {
+            path_disp_days /= 2;
+        }
+        if (path_disp_days < MIN_PATH_DISP_DAYS) {
+            path_disp_days = MIN_PATH_DISP_DAYS;
+        } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
+            path_disp_days = MAX_PATH_DISP_DAYS;
+        }
         sdl_play_event_sound();
         break;
     case SDL_EVENT_SIMPANE_ZOOM_OUT:
@@ -1166,8 +1223,13 @@ void * sim_gravity_thread(void * cx)
 
             // thread zero does the final work
             if (thread_id == 0) {
-                int32_t day = sim.sim_time/86400;
+                int32_t        day;
+                bool           day_changed;
                 static int32_t last_day;
+
+                day = sim.sim_time/86400;
+                day_changed = day != last_day;
+                last_day = day;
 
                 for (k = 0; k < sim.max_object; k++) {
                     object_t * obj = sim.object[k];
@@ -1179,18 +1241,19 @@ void * sim_gravity_thread(void * cx)
                     obj->VY = obj->NEXT_VY;
 
                     // if day has changed then save next entry in object's path
-                    if (day != last_day) {
-                        int32_t idx = obj->PATH_TAIL;
-                        obj->PATH[idx].X = POS_TO_DBL(&obj->X);
-                        obj->PATH[idx].Y = POS_TO_DBL(&obj->Y);
-                        asm volatile("" ::: "memory");
-                        obj->PATH_TAIL = (idx == obj->MAX_PATH - 1 ? 0 : idx + 1);
+                    if (day_changed) {
+                        obj->PATH[path_tail].X = POS_TO_DBL(&obj->X);
+                        obj->PATH[path_tail].Y = POS_TO_DBL(&obj->Y);
                     }
                 }
-                last_day = day;
 
                 // update simulation time
                 sim.sim_time += DT;
+
+                // if day has changed then update path_tail
+                if (day_changed) {
+                    path_tail = (path_tail == MAX_PATH - 1 ? 0 : path_tail + 1);
+                }
             }
 
         } else if (local_state == STATE_STOP) {
@@ -1255,9 +1318,9 @@ int32_t sim_gravity_barrier(int32_t thread_id)
     return ret_state;
 }        
 #else
-// xxx ??
 int32_t sim_gravity_barrier(int32_t thread_id)
 {
+    // not needed on Android becuase max_thread is forced to 1
     return state;
 }        
 #endif
