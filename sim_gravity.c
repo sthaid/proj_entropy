@@ -1,6 +1,7 @@
+// XXX flicker in path display
+
 // XXX list files util should sort
 // XXX display error if bad file
-// XXX add description to file
 
 // XXX add more files ...
 //      - globular cluster
@@ -30,6 +31,7 @@
 // - if forces are not significant then don't inspect every time
 // - display ceneter xy
 // - reset simpane to center and also default width ??
+// -  add description to sim file
 
 // ----------------------------------------------------------------------------------------------------
 // -----------------  BEGIN  --------------------------------------------------------------------------
@@ -75,21 +77,22 @@
 #define MIN_PATH_DISP_DAYS  (365.25 / 8)
 #define MAX_PATH_DISP_DAYS  MAX_PATH
 
-#define SDL_EVENT_STOP                            (SDL_EVENT_USER_START + 0)
-#define SDL_EVENT_RUN                             (SDL_EVENT_USER_START + 1)
-#define SDL_EVENT_DT_PLUS                         (SDL_EVENT_USER_START + 2)
-#define SDL_EVENT_DT_MINUS                        (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_SELECT_LOCAL                    (SDL_EVENT_USER_START + 4)
-#define SDL_EVENT_SELECT_CLOUD                    (SDL_EVENT_USER_START + 5)
-#define SDL_EVENT_SELECT_PATH_DISP_DEFAULT        (SDL_EVENT_USER_START + 6)
-#define SDL_EVENT_SELECT_PATH_DISP_OFF            (SDL_EVENT_USER_START + 7)
-#define SDL_EVENT_SELECT_PATH_DISP_PLUS           (SDL_EVENT_USER_START + 8)
-#define SDL_EVENT_SELECT_PATH_DISP_MINUS          (SDL_EVENT_USER_START + 9)
-#define SDL_EVENT_SIMPANE_ZOOM_IN                 (SDL_EVENT_USER_START + 20)
-#define SDL_EVENT_SIMPANE_ZOOM_OUT                (SDL_EVENT_USER_START + 21)
-#define SDL_EVENT_SIMPANE_MOUSE_CLICK             (SDL_EVENT_USER_START + 22)
-#define SDL_EVENT_SIMPANE_MOUSE_MOTION            (SDL_EVENT_USER_START + 23)
-#define SDL_EVENT_BACK                            (SDL_EVENT_USER_START + 30)
+#define SDL_EVENT_STOP                     (SDL_EVENT_USER_START + 0)
+#define SDL_EVENT_RUN                      (SDL_EVENT_USER_START + 1)
+#define SDL_EVENT_DT_PLUS                  (SDL_EVENT_USER_START + 2)
+#define SDL_EVENT_DT_MINUS                 (SDL_EVENT_USER_START + 3)
+#define SDL_EVENT_SELECT_LOCAL             (SDL_EVENT_USER_START + 4)
+#define SDL_EVENT_SELECT_CLOUD             (SDL_EVENT_USER_START + 5)
+#define SDL_EVENT_PATH_DISP_DEFAULT        (SDL_EVENT_USER_START + 6)
+#define SDL_EVENT_PATH_DISP_OFF            (SDL_EVENT_USER_START + 7)
+#define SDL_EVENT_PATH_DISP_PLUS           (SDL_EVENT_USER_START + 8)
+#define SDL_EVENT_PATH_DISP_MINUS          (SDL_EVENT_USER_START + 9)
+#define SDL_EVENT_HELP                     (SDL_EVENT_USER_START + 10)
+#define SDL_EVENT_SIMPANE_ZOOM_IN          (SDL_EVENT_USER_START + 20)
+#define SDL_EVENT_SIMPANE_ZOOM_OUT         (SDL_EVENT_USER_START + 21)
+#define SDL_EVENT_SIMPANE_MOUSE_CLICK      (SDL_EVENT_USER_START + 22)
+#define SDL_EVENT_SIMPANE_MOUSE_MOTION     (SDL_EVENT_USER_START + 23)
+#define SDL_EVENT_BACK                     (SDL_EVENT_USER_START + 30)
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -100,9 +103,12 @@
      (s) == STATE_RUN               ? "RUN"               : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
-#define CURR_DISPLAY_SIMULATION   0
-#define CURR_DISPLAY_SELECT_LOCAL 1
-#define CURR_DISPLAY_SELECT_CLOUD 2
+#define CURR_DISPLAY_NONE         0
+#define CURR_DISPLAY_TERMINATE    1
+#define CURR_DISPLAY_SIMULATION   2
+#define CURR_DISPLAY_SELECT_LOCAL 3
+#define CURR_DISPLAY_SELECT_CLOUD 4
+#define CURR_DISPLAY_HELP         5
 
 #define POS_TO_DBL sim_gravity_cvt_position_to_double // xxx do we keep these?
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
@@ -177,8 +183,6 @@ static int64_t      run_start_wall_time;
 static int32_t      max_thread;
 static pthread_t    thread_id[MAX_THREAD];
 
-static int32_t      curr_display;
-
 static double       path_disp_days = -1;
 static int32_t      path_tail;
 
@@ -208,9 +212,10 @@ static const double valid_sim_width[] = {
 int32_t sim_gravity_init(char * pathname);
 void sim_gravity_terminate(void);
 void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object);
-bool sim_gravity_display(void);
-bool sim_gravity_display_simulation(bool new_display);
-bool sim_gravity_display_select(bool new_display);
+void sim_gravity_display(void);
+int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_display);
+int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display);
+int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
 double sim_gravity_cvt_position_to_double(position_t * x);
@@ -224,12 +229,7 @@ void sim_gravity(void)
 {
     sim_gravity_init(DEFAULT_SIM_GRAVITY_PATHNAME);
 
-    while (true) {
-        bool done = sim_gravity_display();
-        if (done) {
-            break;
-        }
-    }
+    sim_gravity_display();
 
     sim_gravity_terminate();
 }
@@ -597,33 +597,36 @@ void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
 
 // -----------------  DISPLAY  --------------------------------------------------
 
-bool sim_gravity_display(void)
+void sim_gravity_display(void)
 {
-    bool done, new_display;
-    static int32_t curr_display_last = -1;
+    int32_t last_display = CURR_DISPLAY_NONE;
+    int32_t curr_display = CURR_DISPLAY_SIMULATION;
+    int32_t next_display = CURR_DISPLAY_SIMULATION;
 
-    new_display = (curr_display != curr_display_last);
-    curr_display_last = curr_display;
+    while (true) {
+        switch (curr_display) {
+        case CURR_DISPLAY_SIMULATION:         
+            next_display = sim_gravity_display_simulation(curr_display, last_display);
+            break;
+        case CURR_DISPLAY_SELECT_LOCAL:         
+        case CURR_DISPLAY_SELECT_CLOUD:         
+            next_display = sim_gravity_display_select(curr_display, last_display);
+            break;
+        case CURR_DISPLAY_HELP:         
+            next_display = sim_gravity_display_help(curr_display, last_display);
+            break;
+        }
 
-    if (curr_display == CURR_DISPLAY_SIMULATION) {
-        done = sim_gravity_display_simulation(new_display);
-    } else if (curr_display == CURR_DISPLAY_SELECT_LOCAL || 
-               curr_display == CURR_DISPLAY_SELECT_CLOUD) 
-    {
-        done = sim_gravity_display_select(new_display);
-    } else {
-        ERROR("curr_display %d is invalid\n", curr_display);
-        done = true;
+        if (sdl_quit || next_display == CURR_DISPLAY_TERMINATE) {
+            break;
+        }
+
+        last_display = curr_display;
+        curr_display = next_display;
     }
-
-    if (done) {
-        curr_display_last = -1;
-    }
-
-    return done;
 }
 
-bool sim_gravity_display_simulation(bool new_display)
+int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_display)
 {
     #define IN_RECT(X,Y,RECT) \
         ((X) >= (RECT).x && (X) < (RECT).x + (RECT).w && \
@@ -636,343 +639,66 @@ bool sim_gravity_display_simulation(bool new_display)
     double         sim_pane_width;
     sdl_event_t *  event;
     char           str[100], str1[100];
-    bool           done = false;
+    int32_t        next_display = -1;
 
     static SDL_Texture * circle_texture_tbl[MAX_CIRCLE_RADIUS][MAX_COLOR];
 
     //
-    // if this display has just been activated then 
-    // nothing to do here 
+    // loop until next_display has been set
     //
 
-    if (new_display) {
-        ;
-    }
+    while (next_display == -1) {
+        //
+        // short delay
+        //
 
-    //
-    // initialize the pane locations:
-    // - sim_pane: the main simulation display area
-    // - ctl_pane: the controls display area
-    //
+        usleep(5000);
 
-    if (sdl_win_width > sdl_win_height) {
-        sim_pane_width = sdl_win_height;
-        SDL_INIT_PANE(sim_pane, 
-                      0, 0,  
-                      sim_pane_width, sim_pane_width);
-        SDL_INIT_PANE(ctl_pane, 
-                      sim_pane_width, 0, 
-                      sdl_win_width-sim_pane_width, sdl_win_height);
-    } else {
-        sim_pane_width = sdl_win_width;
-        SDL_INIT_PANE(sim_pane, 0, 0,  sim_pane_width, sim_pane_width);
-        SDL_INIT_PANE(ctl_pane, 0, 0, 0, 0);
-    }
-    sdl_event_init();
+        //
+        // initialize the pane locations:
+        // - sim_pane: the main simulation display area
+        // - ctl_pane: the controls display area
+        //
 
-    //
-    // short delay
-    //
-
-    usleep(5000);
-
-    //
-    // clear window
-    //
-
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdl_renderer);
-
-    //
-    // SIMPANE ...
-    //
-
-    // draw sim_pane objects 
-    for (i = 0; i < sim.max_object; i++) {
-        object_t * obj = sim.object[i];
-        object_t * obj_tracker;
-        int32_t    disp_x, disp_y, disp_r, disp_color;
-        int32_t    path_idx, path_count, path_max;
-        double     X, Y, X_ORIGIN, Y_ORIGIN;
-
-        static SDL_Point  points[MAX_PATH+10];
-
-        // display the object ...
-
-        // determine display origin
-        if (tracker_obj == -1) {
-            X_ORIGIN = sim_x;
-            Y_ORIGIN = sim_y;
+        if (sdl_win_width > sdl_win_height) {
+            sim_pane_width = sdl_win_height;
+            SDL_INIT_PANE(sim_pane, 
+                          0, 0,  
+                          sim_pane_width, sim_pane_width);
+            SDL_INIT_PANE(ctl_pane, 
+                          sim_pane_width, 0, 
+                          sdl_win_width-sim_pane_width, sdl_win_height);
         } else {
-            X_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->X);
-            Y_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->Y);
+            sim_pane_width = sdl_win_width;
+            SDL_INIT_PANE(sim_pane, 0, 0,  sim_pane_width, sim_pane_width);
+            SDL_INIT_PANE(ctl_pane, 0, 0, 0, 0);
         }
+        sdl_event_init();
 
-        // determine object's display info
-        // - position: disp_x, disp_y
-        // - radius: disp_r
-        // - color: disp_color
-        disp_x = sim_pane.x + (POS_TO_DBL(&obj->X) - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-        disp_y = sim_pane.y + (POS_TO_DBL(&obj->Y) - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-        disp_r = (obj->DISP_R < 1 ? 1 : obj->DISP_R >= MAX_CIRCLE_RADIUS ? MAX_CIRCLE_RADIUS-1 : obj->DISP_R);
-        disp_color = (i != tracker_obj ? obj->DISP_COLOR : PINK);
+        //
+        // clear window
+        //
 
-        // if circle to represent this object has not yet been created then create it
-        if (circle_texture_tbl[disp_r][disp_color] == NULL) {
-            circle_texture_tbl[disp_r][disp_color] =
-                sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
-        }
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
 
-        // render the circle, representing the object
-        sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
+        //
+        // SIMPANE ...
+        //
 
-        // display object's path ...
-
-        // initialize:
-        // - obj_tracker
-        // - path_idx
-        // - pat_max
-        obj_tracker = (tracker_obj != -1 ? sim.object[tracker_obj] : NULL);
-
-        path_idx = path_tail - 1;
-        if (path_idx < 0) {
-            path_idx += MAX_PATH;
-        }
-
-        path_max = path_disp_days;
-        if (path_max < 0) {
-            path_max = obj->MAX_PATH_DEFAULT;
-        } 
-        if (path_max > MAX_PATH) {
-            path_max = MAX_PATH;
-        }
-
-        // if no path to display then continue
-        if (path_max == 0 || obj_tracker == obj) {
-            continue;
-        }
-
-        // loop over path points, constructing the points[] array
-        path_count = 0;
-        while (path_count < path_max) {
-            if (obj_tracker == NULL) {
-                X_ORIGIN = sim_x;
-                Y_ORIGIN = sim_y;
-            } else {
-                X_ORIGIN = obj_tracker->PATH[path_idx].X;
-                Y_ORIGIN = obj_tracker->PATH[path_idx].Y;
-                if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
-                    break;
-                }
-            }
-
-            X = obj->PATH[path_idx].X;
-            Y = obj->PATH[path_idx].Y;
-            if (X == 0 && Y == 0) {
-                break;
-            }
-
-            points[path_count].x = sim_pane.x + (X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            points[path_count].y = sim_pane.y + (Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-            path_count++;
-
-            path_idx = (path_idx == 0 ? MAX_PATH-1 : path_idx-1);
-        }
-
-        // display the lines that connect the points[] array
-        SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255);
-        SDL_RenderDrawLines(sdl_renderer, points, path_count);
-    }
-
-    // display sim_pane title
-    sprintf(str, "WIDTH %0.2lf AU", sim_width/AU);
-    if (sim_width >= 999*AU) {
-        sprintf(str+strlen(str), " %0.2lf LY", sim_width/LY);
-    }
-    sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
-
-    // register sim_pane controls
-    col = SDL_PANE_COLS(&sim_pane,0)-2;
-    sdl_render_text_font0(&sim_pane,  0, col,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
-    sdl_render_text_font0(&sim_pane,  2, col,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
-    sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK, SDL_EVENT_TYPE_MOUSE_CLICK, &sim_pane);
-    sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
-
-    // draw sim_pane border
-    sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
-
-    //
-    // CTLPANE ...
-    //
-
-    // clear ctl_pane
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(sdl_renderer, &ctl_pane);
-
-    // display controls  
-    sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
-                       SDL_FIELD_COLS_UNLIMITTED, true, 0);
-    sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-    sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
-    sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
-    sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
-    sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
-    sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
-    sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_SELECT_PATH_DISP_DEFAULT);
-    sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_SELECT_PATH_DISP_OFF);
-    sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_SELECT_PATH_DISP_PLUS);
-    sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_SELECT_PATH_DISP_MINUS);
-    sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",      SDL_EVENT_BACK);
-
-    // display status lines
-    sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
-    sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
-
-    if (DT >= 3600) {
-        sprintf(str, "DT   %d HOURS", DT/3600);
-    } else if (DT >= 60) {
-        sprintf(str, "DT   %d MINUTES", DT/60);
-    } else{
-        sprintf(str, "DT   %d SECONDS", DT);
-    }
-    sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
-
-    sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "OFF");
-    sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
-
-    if (path_disp_days == 0) {
-        sdl_render_text_font0(&ctl_pane, 16, 0, "PATH OFF", SDL_EVENT_NONE);
-    } else if (path_disp_days < 0) {
-        sdl_render_text_font0(&ctl_pane, 16, 0, "PATH DEFAULT", SDL_EVENT_NONE);
-    } else {
-        if (path_disp_days < 365.25) {
-            sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
-        } else {
-            sprintf(str, "PATH %0.0lf YEARS", path_disp_days/365.25);
-        }
-        sdl_render_text_font0(&ctl_pane, 16, 0, str, SDL_EVENT_NONE);
-    }
-
-    if (state == STATE_RUN) {
-        double perf = (sim.sim_time * 1000000 - run_start_sim_time) / (microsec_timer() - run_start_wall_time);
-        sprintf(str, "RATE %0.1lE", perf);
-        sdl_render_text_font0(&ctl_pane, 18, 0, str, SDL_EVENT_NONE);
-    }
-
-    //
-    // present the display
-    //
-
-    SDL_RenderPresent(sdl_renderer);
-
-    //
-    // handle events
-    //
-
-    event = sdl_poll_event();
-    switch (event->event) {
-    case SDL_EVENT_RUN:
-        state = STATE_RUN;
-        run_start_sim_time = sim.sim_time * 1000000;
-        run_start_wall_time = microsec_timer();
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_STOP:
-        state = STATE_STOP;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_BACK: 
-    case SDL_EVENT_QUIT:
-        done = true;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_DT_PLUS:
-        for (i = 0; i < MAX_VALID_DT-1; i++) {
-            if (DT == valid_dt[i]) {
-                DT = valid_dt[i+1];
-                break;
-            }
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_DT_MINUS:
-        for (i = 1; i < MAX_VALID_DT; i++) {
-            if (DT == valid_dt[i]) {
-                DT = valid_dt[i-1];
-                break;
-            }
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_LOCAL:
-        state = STATE_STOP;
-        curr_display = CURR_DISPLAY_SELECT_LOCAL;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_CLOUD:
-        state = STATE_STOP;
-        curr_display = CURR_DISPLAY_SELECT_CLOUD;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_PATH_DISP_DEFAULT:
-        path_disp_days = -1;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_PATH_DISP_OFF:
-        path_disp_days = 0;
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_PATH_DISP_PLUS:
-        if (path_disp_days <= 0) {
-            path_disp_days = MIN_PATH_DISP_DAYS;
-        } else  {
-            path_disp_days *= 2;
-        }
-        if (path_disp_days < MIN_PATH_DISP_DAYS) {
-            path_disp_days = MIN_PATH_DISP_DAYS;
-        } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
-            path_disp_days = MAX_PATH_DISP_DAYS;
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SELECT_PATH_DISP_MINUS:
-        if (path_disp_days <= 0) {
-            path_disp_days = MAX_PATH_DISP_DAYS;
-        } else  {
-            path_disp_days /= 2;
-        }
-        if (path_disp_days < MIN_PATH_DISP_DAYS) {
-            path_disp_days = MIN_PATH_DISP_DAYS;
-        } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
-            path_disp_days = MAX_PATH_DISP_DAYS;
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SIMPANE_ZOOM_OUT:
-        for (i = 0; i < MAX_VALID_SIM_WIDTH-1; i++) {
-            if (IS_CLOSE(sim_width, valid_sim_width[i])) {
-                sim_width = valid_sim_width[i+1];
-                break;
-            }
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SIMPANE_ZOOM_IN:
-        for (i = 1; i < MAX_VALID_SIM_WIDTH; i++) {
-            if (IS_CLOSE(sim_width, valid_sim_width[i])) {
-                sim_width = valid_sim_width[i-1];
-                break;
-            }
-        }
-        sdl_play_event_sound();
-        break;
-    case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
-        int32_t found_obj = -1;
+        // draw sim_pane objects 
         for (i = 0; i < sim.max_object; i++) {
             object_t * obj = sim.object[i];
-            int32_t disp_x, disp_y;
-            double X_ORIGIN, Y_ORIGIN;
+            object_t * obj_tracker;
+            int32_t    disp_x, disp_y, disp_r, disp_color;
+            int32_t    path_idx, path_count, path_max;
+            double     X, Y, X_ORIGIN, Y_ORIGIN;
 
+            static SDL_Point  points[MAX_PATH+10];
+
+            // display the object ...
+
+            // determine display origin
             if (tracker_obj == -1) {
                 X_ORIGIN = sim_x;
                 Y_ORIGIN = sim_y;
@@ -981,144 +707,487 @@ bool sim_gravity_display_simulation(bool new_display)
                 Y_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->Y);
             }
 
+            // determine object's display info
+            // - position: disp_x, disp_y
+            // - radius: disp_r
+            // - color: disp_color
             disp_x = sim_pane.x + (POS_TO_DBL(&obj->X) - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
             disp_y = sim_pane.y + (POS_TO_DBL(&obj->Y) - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_r = (obj->DISP_R < 1 ? 1 : obj->DISP_R >= MAX_CIRCLE_RADIUS ? MAX_CIRCLE_RADIUS-1 : obj->DISP_R);
+            disp_color = (i != tracker_obj ? obj->DISP_COLOR : PINK);
 
-            if (disp_x >= event->mouse_click.x - 15 &&
-                disp_x <= event->mouse_click.x + 15 &&
-                disp_y >= event->mouse_click.y - 15 &&
-                disp_y <= event->mouse_click.y + 15 &&
-                (found_obj == -1 || sim.object[i]->MASS > sim.object[found_obj]->MASS))
-            {
-                found_obj = i;
+            // if circle to represent this object has not yet been created then create it
+            if (circle_texture_tbl[disp_r][disp_color] == NULL) {
+                circle_texture_tbl[disp_r][disp_color] =
+                    sdl_create_filled_circle_texture(disp_r, sdl_pixel_rgba[disp_color]);
             }
+
+            // render the circle, representing the object
+            sdl_render_circle(disp_x, disp_y, circle_texture_tbl[disp_r][disp_color]);
+
+            // display object's path ...
+
+            // initialize:
+            // - obj_tracker
+            // - path_idx
+            // - pat_max
+            obj_tracker = (tracker_obj != -1 ? sim.object[tracker_obj] : NULL);
+
+            path_idx = path_tail - 1;
+            if (path_idx < 0) {
+                path_idx += MAX_PATH;
+            }
+
+            path_max = path_disp_days;
+            if (path_max < 0) {
+                path_max = obj->MAX_PATH_DEFAULT;
+            } 
+            if (path_max > MAX_PATH) {
+                path_max = MAX_PATH;
+            }
+
+            // if no path to display then continue
+            if (path_max == 0 || obj_tracker == obj) {
+                continue;
+            }
+
+            // loop over path points, constructing the points[] array
+            path_count = 0;
+            while (path_count < path_max) {
+                if (obj_tracker == NULL) {
+                    X_ORIGIN = sim_x;
+                    Y_ORIGIN = sim_y;
+                } else {
+                    X_ORIGIN = obj_tracker->PATH[path_idx].X;
+                    Y_ORIGIN = obj_tracker->PATH[path_idx].Y;
+                    if (X_ORIGIN == 0 && Y_ORIGIN == 0) {
+                        break;
+                    }
+                }
+
+                X = obj->PATH[path_idx].X;
+                Y = obj->PATH[path_idx].Y;
+                if (X == 0 && Y == 0) {
+                    break;
+                }
+
+                points[path_count].x = sim_pane.x + (X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+                points[path_count].y = sim_pane.y + (Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+                path_count++;
+
+                path_idx = (path_idx == 0 ? MAX_PATH-1 : path_idx-1);
+            }
+
+            // display the lines that connect the points[] array
+            SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255);
+            SDL_RenderDrawLines(sdl_renderer, points, path_count);
         }
-        if (found_obj == -1) {
+
+        // display sim_pane title
+        sprintf(str, "WIDTH %0.2lf AU", sim_width/AU);
+        if (sim_width >= 999*AU) {
+            sprintf(str+strlen(str), " %0.2lf LY", sim_width/LY);
+        }
+        sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
+
+        // register sim_pane controls
+        col = SDL_PANE_COLS(&sim_pane,0)-2;
+        sdl_render_text_font0(&sim_pane,  0, col,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
+        sdl_render_text_font0(&sim_pane,  2, col,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK, SDL_EVENT_TYPE_MOUSE_CLICK, &sim_pane);
+        sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
+
+        // draw sim_pane border
+        sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
+
+        //
+        // CTLPANE ...
+        //
+
+        // clear ctl_pane
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(sdl_renderer, &ctl_pane);
+
+        // display controls  
+        sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
+                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
+        sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
+        sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
+        sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
+        sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
+        sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
+        sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_PATH_DISP_OFF);
+        sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_PATH_DISP_PLUS);
+        sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_PATH_DISP_MINUS);
+        sdl_render_text_font0(&ctl_pane, 10,  0, "HELP",      SDL_EVENT_HELP);
+
+        sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",      SDL_EVENT_BACK);
+
+        // display status lines
+        sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
+        sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
+
+        if (DT >= 3600) {
+            sprintf(str, "DT   %d HOURS", DT/3600);
+        } else if (DT >= 60) {
+            sprintf(str, "DT   %d MINUTES", DT/60);
+        } else{
+            sprintf(str, "DT   %d SECONDS", DT);
+        }
+        sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
+
+        sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "OFF");
+        sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
+
+        if (path_disp_days == 0) {
+            sdl_render_text_font0(&ctl_pane, 15, 0, "PATH OFF", SDL_EVENT_NONE);
+        } else if (path_disp_days < 0) {
+            sdl_render_text_font0(&ctl_pane, 15, 0, "PATH DEFAULT", SDL_EVENT_NONE);
+        } else {
+            if (path_disp_days < 365.25) {
+                sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
+            } else {
+                sprintf(str, "PATH %0.0lf YEARS", path_disp_days/365.25);
+            }
+            sdl_render_text_font0(&ctl_pane, 15, 0, str, SDL_EVENT_NONE);
+        }
+
+        if (state == STATE_RUN) {
+            double perf = (sim.sim_time * 1000000 - run_start_sim_time) / (microsec_timer() - run_start_wall_time);
+            sprintf(str, "RATE %0.1lE", perf);
+            sdl_render_text_font0(&ctl_pane, 16, 0, str, SDL_EVENT_NONE);
+        }
+
+        //
+        // present the display
+        //
+
+        SDL_RenderPresent(sdl_renderer);
+
+        //
+        // handle events
+        //
+
+        event = sdl_poll_event();
+        switch (event->event) {
+        case SDL_EVENT_RUN:
+            state = STATE_RUN;
+            run_start_sim_time = sim.sim_time * 1000000;
+            run_start_wall_time = microsec_timer();
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_STOP:
+            state = STATE_STOP;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_BACK: 
+        case SDL_EVENT_QUIT:
+            next_display = CURR_DISPLAY_TERMINATE;  // XXX don't call it 'CURR_'
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_DT_PLUS:
+            for (i = 0; i < MAX_VALID_DT-1; i++) {
+                if (DT == valid_dt[i]) {
+                    DT = valid_dt[i+1];
+                    break;
+                }
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_DT_MINUS:
+            for (i = 1; i < MAX_VALID_DT; i++) {
+                if (DT == valid_dt[i]) {
+                    DT = valid_dt[i-1];
+                    break;
+                }
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_SELECT_LOCAL:
+            state = STATE_STOP;
+            next_display = CURR_DISPLAY_SELECT_LOCAL;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_SELECT_CLOUD:
+            state = STATE_STOP;
+            next_display = CURR_DISPLAY_SELECT_CLOUD;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_PATH_DISP_DEFAULT:
+            path_disp_days = -1;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_PATH_DISP_OFF:
+            path_disp_days = 0;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_PATH_DISP_PLUS:
+            if (path_disp_days <= 0) {
+                path_disp_days = MIN_PATH_DISP_DAYS;
+            } else  {
+                path_disp_days *= 2;
+            }
+            if (path_disp_days < MIN_PATH_DISP_DAYS) {
+                path_disp_days = MIN_PATH_DISP_DAYS;
+            } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
+                path_disp_days = MAX_PATH_DISP_DAYS;
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_PATH_DISP_MINUS:
+            if (path_disp_days <= 0) {
+                path_disp_days = MAX_PATH_DISP_DAYS;
+            } else  {
+                path_disp_days /= 2;
+            }
+            if (path_disp_days < MIN_PATH_DISP_DAYS) {
+                path_disp_days = MIN_PATH_DISP_DAYS;
+            } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
+                path_disp_days = MAX_PATH_DISP_DAYS;
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_HELP:
+            state = STATE_STOP;
+            next_display = CURR_DISPLAY_HELP;
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_SIMPANE_ZOOM_OUT:
+            for (i = 0; i < MAX_VALID_SIM_WIDTH-1; i++) {
+                if (IS_CLOSE(sim_width, valid_sim_width[i])) {
+                    sim_width = valid_sim_width[i+1];
+                    break;
+                }
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_SIMPANE_ZOOM_IN:
+            for (i = 1; i < MAX_VALID_SIM_WIDTH; i++) {
+                if (IS_CLOSE(sim_width, valid_sim_width[i])) {
+                    sim_width = valid_sim_width[i-1];
+                    break;
+                }
+            }
+            sdl_play_event_sound();
+            break;
+        case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
+            int32_t found_obj = -1;
+            for (i = 0; i < sim.max_object; i++) {
+                object_t * obj = sim.object[i];
+                int32_t disp_x, disp_y;
+                double X_ORIGIN, Y_ORIGIN;
+
+                if (tracker_obj == -1) {
+                    X_ORIGIN = sim_x;
+                    Y_ORIGIN = sim_y;
+                } else {
+                    X_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->X);
+                    Y_ORIGIN = POS_TO_DBL(&sim.object[tracker_obj]->Y);
+                }
+
+                disp_x = sim_pane.x + (POS_TO_DBL(&obj->X) - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+                disp_y = sim_pane.y + (POS_TO_DBL(&obj->Y) - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+
+                if (disp_x >= event->mouse_click.x - 15 &&
+                    disp_x <= event->mouse_click.x + 15 &&
+                    disp_y >= event->mouse_click.y - 15 &&
+                    disp_y <= event->mouse_click.y + 15 &&
+                    (found_obj == -1 || sim.object[i]->MASS > sim.object[found_obj]->MASS))
+                {
+                    found_obj = i;
+                }
+            }
+            if (found_obj == -1) {
+                break;
+            }
+            tracker_obj = (found_obj == tracker_obj ? -1 : found_obj);
+            sdl_play_event_sound();
+            break; }
+        case SDL_EVENT_SIMPANE_MOUSE_MOTION:
+            if (tracker_obj == -1) {
+                sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
+                sim_y -= (event->mouse_motion.delta_y * (sim_width / sim_pane_width));
+            }
             break;
         }
-        tracker_obj = (found_obj == tracker_obj ? -1 : found_obj);
-        sdl_play_event_sound();
-        break; }
-    case SDL_EVENT_SIMPANE_MOUSE_MOTION:
-        if (tracker_obj == -1) {
-            sim_x -= (event->mouse_motion.delta_x * (sim_width / sim_pane_width));
-            sim_y -= (event->mouse_motion.delta_y * (sim_width / sim_pane_width));
-        }
-        break;
-    default:
-        break;
     }
 
-    // return done flag
-    return done;
+    // return next_display
+    return next_display;
 }
 
-bool sim_gravity_display_select(bool new_display)
+int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
 {
     SDL_Rect       title_line_pane;
     SDL_Rect       selection_pane;
     int32_t        title_line_pane_height, i, selection;
     sdl_event_t  * event;
     char           shortname[200];
-    bool           done = false;
-
-    static int32_t max_pathname;
-    static char ** pathname;
-
-    #define LIST_FILES_FREE() \
-        do { \
-            list_files_free(max_pathname, pathname); \
-            max_pathname = 0; \
-            pathname = NULL; \
-        } while (0)
+    char         * location;
+    int32_t        next_display = -1;
+    int32_t        max_pathname = 0;
+    char        ** pathname = NULL;
 
     // xxx needs scroll up/down
 
     //
-    // if this display has just been activated then 
     // obtain list of files from the appropriate location
     //
 
-    if (new_display) {
-        char * location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
-                           ? "sim_gravity/" 
-                           : "http://wikiscience101.sthaid.org/public/sim_gravity/");
-        list_files(location, &max_pathname, &pathname);
+    location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
+                ? "sim_gravity/" 
+                : "http://wikiscience101.sthaid.org/public/sim_gravity/");
+    list_files(location, &max_pathname, &pathname);
+
+    //
+    // loop until next_display has been set
+    //
+
+    while (next_display == -1) {
+        //
+        // short delay
+        //
+
+        usleep(5000);
+
+        //
+        // this display has 2 panes
+        // - title_line_pane: the top 2 lines
+        // - selection_pane: the remainder
+        //
+
+        title_line_pane_height = sdl_font[0].char_height * 2;
+        SDL_INIT_PANE(title_line_pane, 
+                      0, 0,  
+                      sdl_win_width, title_line_pane_height);
+        SDL_INIT_PANE(selection_pane, 
+                      0, title_line_pane_height,
+                      sdl_win_width, sdl_win_height - title_line_pane_height);
+        sdl_event_init();
+
+        //
+        // clear window
+        //
+
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
+
+        //
+        // render the title line and selection lines
+        //
+
+        if (curr_display == CURR_DISPLAY_SELECT_LOCAL) {
+            sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - LOCAL SELECTIONS", SDL_EVENT_NONE);
+        } else {
+            sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - CLOUD SELECTIONS", SDL_EVENT_NONE);
+        }
+        sdl_render_text_font0(&selection_pane, SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-4, "BACK", SDL_EVENT_BACK);
+
+        for (i = 0; i < max_pathname; i++) {
+            strcpy(shortname, pathname[i]);
+            sdl_render_text_font0(&selection_pane, 2*i, 0, basename(shortname), SDL_EVENT_USER_START+i);
+        }
+
+        //
+        // present the display
+        //
+
+        SDL_RenderPresent(sdl_renderer);
+
+        //
+        // handle events
+        //
+
+        event = sdl_poll_event();
+        if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_pathname) {
+            sdl_play_event_sound();
+            selection = event->event - SDL_EVENT_USER_START;
+            sim_gravity_init(pathname[selection]);
+            next_display = CURR_DISPLAY_SIMULATION;
+        } else if (event->event == SDL_EVENT_BACK) {
+            sdl_play_event_sound();
+            next_display = CURR_DISPLAY_SIMULATION;
+        } else if (event->event == SDL_EVENT_QUIT) {
+            sdl_play_event_sound();
+            next_display = CURR_DISPLAY_TERMINATE;
+        }
     }
 
-    //
-    // short delay
-    //
+    // free the file list
+    list_files_free(max_pathname, pathname);
 
-    usleep(5000);
+    // return next_display
+    return next_display;
+}
 
-    //
-    // this display has 2 panes
-    // - title_line_pane: the top 2 lines
-    // - selection_pane: the remainder
-    //
+// XXX move to util
+void sdl_display_text(char * title, char **lines);
 
-    title_line_pane_height = sdl_font[0].char_height * 2;
-    SDL_INIT_PANE(title_line_pane, 
-                  0, 0,  
-                  sdl_win_width, title_line_pane_height);
-    SDL_INIT_PANE(selection_pane, 
-                  0, title_line_pane_height,
-                  sdl_win_width, sdl_win_height - title_line_pane_height);
-    sdl_event_init();
+int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
+{
+    // XXX tbd
 
-    //
-    // clear window
-    //
+    // display help 
+    sdl_display_text("XXX HELP XXX", NULL);
 
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdl_renderer);
+    // return next_display
+    return sdl_quit ? CURR_DISPLAY_TERMINATE : CURR_DISPLAY_SIMULATION;
+}
 
-    //
-    // render the title line and selection lines
-    //
+void sdl_display_text(char * title, char **lines)
+{
+    SDL_Rect       title_line_pane;
+    SDL_Rect       text_pane;
+    int32_t        title_line_pane_height;
+    sdl_event_t  * event;
+    bool           done = false;
 
-    if (curr_display == CURR_DISPLAY_SELECT_LOCAL) {
-        sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - LOCAL SELECTIONS", SDL_EVENT_NONE);
-    } else {
-        sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - CLOUD SELECTIONS", SDL_EVENT_NONE);
+    INFO("XXX SDL_DISPLAY_TEXT START\n");
+
+    while (!done) {
+        // short delay
+        usleep(5000);
+
+        // init panes and event
+        title_line_pane_height = sdl_font[0].char_height * 2;
+        SDL_INIT_PANE(title_line_pane, 
+                    0, 0,  
+                    sdl_win_width, title_line_pane_height);
+        SDL_INIT_PANE(text_pane, 
+                    0, title_line_pane_height,
+                    sdl_win_width, sdl_win_height - title_line_pane_height);
+        sdl_event_init();
+
+        // clear display, and init events
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
+
+        // display title
+        sdl_render_text_ex(&title_line_pane, 0, 0, title, SDL_EVENT_NONE,
+                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
+
+        // display lines
+        // XXX
+
+        // display controls
+        sdl_render_text_font0(&text_pane, 
+                              SDL_PANE_ROWS(&text_pane,0)-1, SDL_PANE_COLS(&text_pane,0)-4, 
+                              "BACK", SDL_EVENT_BACK);
+
+        // present the display
+        SDL_RenderPresent(sdl_renderer);
+
+        // wait for event
+        event = sdl_poll_event();
+        switch (event->event) {
+        case SDL_EVENT_BACK:
+        case SDL_EVENT_QUIT: 
+            sdl_play_event_sound();
+            done = true;
+        }
     }
-    sdl_render_text_font0(&selection_pane, SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-4, "BACK", SDL_EVENT_BACK);
-
-    for (i = 0; i < max_pathname; i++) {
-        strcpy(shortname, pathname[i]);
-        sdl_render_text_font0(&selection_pane, 2*i, 0, basename(shortname), SDL_EVENT_USER_START+i);
-    }
-
-    //
-    // present the display
-    //
-
-    SDL_RenderPresent(sdl_renderer);
-
-    //
-    // handle events
-    //
-
-    event = sdl_poll_event();
-    if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_pathname) {
-        sdl_play_event_sound();
-        selection = event->event - SDL_EVENT_USER_START;
-        sim_gravity_init(pathname[selection]);
-        LIST_FILES_FREE();
-        curr_display = CURR_DISPLAY_SIMULATION;
-    } else if (event->event == SDL_EVENT_BACK) {
-        sdl_play_event_sound();
-        LIST_FILES_FREE();
-        curr_display = CURR_DISPLAY_SIMULATION;
-    } else if (event->event == SDL_EVENT_QUIT) {
-        sdl_play_event_sound();
-        LIST_FILES_FREE();
-        done = true;
-    }
-
-    // return done flag
-    return done;
 }
 
 // -----------------  THREAD  ---------------------------------------------------

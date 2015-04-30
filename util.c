@@ -1133,6 +1133,7 @@ typedef struct {
 
 static void list_local_files(char * location, int32_t * max, char *** pathnames);
 static void list_cloud_files(char * location, int32_t * max, char *** pathnames);
+static void list_files_sort(char ** pathnames, int32_t max);
 
 void list_files(char * location, int32_t * max, char *** pathnames)
 {
@@ -1150,6 +1151,8 @@ void list_files(char * location, int32_t * max, char *** pathnames)
     } else {
         list_cloud_files(location, max, pathnames);
     }
+
+    list_files_sort(*pathnames, *max);
 }
 
 void list_files_free(int32_t max, char ** pathnames)
@@ -1293,7 +1296,6 @@ static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
 }
 
 #ifndef ANDROID
-
 static void list_local_files(char * location, int32_t * max, char *** pathnames)
 {
     DIR           * dir;
@@ -1324,9 +1326,7 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
 
     closedir(dir);
 }
-
 #else
-
 JNIEnv* Android_JNI_GetEnv(void);
 extern jclass mActivityClass;
 
@@ -1386,8 +1386,40 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     // xxx
     (*mEnv)->PopLocalFrame(mEnv, NULL);
 }
-
 #endif
+
+static void list_files_sort(char ** pathnames, int32_t max)
+{
+    int start, i, min_idx;
+    char * min_val;
+
+    // selection sort ...
+
+    // return if no sorting needed
+    if (max <= 1) {
+        return;
+    }
+
+    // search the pathnames for the minimum value, and swap the minimum value
+    // with the value at the start of pathnames;  
+    // increment start of pathnames and repeat
+    for (start = 0; start < max-1; start++) {
+        // find element in pathnames[start...] with minimum value
+        min_val = pathnames[start];
+        min_idx = start;
+        for (i = start+1; i < max; i++) {
+            if (strcmp(pathnames[i], min_val) < 0) {
+                min_val = pathnames[i];
+                min_idx = i;
+            }
+        }
+
+        // swap element found with element at postion start
+        char * tmp = pathnames[start];
+        pathnames[start] = pathnames[min_idx];
+        pathnames[min_idx] = tmp;
+    }
+}
 
 // -----------------  MISC UTILS  -----------------------------------------
 
