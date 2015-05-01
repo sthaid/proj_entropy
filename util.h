@@ -78,19 +78,22 @@ sdl_font_t sdl_font[SDL_MAX_FONT];
 
 // events
 #define SDL_EVENT_NONE              0
-#define SDL_EVENT_QUIT              1
-#define SDL_EVENT_WIN_SIZE_CHANGE   2
-#define SDL_EVENT_WIN_MINIMIZED     3
-#define SDL_EVENT_WIN_RESTORED      4
+#define SDL_EVENT_BACK              1
+#define SDL_EVENT_QUIT              2
+#define SDL_EVENT_WIN_SIZE_CHANGE   3
+#define SDL_EVENT_WIN_MINIMIZED     4
+#define SDL_EVENT_WIN_RESTORED      5
 #define SDL_EVENT_USER_START        10  
 #define SDL_EVENT_USER_END          255
 #define SDL_EVENT_MAX               256 
 
+// event types
 #define SDL_EVENT_TYPE_NONE         0
 #define SDL_EVENT_TYPE_TEXT         1
 #define SDL_EVENT_TYPE_MOUSE_CLICK  2
 #define SDL_EVENT_TYPE_MOUSE_MOTION 3
 
+// event data structure
 typedef struct {
     int32_t event;
     union {
@@ -136,18 +139,20 @@ extern uint32_t sdl_pixel_rgba[];
 // sdl support: prototypes
 void sdl_init(uint32_t w, uint32_t h);
 void sdl_terminate(void);
-void sdl_render_text_font0(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
-void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
-void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
-        int32_t field_cols, bool center, int32_t font_id);
 void sdl_event_init(void);
 void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos);
 sdl_event_t * sdl_poll_event(void);
 void sdl_play_event_sound(void);
-void sdl_get_string(int32_t count, ...);
+void sdl_render_text_font0(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
+void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
+void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
+        int32_t field_cols, bool center, int32_t font_id);
 void sdl_render_rect(SDL_Rect * rect, int32_t line_width, uint32_t rgba);
 SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba);
 void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture);
+void sdl_display_get_string(int32_t count, ...);
+void sdl_display_text(char * title, char **lines);
+void sdl_display_choose_from_list(char * title_str, char ** choices, int32_t max_choices, int32_t * selection);
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  --------------------------------
 

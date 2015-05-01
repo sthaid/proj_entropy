@@ -92,7 +92,6 @@
 #define SDL_EVENT_SIMPANE_ZOOM_OUT         (SDL_EVENT_USER_START + 21)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK      (SDL_EVENT_USER_START + 22)
 #define SDL_EVENT_SIMPANE_MOUSE_MOTION     (SDL_EVENT_USER_START + 23)
-#define SDL_EVENT_BACK                     (SDL_EVENT_USER_START + 30)
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -1020,174 +1019,55 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
 
 int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
 {
-    SDL_Rect       title_line_pane;
-    SDL_Rect       selection_pane;
-    int32_t        title_line_pane_height, i, selection;
-    sdl_event_t  * event;
-    char           shortname[200];
-    char         * location;
-    int32_t        next_display = -1;
-    int32_t        max_pathname = 0;
-    char        ** pathname = NULL;
+    char  * location;
+    char  * title;
+    int32_t selection, i;
+    char    temp_str[PATH_MAX];
+    char ** pathname = NULL;
+    int32_t max_pathname = 0;
 
-    // xxx needs scroll up/down
-
-    //
-    // obtain list of files from the appropriate location
-    //
-
+    // init
     location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
                 ? "sim_gravity/" 
                 : "http://wikiscience101.sthaid.org/public/sim_gravity/");
+    title    = (curr_display == CURR_DISPLAY_SELECT_LOCAL
+                ? "SIM GRAVITY - LOCAL SELECTIONS"
+                : "SIM GRAVITY - CLOUD SELECTIONS");
+
+    // obtain list of files from the appropriate location
     list_files(location, &max_pathname, &pathname);
 
-    //
-    // loop until next_display has been set
-    //
+    // bring up display to choose 
+    char * basenames[max_pathname];
+    for (i = 0; i < max_pathname; i++) {
+        strcpy(temp_str, pathname[i]);
+        basenames[i] = strdup(basename(temp_str));
+    }
+    sdl_display_choose_from_list(title, basenames, max_pathname, &selection);
+    for (i = 0; i < max_pathname; i++) {
+        free(basenames[i]);
+    }
 
-    while (next_display == -1) {
-        //
-        // short delay
-        //
-
-        usleep(5000);
-
-        //
-        // this display has 2 panes
-        // - title_line_pane: the top 2 lines
-        // - selection_pane: the remainder
-        //
-
-        title_line_pane_height = sdl_font[0].char_height * 2;
-        SDL_INIT_PANE(title_line_pane, 
-                      0, 0,  
-                      sdl_win_width, title_line_pane_height);
-        SDL_INIT_PANE(selection_pane, 
-                      0, title_line_pane_height,
-                      sdl_win_width, sdl_win_height - title_line_pane_height);
-        sdl_event_init();
-
-        //
-        // clear window
-        //
-
-        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(sdl_renderer);
-
-        //
-        // render the title line and selection lines
-        //
-
-        if (curr_display == CURR_DISPLAY_SELECT_LOCAL) {
-            sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - LOCAL SELECTIONS", SDL_EVENT_NONE);
-        } else {
-            sdl_render_text_font0(&title_line_pane, 0, 0, "SIM GRAVITY - CLOUD SELECTIONS", SDL_EVENT_NONE);
-        }
-        sdl_render_text_font0(&selection_pane, SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-4, "BACK", SDL_EVENT_BACK);
-
-        for (i = 0; i < max_pathname; i++) {
-            strcpy(shortname, pathname[i]);
-            sdl_render_text_font0(&selection_pane, 2*i, 0, basename(shortname), SDL_EVENT_USER_START+i);
-        }
-
-        //
-        // present the display
-        //
-
-        SDL_RenderPresent(sdl_renderer);
-
-        //
-        // handle events
-        //
-
-        event = sdl_poll_event();
-        if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_pathname) {
-            sdl_play_event_sound();
-            selection = event->event - SDL_EVENT_USER_START;
-            sim_gravity_init(pathname[selection]);
-            next_display = CURR_DISPLAY_SIMULATION;
-        } else if (event->event == SDL_EVENT_BACK) {
-            sdl_play_event_sound();
-            next_display = CURR_DISPLAY_SIMULATION;
-        } else if (event->event == SDL_EVENT_QUIT) {
-            sdl_play_event_sound();
-            next_display = CURR_DISPLAY_TERMINATE;
-        }
+    // if a selction has been made then call sim_gravity_init to initialize 
+    // the simulation from the selected pathname
+    if (selection != -1) {
+        sim_gravity_init(pathname[selection]);
     }
 
     // free the file list
     list_files_free(max_pathname, pathname);
 
     // return next_display
-    return next_display;
+    return sdl_quit ? CURR_DISPLAY_TERMINATE : CURR_DISPLAY_SIMULATION;
 }
-
-// XXX move to util
-void sdl_display_text(char * title, char **lines);
 
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
 {
-    // XXX tbd
-
-    // display help 
+    // display the help text0
     sdl_display_text("XXX HELP XXX", NULL);
 
     // return next_display
     return sdl_quit ? CURR_DISPLAY_TERMINATE : CURR_DISPLAY_SIMULATION;
-}
-
-void sdl_display_text(char * title, char **lines)
-{
-    SDL_Rect       title_line_pane;
-    SDL_Rect       text_pane;
-    int32_t        title_line_pane_height;
-    sdl_event_t  * event;
-    bool           done = false;
-
-    INFO("XXX SDL_DISPLAY_TEXT START\n");
-
-    while (!done) {
-        // short delay
-        usleep(5000);
-
-        // init panes and event
-        title_line_pane_height = sdl_font[0].char_height * 2;
-        SDL_INIT_PANE(title_line_pane, 
-                    0, 0,  
-                    sdl_win_width, title_line_pane_height);
-        SDL_INIT_PANE(text_pane, 
-                    0, title_line_pane_height,
-                    sdl_win_width, sdl_win_height - title_line_pane_height);
-        sdl_event_init();
-
-        // clear display, and init events
-        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(sdl_renderer);
-
-        // display title
-        sdl_render_text_ex(&title_line_pane, 0, 0, title, SDL_EVENT_NONE,
-                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
-
-        // display lines
-        // XXX
-
-        // display controls
-        sdl_render_text_font0(&text_pane, 
-                              SDL_PANE_ROWS(&text_pane,0)-1, SDL_PANE_COLS(&text_pane,0)-4, 
-                              "BACK", SDL_EVENT_BACK);
-
-        // present the display
-        SDL_RenderPresent(sdl_renderer);
-
-        // wait for event
-        event = sdl_poll_event();
-        switch (event->event) {
-        case SDL_EVENT_BACK:
-        case SDL_EVENT_QUIT: 
-            sdl_play_event_sound();
-            done = true;
-        }
-    }
 }
 
 // -----------------  THREAD  ---------------------------------------------------
