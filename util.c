@@ -557,6 +557,8 @@ void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture)
 
 // - - - - - - - - -  PREDEFINED DISPLAYS  - - - - - - - - - - - - - - - 
 
+#define SDL_EVENT_BACK  (SDL_EVENT_USER_START+0)
+
 void sdl_display_get_string(int32_t count, ...)
 {
     char        * prompt_str[10];  //xxx why 10
@@ -665,24 +667,26 @@ void sdl_display_get_string(int32_t count, ...)
 
         // handle events 
         event = sdl_poll_event();
-        if (event->event != SDL_EVENT_NONE) {
-            // xxx window resizing
-            sdl_play_event_sound();
-        }
         if (event->event == SDL_EVENT_QUIT) {
+            sdl_play_event_sound();
             break;
         } else if (event->event == SDL_EVENT_KEY_SHIFT) {
+            sdl_play_event_sound();
             shift = !shift;
         } else if (event->event == SDL_EVENT_KEY_BS) {
             int32_t len = strlen(ret_str[field_select]);
+            sdl_play_event_sound();
             if (len > 0) {
                 ret_str[field_select][len-1] = '\0';
             }
         } else if (event->event == SDL_EVENT_KEY_TAB) {
+            sdl_play_event_sound();
             field_select = (field_select + 1) % count;
         } else if (event->event == SDL_EVENT_KEY_ENTER) {
+            sdl_play_event_sound();
             break;
         } else if (event->event == SDL_EVENT_KEY_ESC) {
+            sdl_play_event_sound();
             if (strcmp(ret_str[field_select], curr_str[field_select])) {
                 strcpy(ret_str[field_select], curr_str[field_select]);
             } else {
@@ -692,9 +696,11 @@ void sdl_display_get_string(int32_t count, ...)
                 break;
             }
         } else if (event->event >= SDL_EVENT_FIELD_SELECT && event->event < SDL_EVENT_FIELD_SELECT+count) {
+            sdl_play_event_sound();
             field_select = event->event - SDL_EVENT_FIELD_SELECT;
         } else if (event->event >= 0x20 && event->event <= 0x7e) {
             char s[2];
+            sdl_play_event_sound();
             s[0] = event->event;
             s[1] = '\0';
             strcat(ret_str[field_select], s);
@@ -763,7 +769,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
     int32_t        title_line_pane_height, i;
     sdl_event_t  * event;
 
-    // xxx needs scroll up/down
+    // XXX needs scroll up/down
 
     // preset return
     *selection = -1;
@@ -793,7 +799,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         sdl_render_text_font0(&title_line_pane, 0, 0, title_str, SDL_EVENT_NONE);
 
         for (i = 0; i < max_choice; i++) {
-            sdl_render_text_font0(&selection_pane, 2*i, 0, choice[i], SDL_EVENT_USER_START+i);
+            sdl_render_text_font0(&selection_pane, 2*i, 0, choice[i], SDL_EVENT_USER_START+i+1);
         }
 
         sdl_render_text_font0(&selection_pane, 
@@ -805,9 +811,9 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
 
         // handle events
         event = sdl_poll_event();
-        if (event->event >= SDL_EVENT_USER_START && event->event < SDL_EVENT_USER_START+max_choice) {
+        if (event->event >= SDL_EVENT_USER_START+1 && event->event < SDL_EVENT_USER_START+max_choice+1) {
             sdl_play_event_sound();
-            *selection = event->event - SDL_EVENT_USER_START;
+            *selection = event->event - SDL_EVENT_USER_START - 1;
             break;
         } else if (event->event == SDL_EVENT_BACK || event->event == SDL_EVENT_QUIT) {
             sdl_play_event_sound();
@@ -825,6 +831,10 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
 int Pthread_barrier_init(Pthread_barrier_t *barrier,
     const Pthread_barrierattr_t *attr, unsigned count)
 {
+    if (count == 0) {
+        FATAL("barrier count being set to 0\n");
+    }
+
     pthread_mutex_init(&barrier->mutex, NULL);
     pthread_cond_init(&barrier->cond, NULL);
     barrier->count = count;
@@ -835,6 +845,10 @@ int Pthread_barrier_init(Pthread_barrier_t *barrier,
 int Pthread_barrier_wait(Pthread_barrier_t *barrier)
 {
     uint64_t done;
+
+    if (barrier->count == 1) {
+        return;
+    }
 
     pthread_mutex_lock(&barrier->mutex);
     done = barrier->current / barrier->count + 1;
@@ -1254,8 +1268,6 @@ static void list_files_sort(char ** pathnames, int32_t max);
 
 void list_files(char * location, int32_t * max, char *** pathnames)
 {
-    INFO("LIST FILES: '%s'\n", location); //XXX
-
     if (location[strlen(location)-1] != '/') {
         ERROR("invalid location '%s'\n", location);
         *max = 0;
@@ -1314,7 +1326,7 @@ void * open_file(char * pathname)
         size_t offset;
         FILE * fp;
 
-        // xxx check for overun
+        // xxx check for overun of buff
         sprintf(cmd, "curl %s 2>/dev/null", pathname); 
         fp = popen(cmd, "r");
         if (fp == NULL) {
@@ -1384,9 +1396,9 @@ static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
     char   cmd[200];
 
     *max = 0;
-    *pathnames = calloc(1000,sizeof(char*)); //xxx
+    *pathnames = calloc(1000,sizeof(char*)); //xxx, maybe realloc
 
-    sprintf(cmd, "curl %s 2>/dev/null", location);  //xxx test on android too
+    sprintf(cmd, "curl %s 2>/dev/null", location);
     fp = popen(cmd, "r");
     if (fp == NULL) {
         ERROR("popen %s\n", cmd);
@@ -1487,7 +1499,6 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     if (len > 0 && location_copy[len-1] == '/') {
         location_copy[len-1] = '\0';
     }
-    INFO("XXX location_copy '%s'\n", location_copy);
 
     // xxx
     asset_dir = AAssetManager_openDir(asset_manager, location_copy);

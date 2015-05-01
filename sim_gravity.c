@@ -1,6 +1,5 @@
 // XXX flicker in path display
 
-// XXX list files util should sort
 // XXX display error if bad file
 
 // XXX add more files ...
@@ -26,6 +25,7 @@
 // - fixes to wikiscience
 // - solar_sys plus rouge star    CLOUD
 // - 3 body                       LOCAL
+// - list files util should sort
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -88,6 +88,7 @@
 #define SDL_EVENT_PATH_DISP_PLUS           (SDL_EVENT_USER_START + 8)
 #define SDL_EVENT_PATH_DISP_MINUS          (SDL_EVENT_USER_START + 9)
 #define SDL_EVENT_HELP                     (SDL_EVENT_USER_START + 10)
+#define SDL_EVENT_BACK                     (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_ZOOM_IN          (SDL_EVENT_USER_START + 20)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT         (SDL_EVENT_USER_START + 21)
 #define SDL_EVENT_SIMPANE_MOUSE_CLICK      (SDL_EVENT_USER_START + 22)
@@ -102,12 +103,12 @@
      (s) == STATE_RUN               ? "RUN"               : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
-#define CURR_DISPLAY_NONE         0
-#define CURR_DISPLAY_TERMINATE    1
-#define CURR_DISPLAY_SIMULATION   2
-#define CURR_DISPLAY_SELECT_LOCAL 3
-#define CURR_DISPLAY_SELECT_CLOUD 4
-#define CURR_DISPLAY_HELP         5
+#define DISPLAY_NONE         0
+#define DISPLAY_TERMINATE    1
+#define DISPLAY_SIMULATION   2
+#define DISPLAY_SELECT_LOCAL 3
+#define DISPLAY_SELECT_CLOUD 4
+#define DISPLAY_HELP         5
 
 #define POS_TO_DBL sim_gravity_cvt_position_to_double // xxx do we keep these?
 #define DBL_TO_POS sim_gravity_cvt_double_to_position
@@ -598,25 +599,25 @@ void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
 
 void sim_gravity_display(void)
 {
-    int32_t last_display = CURR_DISPLAY_NONE;
-    int32_t curr_display = CURR_DISPLAY_SIMULATION;
-    int32_t next_display = CURR_DISPLAY_SIMULATION;
+    int32_t last_display = DISPLAY_NONE;
+    int32_t curr_display = DISPLAY_SIMULATION;
+    int32_t next_display = DISPLAY_SIMULATION;
 
     while (true) {
         switch (curr_display) {
-        case CURR_DISPLAY_SIMULATION:         
+        case DISPLAY_SIMULATION:         
             next_display = sim_gravity_display_simulation(curr_display, last_display);
             break;
-        case CURR_DISPLAY_SELECT_LOCAL:         
-        case CURR_DISPLAY_SELECT_CLOUD:         
+        case DISPLAY_SELECT_LOCAL:         
+        case DISPLAY_SELECT_CLOUD:         
             next_display = sim_gravity_display_select(curr_display, last_display);
             break;
-        case CURR_DISPLAY_HELP:         
+        case DISPLAY_HELP:         
             next_display = sim_gravity_display_help(curr_display, last_display);
             break;
         }
 
-        if (sdl_quit || next_display == CURR_DISPLAY_TERMINATE) {
+        if (sdl_quit || next_display == DISPLAY_TERMINATE) {
             break;
         }
 
@@ -820,13 +821,13 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_PATH_DISP_OFF);
         sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_PATH_DISP_PLUS);
         sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_PATH_DISP_MINUS);
-        sdl_render_text_font0(&ctl_pane, 10,  0, "HELP",      SDL_EVENT_HELP);
 
+        sdl_render_text_font0(&ctl_pane, 18, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",      SDL_EVENT_BACK);
 
         // display status lines
         sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
-        sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctl_pane, 10, 0, str, SDL_EVENT_NONE);
 
         if (DT >= 3600) {
             sprintf(str, "DT   %d HOURS", DT/3600);
@@ -835,28 +836,28 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         } else{
             sprintf(str, "DT   %d SECONDS", DT);
         }
-        sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctl_pane, 11, 0, str, SDL_EVENT_NONE);
 
         sprintf(str, "TRCK %s", tracker_obj != -1 ? sim.object[tracker_obj]->NAME : "OFF");
-        sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctl_pane, 12, 0, str, SDL_EVENT_NONE);
 
         if (path_disp_days == 0) {
-            sdl_render_text_font0(&ctl_pane, 15, 0, "PATH OFF", SDL_EVENT_NONE);
+            sdl_render_text_font0(&ctl_pane, 13, 0, "PATH OFF", SDL_EVENT_NONE);
         } else if (path_disp_days < 0) {
-            sdl_render_text_font0(&ctl_pane, 15, 0, "PATH DEFAULT", SDL_EVENT_NONE);
+            sdl_render_text_font0(&ctl_pane, 13, 0, "PATH DEFAULT", SDL_EVENT_NONE);
         } else {
             if (path_disp_days < 365.25) {
                 sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
             } else {
                 sprintf(str, "PATH %0.0lf YEARS", path_disp_days/365.25);
             }
-            sdl_render_text_font0(&ctl_pane, 15, 0, str, SDL_EVENT_NONE);
+            sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
         }
 
         if (state == STATE_RUN) {
             double perf = (sim.sim_time * 1000000 - run_start_sim_time) / (microsec_timer() - run_start_wall_time);
             sprintf(str, "RATE %0.1lE", perf);
-            sdl_render_text_font0(&ctl_pane, 16, 0, str, SDL_EVENT_NONE);
+            sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
         }
 
         //
@@ -883,7 +884,7 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             break;
         case SDL_EVENT_BACK: 
         case SDL_EVENT_QUIT:
-            next_display = CURR_DISPLAY_TERMINATE;  // XXX don't call it 'CURR_'
+            next_display = DISPLAY_TERMINATE;  
             sdl_play_event_sound();
             break;
         case SDL_EVENT_DT_PLUS:
@@ -906,12 +907,12 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             break;
         case SDL_EVENT_SELECT_LOCAL:
             state = STATE_STOP;
-            next_display = CURR_DISPLAY_SELECT_LOCAL;
+            next_display = DISPLAY_SELECT_LOCAL;
             sdl_play_event_sound();
             break;
         case SDL_EVENT_SELECT_CLOUD:
             state = STATE_STOP;
-            next_display = CURR_DISPLAY_SELECT_CLOUD;
+            next_display = DISPLAY_SELECT_CLOUD;
             sdl_play_event_sound();
             break;
         case SDL_EVENT_PATH_DISP_DEFAULT:
@@ -950,7 +951,7 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             break;
         case SDL_EVENT_HELP:
             state = STATE_STOP;
-            next_display = CURR_DISPLAY_HELP;
+            next_display = DISPLAY_HELP;
             sdl_play_event_sound();
             break;
         case SDL_EVENT_SIMPANE_ZOOM_OUT:
@@ -1013,7 +1014,10 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         }
     }
 
+    //
     // return next_display
+    //
+
     return next_display;
 }
 
@@ -1027,10 +1031,10 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
     int32_t max_pathname = 0;
 
     // init
-    location = (curr_display == CURR_DISPLAY_SELECT_LOCAL
+    location = (curr_display == DISPLAY_SELECT_LOCAL
                 ? "sim_gravity/" 
                 : "http://wikiscience101.sthaid.org/public/sim_gravity/");
-    title    = (curr_display == CURR_DISPLAY_SELECT_LOCAL
+    title    = (curr_display == DISPLAY_SELECT_LOCAL
                 ? "SIM GRAVITY - LOCAL SELECTIONS"
                 : "SIM GRAVITY - CLOUD SELECTIONS");
 
@@ -1058,7 +1062,7 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
     list_files_free(max_pathname, pathname);
 
     // return next_display
-    return sdl_quit ? CURR_DISPLAY_TERMINATE : CURR_DISPLAY_SIMULATION;
+    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
 }
 
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
@@ -1067,7 +1071,7 @@ int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
     sdl_display_text("XXX HELP XXX", NULL);
 
     // return next_display
-    return sdl_quit ? CURR_DISPLAY_TERMINATE : CURR_DISPLAY_SIMULATION;
+    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
 }
 
 // -----------------  THREAD  ---------------------------------------------------

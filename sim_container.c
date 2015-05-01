@@ -17,8 +17,9 @@
 #define SDL_EVENT_PLAYBACK_REV   (SDL_EVENT_USER_START + 6)
 #define SDL_EVENT_PLAYBACK_FWD   (SDL_EVENT_USER_START + 7)
 #define SDL_EVENT_RESET          (SDL_EVENT_USER_START + 9)
-#define SDL_EVENT_RESET_PARAMS   (SDL_EVENT_USER_START + 10)
-#define SDL_EVENT_BACK           (SDL_EVENT_USER_START + 11)
+#define SDL_EVENT_SELECT_PARAMS  (SDL_EVENT_USER_START + 10)
+#define SDL_EVENT_HELP           (SDL_EVENT_USER_START + 11)
+#define SDL_EVENT_BACK           (SDL_EVENT_USER_START + 12)
 
 #define PARTICLE_DIAMETER ((int64_t)(1000000))
 
@@ -65,6 +66,12 @@
 #define DEFAULT_RUN_SPEED 5
 #define RUN_SPEED_SLEEP_TIME (100 * ((1 << (MAX_RUN_SPEED-run_speed)) - 1))
 
+#define DISPLAY_NONE          0
+#define DISPLAY_TERMINATE     1
+#define DISPLAY_SIMULATION    2
+#define DISPLAY_SELECT_PARAMS 3
+#define DISPLAY_HELP          4
+
 //
 // typedefs
 //
@@ -103,9 +110,12 @@ static pthread_barrier_t barrier;
 // prototypes
 //
 
-int32_t sim_container_init(bool startup, int32_t max_particle, int64_t sim_width);
+int32_t sim_container_init(int32_t max_particle, int64_t sim_width);
 void sim_container_terminate(void);
-bool sim_container_display(void);
+void sim_container_display(void);
+int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_display);
+int32_t sim_container_display_select_params(int32_t curr_display, int32_t last_display);
+int32_t sim_container_display_help(int32_t curr_display, int32_t last_display);
 void * sim_container_thread(void * cx);
 bool sim_container_should_auto_stop(void);
 
@@ -113,27 +123,22 @@ bool sim_container_should_auto_stop(void);
 
 void sim_container(void) 
 {
-    if (sim_container_init(true, DEFAULT_MAX_PARTICLE, DEFAULT_SIM_WIDTH*PARTICLE_DIAMETER) != 0) {
-        return;
-    }
+    run_speed = DEFAULT_RUN_SPEED;
 
-    while (true) {
-        bool done = sim_container_display();
-        if (done) {
-            break;
-        }
-    }
+    sim_container_init(DEFAULT_MAX_PARTICLE, DEFAULT_SIM_WIDTH*PARTICLE_DIAMETER);
+
+    sim_container_display();
 
     sim_container_terminate();
 }
 
 // -----------------  INIT & TERMINATE  -----------------------------------------
 
-int32_t sim_container_init(bool startup, int32_t max_particle, int64_t sim_width)
+int32_t sim_container_init(int32_t max_particle, int64_t sim_width)
 {
     #define SIM_SIZE(n) (sizeof(sim_t) + (n) * sizeof(particle_t))
 
-    int32_t i, num_proc, direction;
+    int32_t i, direction;
 
     // print info msg
     INFO("initialize start, max_particle=%d sim_width=%"PRId64"\n",max_particle, sim_width);
@@ -142,6 +147,8 @@ int32_t sim_container_init(bool startup, int32_t max_particle, int64_t sim_width
     free(sim);
     sim = calloc(1, SIM_SIZE(max_particle));
     if (sim == NULL) {
+        // xxx test this path
+        // xxx fake in a dummy sim that is malloced but with small max_particles
         return -1;
     }
 
@@ -163,17 +170,20 @@ int32_t sim_container_init(bool startup, int32_t max_particle, int64_t sim_width
 
     // init control variables
     state = STATE_STOP;
-    if (startup) {
-        run_speed = DEFAULT_RUN_SPEED;
-    }
     cont_shrink_restore_speed = 0;
 
     // create worker threads
-    num_proc = sysconf(_SC_NPROCESSORS_ONLN);
-    max_thread = (num_proc == 1            ? 1 :
-                  num_proc <= MAX_THREAD+1 ? num_proc-1
-                                           : MAX_THREAD);
-    INFO("max_thread=%d num_proc=%d\n", max_thread, num_proc);
+#ifndef ANDROID
+    max_thread = sysconf(_SC_NPROCESSORS_ONLN) - 1;
+    if (max_thread == 0) {
+        max_thread = 1;
+    } else if (max_thread > MAX_THREAD) {
+        max_thread = MAX_THREAD;
+    }
+#else
+    max_thread = 1;
+#endif
+    INFO("max_thread=%dd\n", max_thread);
     pthread_barrier_init(&barrier,NULL,max_thread);
     for (i = 0; i < max_thread; i++) {
         pthread_create(&thread_id[i], NULL, sim_container_thread, (void*)(long)i);
@@ -211,198 +221,287 @@ void sim_container_terminate(void)
 
 // -----------------  DISPLAY  --------------------------------------------------
 
-bool sim_container_display(void)
+void sim_container_display(void)
+{
+    int32_t last_display = DISPLAY_NONE;
+    int32_t curr_display = DISPLAY_SIMULATION;
+    int32_t next_display = DISPLAY_SIMULATION;
+
+    while (true) {
+        switch (curr_display) {
+        case DISPLAY_SIMULATION:
+            next_display = sim_container_display_simulation(curr_display, last_display);
+            break;
+        case DISPLAY_SELECT_PARAMS:
+            next_display = sim_container_display_select_params(curr_display, last_display);
+            break;
+        case DISPLAY_HELP:
+            next_display = sim_container_display_help(curr_display, last_display);
+            break;
+        }
+
+        if (sdl_quit || next_display == DISPLAY_TERMINATE) {
+            break;
+        }
+
+        last_display = curr_display;
+        curr_display = next_display;
+    }
+}
+
+int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_display)
 {
     SDL_Rect      ctlpane;
     SDL_Rect      cont_rect;
     sdl_event_t * event;
-    int32_t       i, simpane_width, cont_width, count, color;
+    int32_t       i, simpane_width, cont_width, color;
     int32_t       win_x, win_y, win_r;
     double        sum_speed, temperature;
     char          str[100];
-    bool          done = false;
+    int32_t       next_display = -1;
 
     static int32_t       win_r_last = -1;
     static SDL_Texture * circle_texture[MAX_COLOR];       
     
-    // init
-    if (sdl_win_width > sdl_win_height) {
-        simpane_width = sdl_win_height;
-        SDL_INIT_PANE(ctlpane,
-                      simpane_width, 0,             // x, y
-                      sdl_win_width-simpane_width, sdl_win_height);     // w, h
-    } else {
-        simpane_width = sdl_win_width;
-        SDL_INIT_PANE(ctlpane, 0, 0, 0, 0);
-    }
-    sdl_event_init();
+    //
+    // loop until next_display has been set
+    //
 
-    // determine display radius of particles,
-    // if radius has changed then recompute the circle textures
-    win_r = simpane_width / (sim->sim_width/PARTICLE_DIAMETER) / 2;
-    if (win_r < 1) {
-        win_r = 1;
-    }
-    if (win_r != win_r_last) {
-        for (color = 0; color < MAX_COLOR; color++) {
-            if (circle_texture[color] != NULL) {
-                SDL_DestroyTexture(circle_texture[color]);
-                circle_texture[color] = NULL;
+    while (next_display == -1) {
+        //
+        // short delay
+        //
+
+        usleep(5000);
+
+        //
+        // init
+        //
+
+        if (sdl_win_width > sdl_win_height) {
+            simpane_width = sdl_win_height;
+            SDL_INIT_PANE(ctlpane,
+                          simpane_width, 0,             // x, y
+                          sdl_win_width-simpane_width, sdl_win_height);     // w, h
+        } else {
+            simpane_width = sdl_win_width;
+            SDL_INIT_PANE(ctlpane, 0, 0, 0, 0);
+        }
+        sdl_event_init();
+
+        //
+        // determine display radius of particles,
+        // if radius has changed then recompute the circle textures
+        //
+
+        win_r = simpane_width / (sim->sim_width/PARTICLE_DIAMETER) / 2;
+        if (win_r < 1) {
+            win_r = 1;
+        }
+        if (win_r != win_r_last) {
+            for (color = 0; color < MAX_COLOR; color++) {
+                if (circle_texture[color] != NULL) {
+                    SDL_DestroyTexture(circle_texture[color]);
+                    circle_texture[color] = NULL;
+                }
+                circle_texture[color] = sdl_create_filled_circle_texture(win_r, sdl_pixel_rgba[color]);
             }
-            circle_texture[color] = sdl_create_filled_circle_texture(win_r, sdl_pixel_rgba[color]);
+            win_r_last = win_r;
         }
-        win_r_last = win_r;
-    }
 
-    // if in a stopped state then delay for 50 ms, to reduce cpu usage
-    count = 0;
-    while ((state == STATE_STOP ||
-            state == STATE_LOW_ENTROPY_STOP ||
-            state == STATE_PLAYBACK_STOP) &&
-           (count < 100))
-    {
-        count++;
-        usleep(1000);
-    }
+        //
+        // clear window
+        //
 
-    // clear window
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdl_renderer);
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
 
-    // draw particle
-    sum_speed = 0;
-    for (i = 0; i < sim->max_particle; i++) {
-        particle_t * p = &sim->particle[i];
+        //
+        // draw particles
+        //
 
-        win_x = (p->x + sim->sim_width/2) * simpane_width / sim->sim_width;
-        win_y = (p->y + sim->sim_width/2) * simpane_width / sim->sim_width;
-        sdl_render_circle(win_x, win_y, circle_texture[SPEED_TO_COLOR(p->speed)]);
+        sum_speed = 0;
+        for (i = 0; i < sim->max_particle; i++) {
+            particle_t * p = &sim->particle[i];
 
-        sum_speed += p->speed;
-    }
-    temperature = sum_speed / sim->max_particle - 454;
+            win_x = (p->x + sim->sim_width/2) * simpane_width / sim->sim_width;
+            win_y = (p->y + sim->sim_width/2) * simpane_width / sim->sim_width;
+            sdl_render_circle(win_x, win_y, circle_texture[SPEED_TO_COLOR(p->speed)]);
 
-    // clear ctlpane
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(sdl_renderer, &ctlpane);
-
-    // display controls
-    sdl_render_text_font0(&ctlpane,  0, 3,  "CONTAINER",       SDL_EVENT_NONE);
-    sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",             SDL_EVENT_RUN);
-    sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",            SDL_EVENT_STOP);
-    sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",            SDL_EVENT_SLOW);
-    sdl_render_text_font0(&ctlpane,  4, 9,  "FAST",            SDL_EVENT_FAST);
-    sdl_render_text_font0(&ctlpane,  6, 0,  "SHRINK",          SDL_EVENT_SHRINK);
-    sdl_render_text_font0(&ctlpane,  6, 9,  "RESTORE",         SDL_EVENT_RESTORE);
-    sdl_render_text_font0(&ctlpane,  8, 0,  "PB_REV",          SDL_EVENT_PLAYBACK_REV);
-    sdl_render_text_font0(&ctlpane,  8, 9,  "PB_FWD",          SDL_EVENT_PLAYBACK_FWD);
-    sdl_render_text_font0(&ctlpane, 10, 0,  "RESET",           SDL_EVENT_RESET);
-    sdl_render_text_font0(&ctlpane, 10, 9,  "RESET_PARAM",     SDL_EVENT_RESET_PARAMS);
-    sdl_render_text_font0(&ctlpane, 18,15,  "BACK",            SDL_EVENT_BACK);
-
-    // display status line
-    sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
-    if (state == STATE_RUN || state == STATE_STOP || state == STATE_LOW_ENTROPY_STOP) {
-        if (cont_shrink_restore_speed < 0) {
-            strcat(str, "SHRINK");
-        } else if (cont_shrink_restore_speed > 0) {
-            strcat(str, "RESTORE");
+            sum_speed += p->speed;
         }
-    }
-    sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+        temperature = sum_speed / sim->max_particle - 454;
 
-    // display remaining status lines 
-    sprintf(str, "PARTICLES   = %d", sim->max_particle);    
-    sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-    sprintf(str, "SIM_WIDTH   = %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
-    sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
-    sprintf(str, "RUN_SPEED   = %d", run_speed);    
-    sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
-    sprintf(str, "TEMPERATURE = %0.2f", temperature);
-    sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
+        //
+        // clear ctlpane
+        //
 
-    // draw container border
-    cont_width = (int64_t)simpane_width * sim->cont_width / sim->sim_width;
-    cont_rect.x = (simpane_width - cont_width) / 2;
-    cont_rect.y = (simpane_width - cont_width) / 2;
-    cont_rect.w = cont_width;
-    cont_rect.h = cont_width;
-    sdl_render_rect(&cont_rect, 3, sdl_pixel_rgba[GREEN]);
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(sdl_renderer, &ctlpane);
 
-    // present the display
-    SDL_RenderPresent(sdl_renderer);
+        //
+        // display controls
+        //
 
-    // handle events
-    event = sdl_poll_event();
-    if (event->event != SDL_EVENT_NONE) {
-        sdl_play_event_sound();
-    }
-    switch (event->event) {
-    case SDL_EVENT_RUN:
-        state = STATE_RUN;
-        break;
-    case SDL_EVENT_STOP:
-        if (state == STATE_RUN) {
+        sdl_render_text_font0(&ctlpane,  0, 3,  "CONTAINER", SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
+        sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
+        sdl_render_text_font0(&ctlpane,  4, 9,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  6, 0,  "SHRINK",    SDL_EVENT_SHRINK);
+        sdl_render_text_font0(&ctlpane,  6, 9,  "RESTORE",   SDL_EVENT_RESTORE);
+        sdl_render_text_font0(&ctlpane,  8, 0,  "PB_REV",    SDL_EVENT_PLAYBACK_REV);
+        sdl_render_text_font0(&ctlpane,  8, 9,  "PB_FWD",    SDL_EVENT_PLAYBACK_FWD);
+        sdl_render_text_font0(&ctlpane, 10, 0,  "RESET",     SDL_EVENT_RESET);
+        sdl_render_text_font0(&ctlpane, 10, 9,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
+        sdl_render_text_font0(&ctlpane, 18, 0,  "HELP",      SDL_EVENT_HELP);
+        sdl_render_text_font0(&ctlpane, 18,15,  "BACK",      SDL_EVENT_BACK);
+
+        //
+        // display status lines
+        //
+
+        sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
+        if (state == STATE_RUN || state == STATE_STOP || state == STATE_LOW_ENTROPY_STOP) {
+            if (cont_shrink_restore_speed < 0) {
+                strcat(str, "SHRINK");
+            } else if (cont_shrink_restore_speed > 0) {
+                strcat(str, "RESTORE");
+            }
+        }
+        sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+
+        sprintf(str, "PARTICLES   = %d", sim->max_particle);    
+        sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "SIM_WIDTH   = %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
+        sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "RUN_SPEED   = %d", run_speed);    
+        sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "TEMPERATURE = %0.2f", temperature);
+        sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
+
+        //
+        // draw container border
+        //
+
+        cont_width = (int64_t)simpane_width * sim->cont_width / sim->sim_width;
+        cont_rect.x = (simpane_width - cont_width) / 2;
+        cont_rect.y = (simpane_width - cont_width) / 2;
+        cont_rect.w = cont_width;
+        cont_rect.h = cont_width;
+        sdl_render_rect(&cont_rect, 3, sdl_pixel_rgba[GREEN]);
+
+        //
+        // present the display
+        //
+
+        SDL_RenderPresent(sdl_renderer);
+
+        //
+        // handle events
+        //
+
+        event = sdl_poll_event();
+        if (event->event != SDL_EVENT_NONE) {
+            sdl_play_event_sound();
+        }
+        switch (event->event) {
+        case SDL_EVENT_RUN:
+            state = STATE_RUN;
+            break;
+        case SDL_EVENT_STOP:
+            if (state == STATE_RUN) {
+                state = STATE_STOP;
+            } else if (state == STATE_PLAYBACK_REV || state == STATE_PLAYBACK_FWD) {
+                state = STATE_PLAYBACK_STOP;
+            }
+            break;
+        case SDL_EVENT_SLOW:
+            if (run_speed > MIN_RUN_SPEED) {
+                run_speed--;
+            }
+            break;
+        case SDL_EVENT_FAST:
+            if (run_speed < MAX_RUN_SPEED) {
+                run_speed++;
+            }
+            break;
+        case SDL_EVENT_SHRINK:
+            cont_shrink_restore_speed = -CONT_SHRINK_RESTORE_SPEED;
+            break;
+        case SDL_EVENT_RESTORE:
+            cont_shrink_restore_speed = CONT_SHRINK_RESTORE_SPEED;
+            break;
+        case SDL_EVENT_PLAYBACK_REV:
+            state = STATE_PLAYBACK_REV;
+            break;
+        case SDL_EVENT_PLAYBACK_FWD:
+            state = STATE_PLAYBACK_FWD;
+            break;
+        case SDL_EVENT_RESET: {
+            int32_t max_particle = sim->max_particle;
+            int64_t sim_width    = sim->sim_width;
             state = STATE_STOP;
-        } else if (state == STATE_PLAYBACK_REV || state == STATE_PLAYBACK_FWD) {
-            state = STATE_PLAYBACK_STOP;
+            sim_container_terminate();
+            sim_container_init(max_particle, sim_width);
+            break; }
+        case SDL_EVENT_SELECT_PARAMS:
+            state = STATE_STOP;
+            next_display = DISPLAY_SELECT_PARAMS;
+            break; 
+        case SDL_EVENT_HELP: 
+            state = STATE_STOP;
+            next_display = DISPLAY_HELP;
+            break;
+        case SDL_EVENT_BACK: 
+        case SDL_EVENT_QUIT:
+            state = STATE_STOP;
+            next_display = DISPLAY_TERMINATE;
+            break;
+        default:
+            break;
         }
-        break;
-    case SDL_EVENT_SLOW:
-        if (run_speed > MIN_RUN_SPEED) {
-            run_speed--;
-        }
-        break;
-    case SDL_EVENT_FAST:
-        if (run_speed < MAX_RUN_SPEED) {
-            run_speed++;
-        }
-        break;
-    case SDL_EVENT_SHRINK:
-        cont_shrink_restore_speed = -CONT_SHRINK_RESTORE_SPEED;
-        break;
-    case SDL_EVENT_RESTORE:
-        cont_shrink_restore_speed = CONT_SHRINK_RESTORE_SPEED;
-        break;
-    case SDL_EVENT_PLAYBACK_REV:
-        state = STATE_PLAYBACK_REV;
-        break;
-    case SDL_EVENT_PLAYBACK_FWD:
-        state = STATE_PLAYBACK_FWD;
-        break;
-    case SDL_EVENT_RESET:
-    case SDL_EVENT_RESET_PARAMS: {
-        int32_t mp = sim->max_particle;
-        int32_t sw = sim->sim_width / PARTICLE_DIAMETER;
-
-        sim_container_terminate();
-        if (event->event == SDL_EVENT_RESET_PARAMS) {
-            char cur_mp[100], cur_sw[100];
-            char ret_mp[100], ret_sw[100];
-
-            sprintf(cur_mp, "%d", mp);
-            sprintf(cur_sw, "%d", sw);
-            sdl_get_string(2, "PARTICLES", cur_mp, ret_mp, "SIM_WIDTH", cur_sw, ret_sw);
-            sscanf(ret_mp, "%d", &mp);
-            sscanf(ret_sw, "%d", &sw);
-
-            if (mp > MAX_MAX_PARTICLE) mp = MAX_MAX_PARTICLE;
-            if (mp < MIN_MAX_PARTICLE) mp = MIN_MAX_PARTICLE;
-            if (sw > MAX_SIM_WIDTH) sw = MAX_SIM_WIDTH;
-            if (sw < MIN_SIM_WIDTH) sw = MIN_SIM_WIDTH;
-        }
-        sim_container_init(false, mp, sw * PARTICLE_DIAMETER);
-        break; }
-    case SDL_EVENT_BACK: 
-    case SDL_EVENT_QUIT:
-        done = true;
-        break;
-    default:
-        break;
     }
 
-    // return done flag
-    return done;
+    //
+    // return next_display
+    //
+
+    return next_display;
+}
+
+int32_t sim_container_display_select_params(int32_t curr_display, int32_t last_display)
+{
+    int32_t mp = sim->max_particle;
+    int32_t sw = sim->sim_width / PARTICLE_DIAMETER;
+    char    cur_mp[100], cur_sw[100];
+    char    ret_mp[100], ret_sw[100];
+
+    sprintf(cur_mp, "%d", mp);
+    sprintf(cur_sw, "%d", sw);
+    sdl_display_get_string(2, "PARTICLES", cur_mp, ret_mp, "SIM_WIDTH", cur_sw, ret_sw);
+
+    sscanf(ret_mp, "%d", &mp);
+    sscanf(ret_sw, "%d", &sw);
+    if (mp > MAX_MAX_PARTICLE) mp = MAX_MAX_PARTICLE;
+    if (mp < MIN_MAX_PARTICLE) mp = MIN_MAX_PARTICLE;
+    if (sw > MAX_SIM_WIDTH) sw = MAX_SIM_WIDTH;
+    if (sw < MIN_SIM_WIDTH) sw = MIN_SIM_WIDTH;
+
+    sim_container_terminate();
+    sim_container_init(mp, sw * PARTICLE_DIAMETER);
+
+    // return next_display
+    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
+}
+
+int32_t sim_container_display_help(int32_t curr_display, int32_t last_display)
+{
+    // display the help text0
+    sdl_display_text("XXX HELP XXX", NULL);
+    
+    // return next_display
+    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
 }
 
 // -----------------  THREAD  ---------------------------------------------------

@@ -78,11 +78,10 @@ sdl_font_t sdl_font[SDL_MAX_FONT];
 
 // events
 #define SDL_EVENT_NONE              0
-#define SDL_EVENT_BACK              1
-#define SDL_EVENT_QUIT              2
-#define SDL_EVENT_WIN_SIZE_CHANGE   3
-#define SDL_EVENT_WIN_MINIMIZED     4
-#define SDL_EVENT_WIN_RESTORED      5
+#define SDL_EVENT_QUIT              1
+#define SDL_EVENT_WIN_SIZE_CHANGE   2
+#define SDL_EVENT_WIN_MINIMIZED     3
+#define SDL_EVENT_WIN_RESTORED      4
 #define SDL_EVENT_USER_START        10  
 #define SDL_EVENT_USER_END          255
 #define SDL_EVENT_MAX               256 
