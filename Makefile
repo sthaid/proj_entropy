@@ -17,7 +17,7 @@ CC = gcc
 CFLAGS = -c -g -O2 -pthread -fsigned-char -Wall \
          $(shell sdl2-config --cflags) 
 
-OBJS = main.o sim_container.o sim_gravity.o util.o 
+OBJS = main.o sim_container.o sim_gravity.o sim_universe.o util.o 
 
 #
 # build rules
@@ -43,4 +43,5 @@ main.o: main.c util.h
 util.o: util.c util.h button_sound.h
 sim_container.o: sim_container.c util.h
 sim_gravity.o: sim_gravity.c util.h
+sim_universe.o: sim_universe.c util.h
 

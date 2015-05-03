@@ -5,7 +5,7 @@
 int32_t main(int32_t argc, char **argv)
 {
     struct rlimit   rl;
-    char          * choices[2] = {"CONTAINER", "GRAVITY" };
+    char          * choices[] = {"CONTAINER", "GRAVITY", "UNIVERSE" };
     int32_t         selection;
 
     // init core dumps
@@ -37,8 +37,13 @@ int32_t main(int32_t argc, char **argv)
         case 1:
             sim_gravity();
             break;
+        case 2:
+            sim_universe();
+            break;
         }
     }
+
+    // XXX ABOUT / copyright
 
     // exit 
     // XXX core dump here, argv corrupt

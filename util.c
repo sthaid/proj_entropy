@@ -745,7 +745,7 @@ void sdl_display_text(char * title, char **lines)
 
         // display controls
         sdl_render_text_font0(&text_pane, 
-                              SDL_PANE_ROWS(&text_pane,0)-1, SDL_PANE_COLS(&text_pane,0)-4, 
+                              SDL_PANE_ROWS(&text_pane,0)-1, SDL_PANE_COLS(&text_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
 
         // present the display
@@ -803,7 +803,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         }
 
         sdl_render_text_font0(&selection_pane, 
-                              SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-4, 
+                              SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
 
         // present the display
@@ -1558,6 +1558,7 @@ int32_t random_uniform(int32_t low, int32_t high)
     return low + (random() % range);
 }
 
+// XXX use random?
 // Refer to:
 // - http://en.wikipedia.org/wiki/Triangular_distribution
 // - http://stackoverflow.com/questions/3510475/generate-random-numbers-according-to-distributions
