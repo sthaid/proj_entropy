@@ -5,7 +5,7 @@
 int32_t main(int32_t argc, char **argv)
 {
     struct rlimit   rl;
-    char          * choices[] = {"CONTAINER", "GRAVITY", "UNIVERSE" };
+    // char          * choices[] = {"CONTAINER", "GRAVITY", "UNIVERSE" };
     int32_t         selection;
 
     // init core dumps
@@ -22,6 +22,7 @@ int32_t main(int32_t argc, char **argv)
 
     // processing
     while (!sdl_quit) {
+#if 0
         sdl_display_choose_from_list("SELECT SIMULATION",
                                      choices, sizeof(choices)/sizeof(choices[0]),
                                      &selection);
@@ -29,6 +30,9 @@ int32_t main(int32_t argc, char **argv)
         if (selection == -1) {
             break;
         }
+#else
+        selection = 2;
+#endif
 
         switch (selection) {
         case 0:

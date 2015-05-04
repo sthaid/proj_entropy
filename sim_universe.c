@@ -16,13 +16,12 @@
 #define SDL_EVENT_BACK           (SDL_EVENT_USER_START + 12)
 // xxx delta time
 
-#define DEFAULT_MAX_PARTICLE        1000
-#define DEFAULT_INITIAL_WIDTH       1E9
-#define DEFAULT_INITIAL_AVG_SPEED   3E7
-#define DEFAULT_WIDTH_DOUBLE_YEARS  2E9
-
-//xxx #define MAX_MAX_PARTICLE      10000
-//xxx #define MIN_MAX_PARTICLE      1
+#define DEFAULT_MAX_PARTICLE        (1000000)      // 1 million
+#define DEFAULT_INITIAL_RADIUS      (0.5E9 * 1E6)  // 0.5  billion LY
+#define DEFAULT_INITIAL_AVG_SPEED   (0.10 * 1E6)   // .10 C
+#define DEFAULT_RADIUS_DOUBLE_INTVL (2E9)          // 2 billion years
+#define DEFAULT_DELTA_TIME          (1)            // 1 year
+#define DEFAULT_DISPLAY_WIDTH       (10E9 * 1E6)   // 10 billion LY
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -40,27 +39,27 @@
 #define DISPLAY_SELECT_PARAMS 3
 #define DISPLAY_HELP          4
 
-
 //
 // typedefs
 //
 
 typedef struct {
-    __int128_t x;        // m
-    __int128_t y;        
-    int64_t    x_speed;  // m/sec
-    int64_t    y_speed;
+    int64_t  x;           // 1E-6 LY
+    int64_t  y;        
+    int64_t  x_speed;     // 1E-6 LY / Year
+    int64_t  y_speed;
 } particle_t;
 
 typedef struct {
     // params
-    int64_t max_particle;
-    double  initial_radius;       // m
-    double  initial_avg_speed;    // m/sec  xxx rename initial_avg_speed
-    double  radius_double_years;  // year
+    int64_t  max_particle;
+    int64_t  initial_radius;       // 1E-6 LY
+    int64_t  initial_avg_speed;    // 1E-6 LY / Year
+    int64_t  radius_double_intvl;  // Years
 
     // simulation
-    double  curr_year;           // year 
+    int64_t   time;                // Years
+    int64_t   radius;              // 1E-6 LY
     particle_t particle[0];
 } sim_t;
 
@@ -71,7 +70,8 @@ typedef struct {
 static sim_t           * sim;
 
 static int32_t           state; 
-static double            display_width;       // m
+static int64_t           delta_time;     // Years
+static int64_t           display_width;  // 1E-6 LY
 
 static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
@@ -81,8 +81,8 @@ static pthread_barrier_t barrier;
 // prototypes
 //
 
-int32_t sim_universe_init(int64_t max_particle, double initial_radius,
-                          double initial_avg_speed, double radius_double_years);
+int32_t sim_universe_init(int64_t max_particle, int64_t initial_radius,
+                          int64_t initial_avg_speed, int64_t radius_double_intvl);
 void sim_universe_terminate(void);
 void sim_universe_display(void);
 int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_display);
@@ -94,8 +94,11 @@ void * sim_universe_thread(void * cx);
 
 void sim_universe(void) 
 {
-    sim_universe_init(DEFAULT_MAX_PARTICLE, DEFAULT_INITIAL_WIDTH,
-                      DEFAULT_INITIAL_AVG_SPEED, DEFAULT_WIDTH_DOUBLE_YEARS);
+    display_width = DEFAULT_DISPLAY_WIDTH;
+    delta_time = DEFAULT_DELTA_TIME;
+
+    sim_universe_init(DEFAULT_MAX_PARTICLE, DEFAULT_INITIAL_RADIUS,
+                      DEFAULT_INITIAL_AVG_SPEED, DEFAULT_RADIUS_DOUBLE_INTVL);
 
     sim_universe_display();
 
@@ -106,45 +109,45 @@ void sim_universe(void)
 
 int32_t sim_universe_init(
     int64_t max_particle,
-    double initial_radius,
-    double initial_avg_speed,
-    double radius_double_years)
+    int64_t initial_radius,
+    int64_t initial_avg_speed,
+    int64_t radius_double_intvl)
 {
     #define SIM_SIZE(n) (sizeof(sim_t) + (n) * sizeof(particle_t))
 
     int32_t i;
 
     // print info msg
-    INFO("initialize start, max_particle=%"PRId64" initial_radius=%G"
-         " initial_avg_speed=%G radius_double_years=%G\n",
-         max_particle, initial_radius, initial_avg_speed, radius_double_years);
+    INFO("initialize start: max_particle=%ld initial_radius=%ld"
+         " initial_avg_speed=%ld radius_double_intvl=%ld\n",
+         max_particle, initial_radius, initial_avg_speed, radius_double_intvl);
 
     // allocate sim
     free(sim);
     sim = calloc(1, SIM_SIZE(max_particle));
     if (sim == NULL) {
-        // xxx test this path
         // xxx fake in a dummy sim that is malloced but with small max_particles
         return -1;
     }
 
     // initialize sim
-    sim->max_particle       = max_particle;
+    // xxx maybe the threads can do this init quicker
+    sim->max_particle        = max_particle;
     sim->initial_radius      = initial_radius;
-    sim->initial_avg_speed  = initial_avg_speed;   // XXX limit on this  0.14
-    sim->radius_double_years = radius_double_years;
-
-    sim->curr_year          = 0;
+    sim->initial_avg_speed   = initial_avg_speed;   // xxx limit on this  0.14
+    sim->radius_double_intvl = radius_double_intvl;
+    sim->time                = 0;
+    sim->radius              = initial_radius;
     for (i = 0; i < max_particle; i++) {
         particle_t * p = &sim->particle[i];
         double  direction, distance, speed;
 
-        distance   = ((double)random()/RAND_MAX) * (sim->initial_radius);
+        distance   = sqrt((double)random()/RAND_MAX) * (initial_radius);
         direction  = ((double)random()/RAND_MAX) * (2.0 * M_PI);
-        p->x       = distance * cos(direction);
+        p->x       = distance * cos(direction);  // xxx table lookup for sin/cos
         p->y       = distance * sin(direction);
 
-        speed      = random_triangular(-sim->initial_avg_speed/0.292, sim->initial_avg_speed/0.292);
+        speed      = random_triangular(-3*initial_avg_speed, 3*initial_avg_speed);
         direction  = ((double)random()/RAND_MAX) * (2.0 * M_PI);
         p->x_speed = speed * cos(direction);
         p->y_speed = speed * sin(direction);
@@ -152,7 +155,6 @@ int32_t sim_universe_init(
 
     // init control variables
     state = STATE_STOP;
-    display_width = 100000; // XXX tbd
 
     // create worker threads
 #ifndef ANDROID
@@ -237,13 +239,14 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
     SDL_Rect      ctlpane;
     SDL_Rect      simpane;
     sdl_event_t * event;
-    int32_t       simpane_width, color;
+    int32_t       simpane_width, color, i;
     char          str[100];
     int32_t       next_display = -1;
 
     static SDL_Texture * circle_texture[MAX_COLOR];       
     
     // init circles
+    // xxx maybe use points or rectangles for faster drawing
     for (color = 0; color < MAX_COLOR; color++) {
         if (circle_texture[color] == NULL) {
             circle_texture[color] = sdl_create_filled_circle_texture(1, sdl_pixel_rgba[color]);
@@ -291,16 +294,32 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         // draw particles
         //
 
+        static int32_t loop_count;
+        PRINTF("DRAW PARTICLES COUNT %d\n", loop_count++);
 #if 0
-        // int32_t i, win_x, win_y;
+        for (i = 0; i < sim->max_particle; i++) {
+            particle_t * p = &sim->particle[i];
+            int32_t      win_x, win_y;
+
+            win_x = (p->x + display_width/2) * simpane_width / display_width;
+            win_y = (p->y + display_width/2) * simpane_width / display_width;
+            sdl_render_circle(win_x, win_y, circle_texture[WHITE]);
+        }
+#else
+        static SDL_Point points[1000000];
+        int32_t count;
+        count = 0;
         for (i = 0; i < sim->max_particle; i++) {
             particle_t * p = &sim->particle[i];
 
-            win_x = 0; // XXX (p->x + sim->sim_width/2) * simpane_width / sim->sim_width;
-            win_y = 0; // XXX (p->y + sim->sim_width/2) * simpane_width / sim->sim_width;
-            sdl_render_circle(win_x, win_y, circle_texture[SPEED_TO_COLOR(p->speed)]);
+            points[count].x = (p->x + display_width/2) * simpane_width / display_width;
+            points[count].y = (p->y + display_width/2) * simpane_width / display_width;
+            count++;
         }
+        SDL_SetRenderDrawColor(sdl_renderer, 255,255,255, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoints(sdl_renderer, points, count);
 #endif
+        PRINTF(" ... done\n");
 
         //
         // clear ctlpane
@@ -311,6 +330,9 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
 
         //
         // display controls
+        // xxx add DELTA_TIME controls
+        // xxx add DISPLAY_WIDTH controls
+        // xxx add pan control
         //
 
         sdl_render_text_font0(&ctlpane,  0, 3,  "UNIVERSE",  SDL_EVENT_NONE);
@@ -325,19 +347,28 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         // display status lines
         //
 
-        sprintf(str, "%s %0.1lE ", STATE_STR(state), sim->curr_year);
+        // - state & time
+        sprintf(str, "%-4s %0.9lf BYR", STATE_STR(state), (double)sim->time/1000000000);
         sdl_render_text_font0(&ctlpane,  6, 0, str, SDL_EVENT_NONE);
 
-        // xxx use different units
+        // - delta_time
+        sprintf(str, "DELTA %ld YR", delta_time);
+        sdl_render_text_font0(&ctlpane,  7, 0, str, SDL_EVENT_NONE);
+
+        // - params
         sdl_render_text_font0(&ctlpane, 12, 0, "PARAMS ...", SDL_EVENT_NONE);
         sprintf(str, "N_PART = %ld", sim->max_particle);    
         sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RADIUS = %0.1lE", sim->initial_radius);    
+        sprintf(str, "RADIUS = %0.3lf BLY", (double)sim->initial_radius/(1E9*1E6));
         sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "SPEED  = %0.1lE", sim->initial_avg_speed);    
+        sprintf(str, "SPEED  = %0.3lf C", (double)sim->initial_avg_speed/1E6);
         sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "DOUBLE = %0.1lE", sim->radius_double_years);    
+        sprintf(str, "DOUBLE = %0.3lf BYR", (double)sim->radius_double_intvl/1E9);
         sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
+
+        // - window width
+        sprintf(str, "WIDTH %0.3lf BLY", (double)display_width/(1E9*1E6));
+        sdl_render_text_font0(&simpane,  0, 0, str, SDL_EVENT_NONE);
 
         //
         // draw simpane border
@@ -367,12 +398,14 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
             state = STATE_STOP;
             break;
         case SDL_EVENT_RESET: {
-            // XXX int32_t max_particle = sim->max_particle;
+            // xxx int32_t max_particle = sim->max_particle;
             // int64_t sim_width    = sim->sim_width;
             state = STATE_STOP;
+// xxx preserve if args are 0
             // sim_universe_terminate();
             // sim_universe_init(max_particle, sim_width);
             break; }
+// xxx DT
         case SDL_EVENT_SELECT_PARAMS:
             state = STATE_STOP;
             next_display = DISPLAY_SELECT_PARAMS;
@@ -401,18 +434,19 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
 int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_display)
 {
     int64_t max_particle        = sim->max_particle;
-    double  initial_radius      = sim->initial_radius;
-    double  initial_avg_speed   = sim->initial_avg_speed;
-    double  radius_double_years = sim->radius_double_years;
+    int64_t initial_radius      = sim->initial_radius;
+    int64_t initial_avg_speed   = sim->initial_avg_speed;
+    int64_t radius_double_intvl = sim->radius_double_intvl;
+    double  val;
 
     char cur_s1[100], cur_s2[100], cur_s3[100], cur_s4[100];
     char ret_s1[100], ret_s2[100], ret_s3[100], ret_s4[100];
 
     // get new value strings for the params
-    sprintf(cur_s1, "%ld", max_particle);
-    sprintf(cur_s2, "%0.1lE", initial_radius);
-    sprintf(cur_s3, "%0.1lE", initial_avg_speed);
-    sprintf(cur_s4, "%0.1lE", radius_double_years);
+    sprintf(cur_s1, "%ld",    max_particle);
+    sprintf(cur_s2, "%0.3lf", (double)initial_radius/(1E9*1E6));
+    sprintf(cur_s3, "%0.3lf", (double)initial_avg_speed/1E6);
+    sprintf(cur_s4, "%0.3lf", (double)radius_double_intvl/1E9);
     sdl_display_get_string(4,
                            "N_PART", cur_s1, ret_s1,
                            "RADIUS", cur_s2, ret_s2,
@@ -420,16 +454,23 @@ int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_di
                            "DOUBLE", cur_s4, ret_s4);
 
     // scan returned strings
-    sscanf(ret_s1, "%ld", &max_particle);
-    sscanf(ret_s2, "%lE", &initial_radius);
-    sscanf(ret_s3, "%lE", &initial_avg_speed);
-    sscanf(ret_s4, "%lE", &radius_double_years);
-
     // xxx check ranges
+    if (sscanf(ret_s1, "%lf", &val) == 1) {
+        max_particle = val;
+    }
+    if (sscanf(ret_s2, "%lf", &val) == 1) {
+        initial_radius = val * (1E9*1E6);
+    }
+    if (sscanf(ret_s3, "%lf", &val) == 1) {
+        initial_avg_speed = val * 1E6;
+    }
+    if (sscanf(ret_s4, "%lf", &val) == 1) {
+        radius_double_intvl = val * 1E9;
+    }
 
     // re-init with new params
     sim_universe_terminate();
-    sim_universe_init(max_particle, initial_radius, initial_avg_speed, radius_double_years);
+    sim_universe_init(max_particle, initial_radius, initial_avg_speed, radius_double_intvl);
 
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
@@ -448,95 +489,29 @@ int32_t sim_universe_display_help(int32_t curr_display, int32_t last_display)
 
 void * sim_universe_thread(void * cx)
 {
+    #define BATCH_SIZE 100 
+
     int32_t         id = (long)cx;
 
-    INFO("thread starting, id=%d\n", id);
-    pthread_barrier_wait(&barrier);
-
-    pthread_barrier_wait(&barrier);
-    INFO("thread terminating, id=%d\n", id);
-    return NULL;
-}
-
-#if 0 // xxx todo
-    #define BATCH_SIZE 100 
-    #define PB(n)      (pb_buff + (n) * sim_size)
-
-
-    int32_t         pb_end, pb_beg, pb_idx, pb_max=0;
-    int64_t         pb_tail;
-    void          * pb_buff = NULL;
-
     static int64_t  batch_idx;
+    static int64_t  batch_count;
     static int32_t  curr_state;
-    static int32_t  last_state;
-    static int64_t  sim_size;
-    static int64_t  cont_width;
-    static int32_t  cont_speed;
 
     INFO("thread starting, id=%d\n", id);
     if (id == 0) {
-        batch_idx = 0;
+        batch_idx  = 0;
+        batch_count = 0;
         curr_state = STATE_STOP;
-        last_state = STATE_STOP;
-        sim_size   = SIM_SIZE(sim->max_particle);
-        cont_width = sim->sim_width;
-        cont_speed = 0;
-
-        pb_max = 10000;
-        while (true) {
-            pb_buff = calloc(pb_max, sim_size);
-            if (pb_buff != NULL) {
-                INFO("playback buff_size %d MB, pb_max=%d\n", (int32_t)((pb_max * sim_size) / MB), pb_max);
-                break;
-            }
-            pb_max -= 100;
-            if (pb_max <= 0) {
-                FATAL("failed allocate playback buffer\n");
-            }
-        }
-        pb_end = pb_beg = pb_idx = 0;
-        memcpy(PB(0), sim, sim_size);
-        pb_tail = 1;
     }
     pthread_barrier_wait(&barrier);
 
     while (true) {
-        // thread id 0 performs control functions
+        // thread 0 sets the curr_state global var
         if (id == 0) {
-            // determine current and last state
-            last_state = curr_state;
             curr_state = state;
-
-            // if state has changed, and the current state is not playback then 
-            // reset sim to the last copy saved in the playback buffer array
-            if ((curr_state != last_state) &&
-                (curr_state == STATE_RUN || 
-                 curr_state == STATE_STOP ||
-                 curr_state == STATE_LOW_ENTROPY_STOP))
-            {
-                memcpy(sim, PB((pb_tail-1)%pb_max), sim_size);
-            }
-
-            // determine cont_speed and cont_width
-            if (state == STATE_RUN) {
-                cont_speed = cont_shrink_restore_speed;
-                cont_width = sim->cont_width + 2 * cont_speed * (PARTICLE_DIAMETER / SPEED_AVG / 10);
-                if (cont_width < (int64_t)sim->sim_width*75/100) {
-                    cont_width = (int64_t)sim->sim_width*75/100;
-                    cont_speed = 0;
-                    cont_shrink_restore_speed = 0;
-                }
-                if (cont_width > sim->sim_width) {
-                    cont_width = sim->sim_width;
-                    cont_speed = 0;
-                    cont_shrink_restore_speed = 0;
-                }
-                sim->cont_width = cont_width;
-            }
         }
 
-        // all threads rendezvoud here
+        // rendezvous
         pthread_barrier_wait(&barrier);
 
         // process based on curr_state
@@ -547,7 +522,7 @@ void * sim_universe_thread(void * cx)
             while (true) {
                 // get a batch of particle to process
                 pthread_mutex_lock(&mutex);
-                if (batch_idx / sim->max_particle > sim->state_num) {
+                if (batch_idx / sim->max_particle > batch_count) {
                     pthread_mutex_unlock(&mutex);
                     break;
                 }
@@ -559,167 +534,31 @@ void * sim_universe_thread(void * cx)
 
                 // process the batch
                 for (i = batch_start; i < batch_end; i++) {
-                    particle_t * p = &sim->particle[i];
-                    int64_t new_x, new_y; 
+                    //particle_t * p = &sim->particle[i];
 
-                    // determine particles new x,y position
-                    new_x = p->x + p->x_speed * (PARTICLE_DIAMETER / SPEED_AVG / 10);
-                    new_y = p->y + p->y_speed * (PARTICLE_DIAMETER / SPEED_AVG / 10);
+                    // XXX equations
 
-                    // if the new position is within the universe then
-                    // assign the new position to the particle and continue
-                    if (new_x >= -cont_width/2 &&
-                        new_x <= cont_width/2 &&
-                        new_y >= -cont_width/2 &&
-                        new_y <= cont_width/2)
-                    {
-                        p->x = new_x;
-                        p->y = new_y;
-                        continue;
-                    }
-
-                    // the following code handles particle collision with the
-                    // sides of the universe; note that if the particle goes off
-                    // a corner then this code handles that by processing collision 
-                    // off of 2 sides
-                    double q, rand_dir; 
-                    double new_speed=0, new_x_speed=0, new_y_speed=0;
-
-                    rand_dir = (double)random_uniform(500,2000) / 1000;  // range 0.5 - 2.0
-                    if (fabs(p->x_speed)  < 1) p->x_speed = 1;
-                    if (fabs(p->y_speed)  < 1) p->y_speed = 1;
-
-                    if (new_x < -cont_width/2) {
-                        new_x = -cont_width/2;
-                        new_speed = p->speed - cont_speed;
-                        new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->y_speed / abs(p->x_speed) * rand_dir;
-                        new_x_speed = sqrt( (new_speed * new_speed) / (1. + q * q) );
-                        new_y_speed = q * new_x_speed;
-                    }
-
-                    if (new_x > cont_width/2) {
-                        new_x = cont_width/2;
-                        new_speed = p->speed - cont_speed;
-                        new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->y_speed / -abs(p->x_speed) * rand_dir;
-                        new_x_speed = -sqrt( (new_speed * new_speed) / (1. + q * q) );
-                        new_y_speed = q * new_x_speed;
-                    }
-
-                    if (new_y < -cont_width/2) {
-                        new_y = -cont_width/2;
-                        new_speed = p->speed - cont_speed;
-                        new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->x_speed / abs(p->y_speed) * rand_dir;
-                        new_y_speed = sqrt( (new_speed * new_speed) / (1. + q * q) );
-                        new_x_speed = q * new_y_speed;
-                    }
-
-                    if (new_y > cont_width/2) {
-                        new_y = cont_width/2;
-                        new_speed = p->speed - cont_speed;
-                        new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->x_speed / -abs(p->y_speed) * rand_dir;
-                        new_y_speed = -sqrt( (new_speed * new_speed) / (1. + q * q) );
-                        new_x_speed = q * new_y_speed;
-                    }
-
-                    p->x = new_x;
-                    p->y = new_y;
-                    p->x_speed = new_x_speed;
-                    p->y_speed = new_y_speed;
-                    p->speed = new_speed;
                 }
             }
 
-            // all threads rendezvoud here
+            // rendezvous
             pthread_barrier_wait(&barrier);
 
             // all particles have been updated, thread 0 does post processing
             if (id == 0) {
-                // increment the state_num
-                sim->state_num++;
-
-                // check for auto stop, this occurs when initial condition is closely reproduced
-                if (sim_universe_should_auto_stop()) {
-                    state = STATE_LOW_ENTROPY_STOP;
-                }
-
-                // make playback copy
-                memcpy(PB(pb_tail%pb_max), sim, sim_size);
-                pb_tail++;
-
-                // sleep to pace the simulation
-                if (RUN_SPEED_SLEEP_TIME > 0) {
-                    usleep(RUN_SPEED_SLEEP_TIME);
-                }
-            }
-
-        } else if (curr_state == STATE_PLAYBACK_REV) {
-            if (id == 0) {
-                if (last_state != STATE_PLAYBACK_REV &&
-                    last_state != STATE_PLAYBACK_FWD &&
-                    last_state != STATE_PLAYBACK_STOP) 
-                {
-                    pb_end = (pb_tail - 1) % pb_max;
-                    pb_beg = (pb_tail <= pb_max ? 0 : (pb_tail + 1) % pb_max);
-                    pb_idx = pb_end;
-                }
-
-                memcpy(sim, PB(pb_idx), sim_size);
-
-                if (pb_idx == pb_beg) {
-                    state = STATE_PLAYBACK_STOP;
-                } else {
-                    pb_idx = pb_idx - 1;
-                    if (pb_idx < 0) {
-                        pb_idx += pb_max;
-                    }
-                    if (RUN_SPEED_SLEEP_TIME > 0) {
-                        usleep(RUN_SPEED_SLEEP_TIME);
-                    }
-                }
-            }
-
-        } else if (curr_state == STATE_PLAYBACK_FWD) {
-            if (id == 0) {
-                if (last_state != STATE_PLAYBACK_REV &&
-                    last_state != STATE_PLAYBACK_FWD &&
-                    last_state != STATE_PLAYBACK_STOP) 
-                {
-                    pb_end = (pb_tail - 1) % pb_max;
-                    pb_beg = (pb_tail <= pb_max ? 0 : (pb_tail + 1) % pb_max);
-                    pb_idx = pb_end;
-                }
-
-                memcpy(sim, PB(pb_idx), sim_size);
-
-                if (pb_idx == pb_end) {
-                    state = STATE_PLAYBACK_STOP;
-                } else  {
-                    pb_idx = pb_idx + 1;
-                    if (pb_idx >= pb_max) {
-                        pb_idx -= pb_max;
-                    }
-                    if (RUN_SPEED_SLEEP_TIME > 0) {
-                        usleep(RUN_SPEED_SLEEP_TIME);
-                    }
-                }
+                batch_count++;
             }
 
         } else if (curr_state == STATE_TERMINATE_THREADS) {
-            if (id == 0) {
-                free(pb_buff);
-                pb_buff = NULL;
-            }
             break;
 
-        } else {
-            // the STOP states
+        } else {  // STATE_STOP
             usleep(50000);
         }
     }
-#endif
 
+    pthread_barrier_wait(&barrier);
+    INFO("thread terminating, id=%d\n", id);
+    return NULL;
+}
 
