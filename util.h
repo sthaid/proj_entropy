@@ -135,6 +135,9 @@ typedef struct {
                                      : WHITE)
 
 extern uint32_t sdl_pixel_rgba[];
+extern uint32_t sdl_pixel_r[];
+extern uint32_t sdl_pixel_g[];
+extern uint32_t sdl_pixel_b[];
 
 // sdl support: prototypes
 void sdl_init(uint32_t w, uint32_t h);

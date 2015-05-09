@@ -470,6 +470,46 @@ uint32_t sdl_pixel_rgba[] = {
        (255 << 24) | (255 << 16) | (255 << 8) | 255,     // WHITE       
                                         };
 
+uint32_t sdl_pixel_r[] = {
+       127,     // PURPLE
+       0,       // BLUE
+       0,       // LIGHT_BLUE
+       0,       // GREEN
+       255,     // YELLOW
+       255,     // ORANGE
+       255,     // RED         
+       224,     // GRAY        
+       255,     // PINK 
+       255,     // WHITE       
+            };
+
+uint32_t sdl_pixel_g[] = {
+       0,       // PURPLE
+       0,       // BLUE
+       255,     // LIGHT_BLUE
+       255,     // GREEN
+       255,     // YELLOW
+       128,     // ORANGE
+       0,       // RED         
+       224,     // GRAY        
+       105,     // PINK 
+       255,     // WHITE       
+            };
+
+uint32_t sdl_pixel_b[] = {
+       255,     // PURPLE
+       255,     // BLUE
+       255,     // LIGHT_BLUE
+       0,       // GREEN
+       0,       // YELLOW
+       0,       // ORANGE
+       0,       // RED         
+       224,     // GRAY        
+       180,     // PINK 
+       255,     // WHITE       
+            };
+
+
 void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba)
 {
     SDL_Rect rect = *rect_arg;
