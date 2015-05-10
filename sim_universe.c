@@ -51,8 +51,9 @@
 #define SDL_EVENT_FAST               (SDL_EVENT_USER_START + 3)
 #define SDL_EVENT_RESET              (SDL_EVENT_USER_START + 9)
 #define SDL_EVENT_SELECT_PARAMS      (SDL_EVENT_USER_START + 10)
-#define SDL_EVENT_HELP               (SDL_EVENT_USER_START + 11)
-#define SDL_EVENT_BACK               (SDL_EVENT_USER_START + 12)
+#define SDL_EVENT_SUSPEND_EXPANSION  (SDL_EVENT_USER_START + 11)
+#define SDL_EVENT_HELP               (SDL_EVENT_USER_START + 12)
+#define SDL_EVENT_BACK               (SDL_EVENT_USER_START + 13)
 #define SDL_EVENT_SIMPANE_ZOOM_IN    (SDL_EVENT_USER_START + 20)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT   (SDL_EVENT_USER_START + 21)
 
@@ -76,7 +77,7 @@
 
 #define MIN_RUN_SPEED     1
 #define MAX_RUN_SPEED     9
-#define DEFAULT_RUN_SPEED 5
+#define DEFAULT_RUN_SPEED MAX_RUN_SPEED
 #define RUN_SPEED_SLEEP_TIME (392 * ((1 << (MAX_RUN_SPEED-run_speed)) - 1))
 
 #define DISPLAY_NONE          0
@@ -121,7 +122,10 @@ static int32_t           state;
 static int32_t           display_width;  // units 100,000 LY
 static int32_t           delta_time;     // units 1000 years
 static int32_t           run_speed;
-static bool              pause_expansion;
+static bool              suspend_expansion;
+
+static int32_t           perf_start_sim_current_time;
+static int64_t           perf_start_wall_time;
 
 static int32_t           max_thread;
 static pthread_t         thread_id[MAX_THREAD];
@@ -144,10 +148,10 @@ int32_t sim_universe_barrier(int32_t thread_id);
 
 void sim_universe(void) 
 {
-    display_width   = DEFAULT_DISPLAY_WIDTH;
-    delta_time      = DEFAULT_DELTA_TIME;
-    run_speed       = DEFAULT_RUN_SPEED;
-    pause_expansion = false;
+    display_width     = DEFAULT_DISPLAY_WIDTH;
+    delta_time        = DEFAULT_DELTA_TIME;
+    run_speed         = DEFAULT_RUN_SPEED;
+    suspend_expansion = false;
 
     sim_universe_init(DEFAULT_MAX_PARTICLE, DEFAULT_INITIAL_RADIUS,
                       DEFAULT_INITIAL_AVG_SPEED, DEFAULT_RADIUS_DOUBLE_INTVL);
@@ -197,26 +201,36 @@ int32_t sim_universe_init(
     for (i = 0; i < max_particle; i++) {
         particle_t * p = &sim->particle[i];
 
-        if (max_particle > 1) { //XXX
-        double  direction, distance, speed;
+        double  direction, speed;
 
+        // XXX random_uniform may not be correct
+#if 0
+        double distance;
         distance   = sqrt((double)random()/RAND_MAX) * 1000000000;
         direction  = ((double)random()/RAND_MAX) * (2.0 * M_PI);
         p->x       = distance * cos(direction);
         p->y       = distance * sin(direction);
         p->r       = sqrt((int64_t)p->x*p->x + (int64_t)p->y*p->y);
+#else
+        while (true) {
+            int64_t temp;
+            //p->x = random_uniform(-1000000000, 1000000000);
+            //p->y = random_uniform(-1000000000, 1000000000);
+            p->x = (double)random()/RAND_MAX * 2000000000 - 1000000000;
+            p->y = (double)random()/RAND_MAX * 2000000000 - 1000000000;
+            temp = (int64_t)p->x*p->x + (int64_t)p->y*p->y;
+            if (temp > 1000000000000000000) {
+                continue;
+            }
+            p->r = sqrt(temp);
+            break;
+        }
+#endif
 
         speed      = random_triangular(-3*initial_avg_speed, 3*initial_avg_speed);
         direction  = ((double)random()/RAND_MAX) * (2.0 * M_PI);
         p->xv      = speed * cos(direction);
         p->yv      = speed * sin(direction);
-        } else {
-        p->x = 0;
-        p->y = 0;
-        p->r =0;
-        p->xv = 6000;
-        p->yv = 0;
-        }
 
         p->rva_color = GREEN;
     }
@@ -232,7 +246,7 @@ int32_t sim_universe_init(
     } else if (max_thread > MAX_THREAD) {
         max_thread = MAX_THREAD;
     }
-    max_thread = 1; //XXX
+    // XXX max_thread = 1; //XXX
 #else
     max_thread = 1;
 #endif
@@ -411,13 +425,19 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         // display controls
         //
 
+        char rs_str[20], suspend_str[20];
+        sprintf(rs_str, "%3d", run_speed);
+        sprintf(suspend_str, "%s", suspend_expansion ? "RES" : "SUS");
+
         sdl_render_text_font0(&ctlpane,  0, 3,  "UNIVERSE",  SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  2, 8,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  2, 16, suspend_str, SDL_EVENT_SUSPEND_EXPANSION);
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
-        sdl_render_text_font0(&ctlpane,  4, 9,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 16, rs_str,      SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  6, 0,  "RESET",     SDL_EVENT_RESET);
-        sdl_render_text_font0(&ctlpane,  6, 9,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
+        sdl_render_text_font0(&ctlpane,  6, 8,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
         sdl_render_text_font0(&ctlpane, 18, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctlpane, 18,15,  "BACK",      SDL_EVENT_BACK);
 
@@ -429,20 +449,22 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         // display status lines
         //
 
-        // - state, current_time, current_radius
+        // - state, current_time
         char str[100];
         sprintf(str, "%-6s %0.3lf BYR", STATE_STR(state), (double)sim->current_time*1000/1E9);
-        sdl_render_text_font0(&ctlpane,  6, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RADIUS %0.3lf BLY", (double)sim->current_radius*100000/1E9);
-        sdl_render_text_font0(&ctlpane,  7, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RUNSPD %d", run_speed);
         sdl_render_text_font0(&ctlpane,  8, 0, str, SDL_EVENT_NONE);
 
-#if 0
-        // - delta_time
-        sprintf(str, "DELTA %d YR", delta_time*1000);
-        sdl_render_text_font0(&ctlpane,  7, 0, str, SDL_EVENT_NONE);
-#endif
+        // - current_radius
+        sprintf(str, "RADIUS %0.3lf BLY", (double)sim->current_radius*100000/1E9);
+        sdl_render_text_font0(&ctlpane,  9, 0, str, SDL_EVENT_NONE);
+
+        // - performance rate
+        if (state == STATE_RUN && !suspend_expansion) {
+            double perf = (double)(sim->current_time - perf_start_sim_current_time) / (microsec_timer() - perf_start_wall_time);
+            //printf("current_time %d rsct %d \n", sim->current_time, perf_start_sim_current_time);
+            sprintf(str, "PERFRT %0.3lf BYR/S", perf);
+            sdl_render_text_font0(&ctlpane, 10, 0, str, SDL_EVENT_NONE);
+        }
 
         // - params
         sdl_render_text_font0(&ctlpane, 12, 0, "PARAMS ...", SDL_EVENT_NONE);
@@ -482,6 +504,8 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         switch (event->event) {
         case SDL_EVENT_RUN:
             state = STATE_RUN;
+            perf_start_sim_current_time = sim->current_time;
+            perf_start_wall_time = microsec_timer();
             break;
         case SDL_EVENT_STOP:
             state = STATE_STOP;
@@ -490,13 +514,17 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
             if (run_speed > MIN_RUN_SPEED) {
                 run_speed--;
             }
-            printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
+            perf_start_sim_current_time = sim->current_time;
+            perf_start_wall_time = microsec_timer();
+            //printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
             break;
         case SDL_EVENT_FAST:
             if (run_speed < MAX_RUN_SPEED) {
                 run_speed++;
             }
-            printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
+            perf_start_sim_current_time = sim->current_time;
+            perf_start_wall_time = microsec_timer();
+            //printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
             break;
         case SDL_EVENT_RESET: {
             state = STATE_STOP;
@@ -508,6 +536,11 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
             state = STATE_STOP;
             next_display = DISPLAY_SELECT_PARAMS;
             break; 
+        case SDL_EVENT_SUSPEND_EXPANSION:
+            suspend_expansion = !suspend_expansion;
+            perf_start_sim_current_time = sim->current_time;
+            perf_start_wall_time = microsec_timer();
+            break;
         case SDL_EVENT_HELP: 
             state = STATE_STOP;
             next_display = DISPLAY_HELP;
@@ -637,11 +670,11 @@ void * sim_universe_thread(void * cx)
             static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
             // determine new value for current_radius
-            if (!pause_expansion) {
+            if (!suspend_expansion) {
                 current_time_next = sim->current_time + delta_time;
                 current_radius_next = sim->initial_radius * exp( log(2) * current_time_next / sim->radius_double_intvl );
                 current_radius_expf = exp(log(2) * delta_time / sim->radius_double_intvl) - 1;
-                printf("expf %lf\n", current_radius_expf);
+                //printf("expf %lf\n", current_radius_expf);
             } else {
                 current_time_next = sim->current_time;
                 current_radius_next = sim->initial_radius * exp( log(2) * current_time_next / sim->radius_double_intvl );
@@ -701,7 +734,10 @@ void * sim_universe_thread(void * cx)
                     // - expansion of the universe
 
                     delta_r = (r_next - p->r) + (current_radius_expf * p->r);
-                    rva = (int64_t)delta_r * sim->current_radius / (delta_time * 1000);
+// XXXX TRY THIS
+                    // rva = (int64_t)delta_r * sim->current_radius / (delta_time * 1000);
+                    //rva = delta_r * sim->current_radius / (delta_time * 1000);
+                    rva = delta_r * (sim->current_radius / 100) / (delta_time * 10);
 //printf("delta_r %d  rva %d  current_radius %d  delta_time %d\n", delta_r, rva, sim->current_radius, delta_time);
 
                     // convert the apparent radial velocity to color
@@ -746,6 +782,11 @@ void * sim_universe_thread(void * cx)
                 sim->current_time = current_time_next;
                 sim->current_radius = current_radius_next;
 
+                // simulation variables overflow at 250 BLY radius
+                if (sim->current_radius >= 2500000) {
+                    state = STATE_STOP;
+                }
+                
                 // sleep to pace the simulation
                 if (RUN_SPEED_SLEEP_TIME > 0) {
                     usleep(RUN_SPEED_SLEEP_TIME);
