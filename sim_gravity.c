@@ -1230,6 +1230,7 @@ int32_t sim_gravity_barrier(int32_t thread_id)
 
     int32_t my_count, i;
 
+    // XXX don't need seperate for androd0 ?
     // just return if max_thread is 1
     if (max_thread == 1) {
         return state;

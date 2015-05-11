@@ -1595,6 +1595,7 @@ int32_t random_uniform(int32_t low, int32_t high)
 {
     int32_t range = high - low + 1;
 
+    // XXX this needs work
     return low + (random() % range);
 }
 
