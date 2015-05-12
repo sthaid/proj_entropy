@@ -1,17 +1,4 @@
-// XXX 
-// - rad_k not used
-// - improve performance
-// - tune to universe timing, improve default values
-// - test on android, and use multiple threads
-
-// MAYBE NOT
-// - init threads should run one cycle
-
-// DONE, NEED TO TEST
-// - 'reset' ctl not working
-// - on memory alloc failure, display error, and revert to something that does work
-// - initial_radius
-// - int64_t
+// XXX - test on android, and use multiple threads
 
 #include "util.h"
 
@@ -92,18 +79,18 @@ typedef struct {
 // variables
 //
 
-static sim_t           * sim;
+static sim_t   * sim;
 
-static int32_t           state; 
-static int32_t           display_width;  // units 100,000 LY
-static int32_t           run_speed;
-static bool              suspend_expansion;
+static int32_t   state; 
+static int32_t   display_width;  // units 100,000 LY
+static int32_t   run_speed;
+static bool      suspend_expansion;
 
-static int32_t           perf_start_sim_current_time;
-static int64_t           perf_start_wall_time;
+static int32_t   perf_start_sim_current_time;
+static int64_t   perf_start_wall_time;
 
-static int32_t           max_thread;
-static pthread_t         thread_id[MAX_THREAD];
+static int32_t   max_thread;
+static pthread_t thread_id[MAX_THREAD];
 
 // 
 // prototypes
@@ -636,7 +623,6 @@ void * sim_universe_thread(void * cx)
                 current_time_next = sim->current_time + DELTA_TIME;
             } else {
                 current_time_next = sim->current_time;
-                // XXX check this path yields 0 for expf
             }
             current_radius_next = sim_universe_compute_radius(current_time_next);
             current_radius_expf = (double)(current_radius_next - sim->current_radius) / sim->current_radius;
@@ -741,7 +727,33 @@ int32_t sim_universe_compute_radius(int32_t time)
 {
     double r1, r2;
 
-    // XXX comment, and include data
+    // Units:
+    // - TIME  : Billion Years
+    // - R1,R2 : Billion Light Years
+    //
+    //    TIME          R1         R2          R1+R2
+    // -----------    ------      ------      --------
+    // time=0 BYR:   0.000000  + 0.000000   = 0.000000
+    // time=1 BYR:   5.000000  + 0.227259   = 5.227259
+    // time=2 BYR:   7.071068  + 0.557810   = 7.628878
+    // time=3 BYR:   8.660254  + 1.038604   = 9.698858
+    // time=4 BYR:   10.000000 + 1.737926   = 11.737926
+    // time=5 BYR:   11.180340 + 2.755102   = 13.935442
+    // time=6 BYR:   12.247449 + 4.234602   = 16.482051
+    // time=7 BYR:   13.228757 + 6.386561   = 19.615318
+    // time=8 BYR:   14.142136 + 9.516623   = 23.658759
+    // time=9 BYR:   15.000000 + 14.069353  = 29.069353
+    // time=10 BYR:  15.811388 + 20.691377  = 36.502765
+    // time=11 BYR:  16.583124 + 30.323226  = 46.906350
+    // time=12 BYR:  17.320508 + 44.332918  = 61.653426
+    // time=13 BYR:  18.027756 + 64.710258  = 82.738015
+    // time=14 BYR:  18.708287 + 94.349454  = 113.057741
+    // time=15 BYR:  19.364917 + 137.460180 = 156.825097
+    // time=16 BYR:  20.000000 + 200.165481 = 220.165481
+    // time=17 BYR:  20.615528 + 291.371430 = 311.986958
+    // time=18 BYR:  21.213203 + 424.032069 = 445.245273
+    // time=19 BYR:  21.794495 + 616.989276 = 638.783770
+
     r1 = 50 * sqrt(time);
     r2 = 5000 * (exp(log(2) * time / 1850000) - 1);
 
