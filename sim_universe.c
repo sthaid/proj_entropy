@@ -1,39 +1,17 @@
 // XXX 
-//
-// - display run rate, and compare with max_threads
-// - handle pause
-// - auto stop at radius = 200 billion ly
-// - runspeed default = 9
+// - rad_k not used
 // - improve performance
-
-// - better unit test ??
-// - init threads should run one cycle
-// - 'reset' ctl not working
-// - horizontal and vertical lines
-// - tune to universe timing
-
-// - int64_t
-// - improve default values
-// - remember last apparanet velocity compontnt due to expansion, if needed
-// - more efficient init, cut time down for 10 million particles
-// - use multiple threads
-// - overflow checks in simulation thread
-// - on memory alloc failure, display error, and revert to something that does work
+// - tune to universe timing, improve default values
+// - test on android, and use multiple threads
 
 // MAYBE NOT
-// - delta time adjustment
+// - init threads should run one cycle
 
-// MAY NEED MORE WORK
-// - wrap
-
-// DONE
-// - get rid of circles
-// - colors, need to rewrite the color code
-// - color scaling
-// - latch color, or compute expansion better
-
-// NOT DOING THIS
-// - delta time controls ??
+// DONE, NEED TO TEST
+// - 'reset' ctl not working
+// - on memory alloc failure, display error, and revert to something that does work
+// - initial_radius
+// - int64_t
 
 #include "util.h"
 
@@ -59,11 +37,10 @@
 
 #define DELTA_TIME                  100          // 100,000 years       units = 1,000 years 
 
-#define DEFAULT_MAX_PARTICLE        100000       // 100,000         
-#define DEFAULT_INITIAL_RADIUS      5000         // 500 million  LY     units = 100,000 LY
-#define DEFAULT_INITIAL_AVG_SPEED   1000         // 0.1C                units = 0.0001 C
-#define DEFAULT_RADIUS_DOUBLE_INTVL 3000000      // 3 billion years     units = 1,000 years
 #define DEFAULT_DISPLAY_WIDTH       100000       // 10 billion LY       units = 100,000 LY
+#define DEFAULT_MAX_PARTICLE        100000       // 100,000         
+#define DEFAULT_INITIAL_TIME        1000         // 1 million years     units = 1,000 years
+#define DEFAULT_INITIAL_AVG_SPEED   1000         // 0.1C                units = 0.0001 C
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -102,9 +79,8 @@ typedef struct {
 typedef struct {
     // params
     int32_t  max_particle;
-    int32_t  initial_radius;       // 100000 LY
+    int32_t  initial_time;         // 1000 years
     int32_t  initial_avg_speed;    // .0001 C
-    int32_t  radius_double_intvl;  // 1000 years
 
     // simulation
     int32_t   current_time;        // 1000 years
@@ -133,14 +109,14 @@ static pthread_t         thread_id[MAX_THREAD];
 // prototypes
 //
 
-int32_t sim_universe_init(int32_t max_particle, int32_t initial_radius,
-                          int32_t initial_avg_speed, int32_t radius_double_intvl);
+int32_t sim_universe_init(int32_t max_particle, int32_t initial_time, int32_t initial_avg_speed);
 void sim_universe_terminate(void);
 void sim_universe_display(void);
 int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_display);
 int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_display);
 int32_t sim_universe_display_help(int32_t curr_display, int32_t last_display);
 void * sim_universe_thread(void * cx);
+int32_t sim_universe_compute_radius(int32_t time);
 int32_t sim_universe_barrier(int32_t thread_id);
 
 // -----------------  MAIN  -----------------------------------------------------
@@ -151,8 +127,7 @@ void sim_universe(void)
     run_speed         = DEFAULT_RUN_SPEED;
     suspend_expansion = false;
 
-    sim_universe_init(DEFAULT_MAX_PARTICLE, DEFAULT_INITIAL_RADIUS,
-                      DEFAULT_INITIAL_AVG_SPEED, DEFAULT_RADIUS_DOUBLE_INTVL);
+    sim_universe_init(DEFAULT_MAX_PARTICLE, DEFAULT_INITIAL_TIME, DEFAULT_INITIAL_AVG_SPEED);
 
     sim_universe_display();
 
@@ -163,38 +138,50 @@ void sim_universe(void)
 
 int32_t sim_universe_init(
     int32_t max_particle,
-    int32_t initial_radius,
-    int32_t initial_avg_speed,
-    int32_t radius_double_intvl)
+    int32_t initial_time,
+    int32_t initial_avg_speed)
 {
     #define SIM_SIZE(n) (sizeof(sim_t) + (n) * sizeof(particle_t))
 
     int32_t i;
 
     // print info msg
-    INFO("initialize start: max_particle=%d initial_radius=%d"
-         " initial_avg_speed=%d radius_double_intvl=%d\n",
-         max_particle, initial_radius, initial_avg_speed, radius_double_intvl);
+    INFO("initialize start: max_particle=%d initial_time=%d initial_avg_speed=%d\n",
+         max_particle, initial_time, initial_avg_speed);
+
+    // terminate threads
+    state = STATE_TERMINATE_THREADS;
+    for (i = 0; i < max_thread; i++) {
+        if (thread_id[i]) {
+            pthread_join(thread_id[i], NULL);
+            thread_id[i] = 0;
+        }
+    }
+    max_thread = 0;
+
+    // free allocations 
+    free(sim);
+    sim = NULL;
 
     // allocate sim
-    free(sim);
-    sim = calloc(1, SIM_SIZE(max_particle));
-    if (sim == NULL) {
-        // xxx fake in a dummy sim that is malloced but with small max_particles
-        return -1;
+    while (true) {
+        sim = calloc(1, SIM_SIZE(max_particle));
+        if (sim != NULL) {
+            break;
+        }
+        ERROR("alloc sim failed, max_particle=%d size=%d MB, retrying with max_particle=%d\n",
+              max_particle, (int32_t)(SIM_SIZE(max_particle)/MB), max_particle/2);
+        max_particle /= 2;
     }
 
     // initialize sim
-    // xxx optimize particle init loop
     sim->max_particle        = max_particle;
-    sim->initial_radius      = initial_radius;
+    sim->initial_time        = initial_time;
     sim->initial_avg_speed   = initial_avg_speed;
-    sim->radius_double_intvl = radius_double_intvl;
 
-    sim->current_time        = 1000000;  // 1 billion years
-    sim->current_radius      = initial_radius;
+    sim->current_time        = initial_time;
+    sim->current_radius      = sim_universe_compute_radius(initial_time);
 
-    int64_t start = microsec_timer(); //xxx
     for (i = 0; i < max_particle; i++) {
         particle_t * p = &sim->particle[i];
         float  direction, speed;
@@ -218,7 +205,6 @@ int32_t sim_universe_init(
 
         p->rva_color = GREEN;
     }
-    PRINTF("xxx DURATION %ld ms\n", (microsec_timer() - start)/1000);
 
     // init control variables
     state = STATE_STOP;
@@ -346,64 +332,36 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
 
         //
         // draw particles
-        // AAA next
-        // xxx add debug timing to periodically print display update cpu time
         //
 
         #define MAX_POINTS 1000
         SDL_Point points[MAX_COLOR][MAX_POINTS];
         int32_t   max_points[MAX_COLOR];
-        int32_t   k1, i;
+        int32_t   k1, k2, i;
         int32_t   disp_x, disp_y, disp_color;
 
         bzero(max_points, sizeof(max_points));
         k1 = 1000000000 / simpane_width;
+        k2 = (simpane_width * (int64_t)sim->current_radius / display_width) -
+             (simpane_width / 2);
 
-//int32_t xxx =  1000000000 / k1 * sim->current_radius / display_width 
-
-int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width 
-                 -simpane_width / 2;
-
-        //int64_t start = microsec_timer(); //xxx
         for (i = 0; i < sim->max_particle; i++) {
             particle_t * p = &sim->particle[i];
 
-#if 0
-            disp_x  = p->x / k1 * sim->current_radius / display_width; 
-            if (disp_x < -simpane_width/2 || disp_x >= simpane_width/2) {
-                continue;
-            }
-            disp_y  = p->y / k1 * sim->current_radius / display_width;
-            if (disp_y < -simpane_width/2 || disp_y >= simpane_width/2) {
-                continue;
-            }
-#else
-            // XXX improve the range
-            disp_x  = (p->x + 1000000000) / k1 * (int64_t)sim->current_radius / display_width - xxx;; 
+            disp_x = (p->x + 1000000000) / k1 * (int64_t)sim->current_radius / display_width - k2; 
             if (disp_x < 0 || disp_x >= simpane_width) {
                 continue;
             }
-            disp_y  = (p->y  + 1000000000) / k1 * (int64_t)sim->current_radius / display_width - xxx;;
+            disp_y = (p->y + 1000000000) / k1 * (int64_t)sim->current_radius / display_width - k2;
             if (disp_y < 0|| disp_y >= simpane_width) {
                 continue;
             }
-#endif
-
-
             disp_color = p->rva_color;
 
-            // XXX if (i < 10) {
-                // XXX printf("ADDED [%d] %d %d\n", i, disp_x , disp_y);
-            // XXX }
-
-#if 0
-            points[disp_color][max_points[disp_color]].x = disp_x + simpane_width / 2;
-            points[disp_color][max_points[disp_color]].y = disp_y + simpane_width / 2;
-#else
             points[disp_color][max_points[disp_color]].x = disp_x;
             points[disp_color][max_points[disp_color]].y = disp_y;
-#endif
             max_points[disp_color]++;
+
             if (max_points[disp_color] == MAX_POINTS) {
                 SDL_SetRenderDrawColor(sdl_renderer, 
                                        sdl_pixel_r[disp_color],
@@ -426,7 +384,6 @@ int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width
                 max_points[disp_color] = 0;
             }
         }
-        //PRINTF("xxx DURATION %ld ms\n", (microsec_timer() - start)/1000);
 
         //
         // clear ctlpane
@@ -484,12 +441,10 @@ int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width
         sdl_render_text_font0(&ctlpane, 12, 0, "PARAMS ...", SDL_EVENT_NONE);
         sprintf(str, "N_PART = %d", sim->max_particle);    
         sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RADIUS = %0.3lf BLY", (double)sim->initial_radius*1E5/1E9);
+        sprintf(str, "TIME   = %0.3lf BYR", (double)sim->initial_time*1E3/1E9);
         sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
         sprintf(str, "SPEED  = %0.3lf C", (double)sim->initial_avg_speed*1E-4);
         sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "DOUBLE = %0.3lf BYR", (double)sim->radius_double_intvl*1E3/1E9);
-        sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
 
         // - window width
         sprintf(str, "WIDTH %0.3lf BLY", (double)display_width*1E5/1E9);
@@ -530,7 +485,6 @@ int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width
             }
             perf_start_sim_current_time = sim->current_time;
             perf_start_wall_time = microsec_timer();
-            //printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
             break;
         case SDL_EVENT_FAST:
             if (run_speed < MAX_RUN_SPEED) {
@@ -538,14 +492,13 @@ int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width
             }
             perf_start_sim_current_time = sim->current_time;
             perf_start_wall_time = microsec_timer();
-            //printf("RUNSPEEDSLEEPTIME US %d  (rs %d)\n", RUN_SPEED_SLEEP_TIME, run_speed);
             break;
-        case SDL_EVENT_RESET: {
+        case SDL_EVENT_RESET:
             state = STATE_STOP;
-            // xxx preserve if args are 0
-            // sim_universe_terminate();
-            // sim_universe_init(max_particle, sim_width);
-            break; }
+            sim_universe_init(sim->max_particle,
+                              sim->initial_time,
+                              sim->initial_avg_speed);
+            break;
         case SDL_EVENT_SELECT_PARAMS:
             state = STATE_STOP;
             next_display = DISPLAY_SELECT_PARAMS;
@@ -599,43 +552,37 @@ int32_t xxx =  simpane_width * (int64_t)sim->current_radius / display_width
 int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_display)
 {
     int32_t max_particle        = sim->max_particle;
-    int32_t initial_radius      = sim->initial_radius;
+    int32_t initial_time        = sim->initial_time;
     int32_t initial_avg_speed   = sim->initial_avg_speed;
-    int32_t radius_double_intvl = sim->radius_double_intvl;
     double  val;
 
-    char cur_s1[100], cur_s2[100], cur_s3[100], cur_s4[100];
-    char ret_s1[100], ret_s2[100], ret_s3[100], ret_s4[100];
+    char cur_s1[100], cur_s2[100], cur_s3[100];
+    char ret_s1[100], ret_s2[100], ret_s3[100];
 
     // get new value strings for the params
     sprintf(cur_s1, "%d",    max_particle);
-    sprintf(cur_s2, "%0.3lf", (double)initial_radius*1E5/1E9) ;   
+    sprintf(cur_s2, "%0.3lf", (double)initial_time*1E3/1E9) ;   
     sprintf(cur_s3, "%0.3lf", (double)initial_avg_speed*1E-4);
-    sprintf(cur_s4, "%0.3lf", (double)radius_double_intvl*1E3/1E9);
-    sdl_display_get_string(4,
+    sdl_display_get_string(3,
                            "N_PART", cur_s1, ret_s1,
-                           "RADIUS", cur_s2, ret_s2,
-                           "SPEED",  cur_s3, ret_s3,
-                           "DOUBLE", cur_s4, ret_s4);
+                           "TIME",   cur_s2, ret_s2,
+                           "SPEED",  cur_s3, ret_s3);
 
     // scan returned strings
-    // xxx check ranges
+    // XXX check ranges
     if (sscanf(ret_s1, "%lf", &val) == 1) {
         max_particle = val;
     }
     if (sscanf(ret_s2, "%lf", &val) == 1) {
-        initial_radius = val / (1E5/1E9);
+        initial_time = val / (1E3/1E9);
     }
     if (sscanf(ret_s3, "%lf", &val) == 1) {
         initial_avg_speed = val / 1E-4;
     }
-    if (sscanf(ret_s4, "%lf", &val) == 1) {
-        radius_double_intvl = val / (1E3/1E9);
-    }
 
     // re-init with new params
     sim_universe_terminate();
-    sim_universe_init(max_particle, initial_radius, initial_avg_speed, radius_double_intvl);
+    sim_universe_init(max_particle, initial_time, initial_avg_speed);
 
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
@@ -644,7 +591,7 @@ int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_di
 int32_t sim_universe_display_help(int32_t curr_display, int32_t last_display)
 {
     // display the help text0
-    sdl_display_text("xxx HELP xxx", NULL);
+    sdl_display_text("XXX HELP ", NULL);
     
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
@@ -683,16 +630,16 @@ void * sim_universe_thread(void * cx)
 
             static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-            // determine new value for current_radius
+            // determine next values for time and radius,
+            // and determine the radius expansion factor
             if (!suspend_expansion) {
                 current_time_next = sim->current_time + DELTA_TIME;
-                current_radius_next = sim->initial_radius * exp( log(2) * current_time_next / sim->radius_double_intvl );
-                current_radius_expf = exp(log(2) * DELTA_TIME / sim->radius_double_intvl) - 1;
             } else {
                 current_time_next = sim->current_time;
-                current_radius_next = sim->initial_radius * exp( log(2) * current_time_next / sim->radius_double_intvl );
-                current_radius_expf = 0;
+                // XXX check this path yields 0 for expf
             }
+            current_radius_next = sim_universe_compute_radius(current_time_next);
+            current_radius_expf = (double)(current_radius_next - sim->current_radius) / sim->current_radius;
 
             while (true) {
                 // get a batch of particle to process
@@ -767,7 +714,7 @@ void * sim_universe_thread(void * cx)
                 sim->current_time = current_time_next;
                 sim->current_radius = current_radius_next;
 
-                // auto stop when current_radius is approaching limit
+                // auto stop when current_radius reaches 30,000 BLY
                 if (sim->current_radius >= 300000000) {
                     state = STATE_STOP;
                 }
@@ -788,6 +735,17 @@ void * sim_universe_thread(void * cx)
 
     INFO("thread terminating, thread_id=%d\n", thread_id);
     return NULL;
+}
+
+int32_t sim_universe_compute_radius(int32_t time)
+{
+    double r1, r2;
+
+    // XXX comment, and include data
+    r1 = 50 * sqrt(time);
+    r2 = 5000 * (exp(log(2) * time / 1850000) - 1);
+
+    return r1 + r2;
 }
 
 int32_t sim_universe_barrier(int32_t thread_id)
