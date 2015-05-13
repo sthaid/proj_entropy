@@ -59,7 +59,7 @@ bool sdl_quit;
 // fonts
 #define SDL_PANE_COLS(p,fid)  ((p)->w / sdl_font[fid].char_width)
 #define SDL_PANE_ROWS(p,fid)  ((p)->h / sdl_font[fid].char_height)
-#define SDL_MAX_FONT 2
+#define SDL_MAX_FONT 3
 typedef struct {
     TTF_Font * font;
     int32_t    char_width;
@@ -92,6 +92,7 @@ sdl_font_t sdl_font[SDL_MAX_FONT];
 #define SDL_EVENT_TYPE_TEXT         1
 #define SDL_EVENT_TYPE_MOUSE_CLICK  2
 #define SDL_EVENT_TYPE_MOUSE_MOTION 3
+#define SDL_EVENT_TYPE_MOUSE_WHEEL  4
 
 // event data structure
 typedef struct {
@@ -105,6 +106,10 @@ typedef struct {
             int32_t delta_x;
             int32_t delta_y;;
         } mouse_motion;
+        struct {
+            int32_t delta_x;
+            int32_t delta_y;;
+        } mouse_wheel;
     };
 } sdl_event_t;
 
@@ -154,7 +159,7 @@ void sdl_render_rect(SDL_Rect * rect, int32_t line_width, uint32_t rgba);
 SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba);
 void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture);
 void sdl_display_get_string(int32_t count, ...);
-void sdl_display_text(char * title, char **lines);
+void sdl_display_text(char * text);
 void sdl_display_choose_from_list(char * title_str, char ** choices, int32_t max_choices, int32_t * selection);
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  --------------------------------

@@ -1,3 +1,6 @@
+// XXX fix 3 body problem
+
+
 // XXX flicker in path display
 
 // XXX display error if bad file
@@ -1068,7 +1071,7 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
 {
     // display the help text0
-    sdl_display_text("XXX HELP XXX", NULL);
+    sdl_display_text("XXX HELP XXX");
 
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;

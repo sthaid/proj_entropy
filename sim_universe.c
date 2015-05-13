@@ -1,6 +1,7 @@
 // XXX - test on android, and use multiple threads
 
 #include "util.h"
+#include "sim_universe_help.h"
 
 //
 // defines
@@ -554,7 +555,7 @@ int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_di
 
     // get new value strings for the params
     sprintf(cur_s1, "%d",    max_particle);
-    sprintf(cur_s2, "%0.3lf", (double)initial_time*1E3/1E9) ;   
+    sprintf(cur_s2, "%0.6lf", (double)initial_time*1E3/1E9) ;   
     sprintf(cur_s3, "%0.3lf", (double)initial_avg_speed*1E-4);
     sdl_display_get_string(3,
                            "N_PART", cur_s1, ret_s1,
@@ -588,8 +589,8 @@ int32_t sim_universe_display_select_params(int32_t curr_display, int32_t last_di
 
 int32_t sim_universe_display_help(int32_t curr_display, int32_t last_display)
 {
-    // display the help text0
-    sdl_display_text("XXX HELP ", NULL);
+    // display the help text
+    sdl_display_text(sim_universe_help);
     
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;

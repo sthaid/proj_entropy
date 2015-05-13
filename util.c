@@ -23,8 +23,8 @@ static Mix_Chunk * sdl_button_sound;
 
 void sdl_init(uint32_t w, uint32_t h)
 {
-    char  * font0_path, * font1_path;
-    int32_t font0_ptsize, font1_ptsize;
+    char  * font0_path, * font1_path, * font2_path;
+    int32_t font0_ptsize, font1_ptsize, font2_ptsize;
 
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
@@ -57,6 +57,8 @@ void sdl_init(uint32_t w, uint32_t h)
     font0_ptsize = 40;
     font1_path = "fonts/FreeMonoBold.ttf";
     font1_ptsize = 60;
+    font2_path = "fonts/FreeMonoBold.ttf";
+    font2_ptsize = 26;
 
     sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
@@ -69,6 +71,12 @@ void sdl_init(uint32_t w, uint32_t h)
         FATAL("failed TTF_OpenFont %s\n", font1_path);
     }
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
+
+    sdl_font[2].font = TTF_OpenFont(font2_path, font2_ptsize);
+    if (sdl_font[2].font == NULL) {
+        FATAL("failed TTF_OpenFont %s\n", font2_path);
+    }
+    TTF_SizeText(sdl_font[2].font, "X", &sdl_font[2].char_width, &sdl_font[2].char_height);
 }
 
 void sdl_terminate(void)
@@ -296,6 +304,30 @@ sdl_event_t * sdl_poll_event(void)
             } while (SDL_PeepEvents(&ev, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) == 1);
             break; }
 
+        case SDL_MOUSEWHEEL: {
+            int32_t mouse_x, mouse_y;
+
+            // check if mouse wheel event is registered for the location of the mouse
+            SDL_GetMouseState(&mouse_x, &mouse_y);
+            for (i = 0; i < SDL_EVENT_MAX; i++) {
+                if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_WHEEL &&
+                    AT_POS(mouse_x, mouse_y, sdl_event_reg_tbl[i].pos, 0)) 
+                {
+                    break;
+                }
+            }
+
+            // if did not find a registered mouse wheel event then get out
+            if (i == SDL_EVENT_MAX) {
+                break;
+            }
+
+            // set return event
+            event.event = i;
+            event.mouse_wheel.delta_x = ev.wheel.x;
+            event.mouse_wheel.delta_y = ev.wheel.y;
+            break; }
+
         case SDL_KEYDOWN: {
             int32_t  key = ev.key.keysym.sym;
             bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
@@ -391,9 +423,9 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
     char             s[500];
     int32_t          slen;
 
-    static SDL_Color fg_color_normal = {255,255,255}; 
-    static SDL_Color fg_color_event  = {0,255,255}; 
-    static SDL_Color bg_color        = {0,0,0}; 
+    static SDL_Color fg_color_normal = {255,255,255,255}; 
+    static SDL_Color fg_color_event  = {0,255,255,255}; 
+    static SDL_Color bg_color        = {0,0,0,255}; 
 
     // if zero length string then nothing to do
     if (str[0] == '\0') {
@@ -509,7 +541,6 @@ uint32_t sdl_pixel_b[] = {
        255,     // WHITE       
             };
 
-
 void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba)
 {
     SDL_Rect rect = *rect_arg;
@@ -535,6 +566,7 @@ void sdl_render_rect(SDL_Rect * rect_arg, int32_t line_width, uint32_t rgba)
         rect.h -= 2;
     }
 }
+
 SDL_Texture * sdl_create_filled_circle_texture(int32_t radius, uint32_t rgba)
 {
     int32_t width = 2 * radius + 1;
@@ -597,7 +629,9 @@ void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture)
 
 // - - - - - - - - -  PREDEFINED DISPLAYS  - - - - - - - - - - - - - - - 
 
-#define SDL_EVENT_BACK  (SDL_EVENT_USER_START+0)
+#define SDL_EVENT_BACK          (SDL_EVENT_USER_START+0)
+#define SDL_EVENT_MOUSE_MOTION  (SDL_EVENT_USER_START+1)
+#define SDL_EVENT_MOUSE_WHEEL   (SDL_EVENT_USER_START+2)
 
 void sdl_display_get_string(int32_t count, ...)
 {
@@ -750,43 +784,96 @@ void sdl_display_get_string(int32_t count, ...)
     sdl_enable_keybd_events = false; 
 }
 
-void sdl_display_text(char * title, char **lines)
+void sdl_display_text(char * text)
 {
-    SDL_Rect       title_line_pane;
-    SDL_Rect       text_pane;
-    int32_t        title_line_pane_height;
+    SDL_Surface  * surface = NULL;
+    SDL_Texture  * texture = NULL;
+    SDL_Rect       disp_pane;
+    SDL_Rect       disp_pane_last = {0,0,0,0};
+    SDL_Rect       dstrect;
+    SDL_Rect       srcrect;
+    SDL_Color      white = {255,255,255,255};
+    SDL_Color      black = {0,0,0,255};
+    SDL_Color      text_color;
     sdl_event_t  * event;
-    bool           done = false;
+    int32_t        srcrect_y  = 0;
+    bool           done       = false;
+    bool           white_text = true;
+
+    text_color = (white_text ? white : black);
 
     while (!done) {
         // short delay
         usleep(5000);
 
-        // init panes and event
-        title_line_pane_height = sdl_font[0].char_height * 2;
-        SDL_INIT_PANE(title_line_pane, 
-                    0, 0,  
-                    sdl_win_width, title_line_pane_height);
-        SDL_INIT_PANE(text_pane, 
-                    0, title_line_pane_height,
-                    sdl_win_width, sdl_win_height - title_line_pane_height);
+        // init disp_pane and event 
+        SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
         sdl_event_init();
 
-        // clear display, and init events
-        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        // if window size has changed, or first call then
+        // init surface and texture for the text 
+        if (memcmp(&disp_pane, &disp_pane_last, sizeof(disp_pane)) != 0) {
+            if (texture) {
+                SDL_DestroyTexture(texture);
+                texture = NULL;
+            }
+            if (surface) {
+                SDL_FreeSurface(surface);
+                surface = NULL;
+            }
+
+            surface = TTF_RenderText_Blended_Wrapped(sdl_font[2].font, text, text_color, disp_pane.w);
+            if (surface == NULL) {
+                ERROR("TTF_RenderText_Blended_Wrapped\n");
+                break;   
+            }
+
+            texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
+            if (texture == NULL) {
+                ERROR("TTF_RenderText_Blended_Wrapped\n");
+                break;   
+            }
+
+            disp_pane_last = disp_pane;
+            srcrect_y = 0;
+        }
+
+        // clear display
+        if (white_text) {
+            SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        } else {
+            SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+        }
         SDL_RenderClear(sdl_renderer);
 
-        // display title
-        sdl_render_text_ex(&title_line_pane, 0, 0, title, SDL_EVENT_NONE,
-                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        // sanitize srcrect_y, this is the location of the text that is displayed
+        // at the top of the display
+        if (srcrect_y < 0) {
+            srcrect_y = 0;
+        } 
+        if (surface->h - srcrect_y < disp_pane.h) {
+            srcrect_y = surface->h - disp_pane.h;
+        }
 
-        // display lines
-        // XXX
+        // display the text
+        srcrect.x = 0;
+        srcrect.y = srcrect_y;
+        srcrect.w = surface->w;
+        srcrect.h = surface->h - srcrect_y;
 
-        // display controls
-        sdl_render_text_font0(&text_pane, 
-                              SDL_PANE_ROWS(&text_pane,0)-1, SDL_PANE_COLS(&text_pane,0)-5, 
+        dstrect.x = 0;
+        dstrect.y = 0;
+        dstrect.w = srcrect.w;
+        dstrect.h = srcrect.h;
+
+        SDL_RenderCopy(sdl_renderer, texture, &srcrect, &dstrect);
+
+        // display controls 
+        sdl_render_text_font0(&disp_pane, 
+                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
+        sdl_event_register(SDL_EVENT_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &disp_pane);
+        sdl_event_register(SDL_EVENT_MOUSE_WHEEL, SDL_EVENT_TYPE_MOUSE_WHEEL, &disp_pane);
 
         // present the display
         SDL_RenderPresent(sdl_renderer);
@@ -794,11 +881,26 @@ void sdl_display_text(char * title, char **lines)
         // wait for event
         event = sdl_poll_event();
         switch (event->event) {
+        case SDL_EVENT_MOUSE_MOTION:
+            srcrect_y -= event->mouse_motion.delta_y;
+            break;
+        case SDL_EVENT_MOUSE_WHEEL:
+            srcrect_y -= event->mouse_wheel.delta_y * 2 * sdl_font[2].char_height;
+            break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
             sdl_play_event_sound();
             done = true;
         }
+    }
+
+    if (texture) {
+        SDL_DestroyTexture(texture);
+        texture = NULL;
+    }
+    if (surface) {
+        SDL_FreeSurface(surface);
+        surface = NULL;
     }
 }
 
@@ -1599,14 +1701,13 @@ int32_t random_uniform(int32_t low, int32_t high)
     return low + (random() % range);
 }
 
-// XXX use random?
 // Refer to:
 // - http://en.wikipedia.org/wiki/Triangular_distribution
 // - http://stackoverflow.com/questions/3510475/generate-random-numbers-according-to-distributions
 int32_t random_triangular(int32_t low, int32_t high)
 {
     int32_t range = high - low;
-    double U = rand() / (double) RAND_MAX;
+    double U = random() / (double) RAND_MAX;
 
     if (U <= 0.5) {
         return low + sqrt(U * range * range / 2);   
