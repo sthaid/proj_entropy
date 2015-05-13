@@ -1,3 +1,4 @@
+// XXX review this
 static char sim_universe_help[] = "\
 OVERVIEW\n\
 --------\n\

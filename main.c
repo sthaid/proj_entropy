@@ -1,11 +1,20 @@
 #include "util.h"
 
+// #define SELECTION 2
+
+#ifndef SELECTION
+static char * choices[] = {
+                "Expanding Gas in a Container",
+                "Gravity in our Solar System and more",
+                "Our Expanding Universe",
+                        };
+#endif
+
 // -----------------  MAIN  ----------------------------------------------
 
 int32_t main(int32_t argc, char **argv)
 {
     struct rlimit   rl;
-    // char          * choices[] = {"CONTAINER", "GRAVITY", "UNIVERSE" };
     int32_t         selection;
 
     // init core dumps
@@ -22,8 +31,8 @@ int32_t main(int32_t argc, char **argv)
 
     // processing
     while (!sdl_quit) {
-#if 0
-        sdl_display_choose_from_list("SELECT SIMULATION",
+#ifndef SELECTION
+        sdl_display_choose_from_list("-- Choose A Simulation --",
                                      choices, sizeof(choices)/sizeof(choices[0]),
                                      &selection);
 
@@ -31,7 +40,7 @@ int32_t main(int32_t argc, char **argv)
             break;
         }
 #else
-        selection = 2;
+        selection = SELECTION;
 #endif
 
         switch (selection) {

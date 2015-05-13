@@ -18,7 +18,6 @@
 #define SDL_FLAGS SDL_WINDOW_FULLSCREEN
 #endif
 
-
 static Mix_Chunk * sdl_button_sound;
 
 void sdl_init(uint32_t w, uint32_t h)
@@ -784,6 +783,7 @@ void sdl_display_get_string(int32_t count, ...)
     sdl_enable_keybd_events = false; 
 }
 
+// XXX not working will with one line
 void sdl_display_text(char * text)
 {
     SDL_Surface  * surface = NULL;
