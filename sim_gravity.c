@@ -41,6 +41,7 @@
 // ----------------------------------------------------------------------------------------------------
 
 #include "util.h"
+#include "sim_gravity_help.h"
 
 //
 // NOTES:
@@ -1070,8 +1071,8 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
 
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
 {
-    // display the help text0
-    sdl_display_text("XXX HELP XXX");
+    // display the help text
+    sdl_display_text(sim_gravity_help);
 
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;

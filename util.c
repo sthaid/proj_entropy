@@ -783,7 +783,6 @@ void sdl_display_get_string(int32_t count, ...)
     sdl_enable_keybd_events = false; 
 }
 
-// XXX not working will with one line
 void sdl_display_text(char * text)
 {
     SDL_Surface  * surface = NULL;
@@ -796,7 +795,7 @@ void sdl_display_text(char * text)
     SDL_Color      black = {0,0,0,255};
     SDL_Color      text_color;
     sdl_event_t  * event;
-    int32_t        srcrect_y  = 0;
+    int32_t        surface_y  = 0;
     bool           done       = false;
     bool           white_text = true;
 
@@ -835,7 +834,7 @@ void sdl_display_text(char * text)
             }
 
             disp_pane_last = disp_pane;
-            srcrect_y = 0;
+            surface_y = 0;
         }
 
         // clear display
@@ -846,20 +845,20 @@ void sdl_display_text(char * text)
         }
         SDL_RenderClear(sdl_renderer);
 
-        // sanitize srcrect_y, this is the location of the text that is displayed
+        // sanitize surface_y, this is the location of the text that is displayed
         // at the top of the display
-        if (srcrect_y < 0) {
-            srcrect_y = 0;
-        } 
-        if (surface->h - srcrect_y < disp_pane.h) {
-            srcrect_y = surface->h - disp_pane.h;
+        if (surface->h - surface_y < disp_pane.h) {
+            surface_y = surface->h - disp_pane.h;
         }
+        if (surface_y < 0) {
+            surface_y = 0;
+        } 
 
         // display the text
         srcrect.x = 0;
-        srcrect.y = srcrect_y;
+        srcrect.y = surface_y;
         srcrect.w = surface->w;
-        srcrect.h = surface->h - srcrect_y;
+        srcrect.h = surface->h - surface_y;
 
         dstrect.x = 0;
         dstrect.y = 0;
@@ -882,10 +881,10 @@ void sdl_display_text(char * text)
         event = sdl_poll_event();
         switch (event->event) {
         case SDL_EVENT_MOUSE_MOTION:
-            srcrect_y -= event->mouse_motion.delta_y;
+            surface_y -= event->mouse_motion.delta_y;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            srcrect_y -= event->mouse_wheel.delta_y * 2 * sdl_font[2].char_height;
+            surface_y -= event->mouse_wheel.delta_y * 2 * sdl_font[2].char_height;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 

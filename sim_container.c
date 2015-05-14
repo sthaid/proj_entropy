@@ -1,4 +1,5 @@
 #include "util.h"
+#include "sim_container_help.h"
 
 //
 // defines
@@ -53,11 +54,11 @@
 
 #define STATE_STR(s) \
     ((s) == STATE_STOP              ? "STOP"              : \
-     (s) == STATE_LOW_ENTROPY_STOP  ? "LOW_ENTROPY_STOP"  : \
+     (s) == STATE_LOW_ENTROPY_STOP  ? "ENTROPY_STOP"      : \
      (s) == STATE_RUN               ? "RUN"               : \
-     (s) == STATE_PLAYBACK_REV      ? "PLAYBACK_REV"      : \
-     (s) == STATE_PLAYBACK_FWD      ? "PLAYBACK_FWD"      : \
-     (s) == STATE_PLAYBACK_STOP     ? "PLAYBACK_STOP"     : \
+     (s) == STATE_PLAYBACK_REV      ? "PB_REV"            : \
+     (s) == STATE_PLAYBACK_FWD      ? "PB_FWD"            : \
+     (s) == STATE_PLAYBACK_STOP     ? "PB_STOP"           : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
 
@@ -497,8 +498,8 @@ int32_t sim_container_display_select_params(int32_t curr_display, int32_t last_d
 
 int32_t sim_container_display_help(int32_t curr_display, int32_t last_display)
 {
-    // display the help text0
-    sdl_display_text("XXX HELP XXX");
+    // display the help text
+    sdl_display_text(sim_container_help);
     
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
