@@ -325,11 +325,7 @@ sdl_event_t * sdl_poll_event(void)
             int32_t  possible_event = -1;
 
             if (key < 128) {
-                if (shift && key >= 'a' && key <= 'z') {
-                    possible_event = key = 'A' + (key - 'a');
-                } else {
-                    possible_event = key;
-                }
+                possible_event = key;
             } else if (key == SDLK_HOME) {
                 possible_event = SDL_EVENT_KEY_HOME;
             } else if (key == SDLK_END) {
@@ -340,8 +336,15 @@ sdl_event_t * sdl_poll_event(void)
                 possible_event = SDL_EVENT_KEY_PGDN;
             }
 
-            if (possible_event != -1 && sdl_event_reg_tbl[possible_event].pos.w != 0) {
-                event.event = possible_event;
+            if (possible_event != -1) {
+                if ((possible_event >= 'a' && possible_event <= 'z') &&
+                    (sdl_event_reg_tbl[possible_event].pos.w ||
+                     sdl_event_reg_tbl[toupper(possible_event)].pos.w))
+                {
+                    event.event = !shift ? possible_event : toupper(possible_event);
+                } else if (sdl_event_reg_tbl[possible_event].pos.w) {
+                    event.event = possible_event;
+                }
             }
             break; }
 
@@ -827,7 +830,6 @@ void sdl_display_text(char * text)
         }
         SDL_FreeSurface(surface);
     }
-    INFO("DONE\n");
 
     // loop until done
     while (!done) {
@@ -938,8 +940,8 @@ void sdl_display_text(char * text)
 
 void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max_choice, int32_t * selection)
 {
-    SDL_Texture  * title_texture;
-    SDL_Texture  * texture[3000];  // XXX malloc/free
+    SDL_Texture  * title_texture = NULL;
+    SDL_Texture ** texture = NULL;
     SDL_Color      fg_color_title = {255,255,255,255}; 
     SDL_Color      fg_color_choice = {0,255,255,255};
     SDL_Color      bg_color = {0,0,0,255}; 
@@ -951,9 +953,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
     int32_t        text_y = 0;
     bool           done = false;
 
-    INFO("MAX_CHOICE %d\n", max_choice);
-    INFO("FONT HEIGHTS %d %d %d\n",
-        sdl_font[0].char_height, sdl_font[1].char_height, sdl_font[2].char_height);
+// XXX 43
 
     // preset return
     *selection = -1;
@@ -962,12 +962,25 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
     surface = TTF_RenderText_Shaded(sdl_font[0].font, title_str, fg_color_title, bg_color);
     title_texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
     SDL_FreeSurface(surface);
+    if (title_texture == NULL) {
+        ERROR("SDL_CreateTextureFromSurface title_texture, %s\n", SDL_GetError());
+        goto done;
+    }
 
     // create textures for each choice string
+    texture = calloc(max_choice, sizeof(void*));
+    if (texture == NULL) {
+        ERROR("calloc texture, max_choice %d\n", max_choice);
+        goto done;
+    }
     for (i = 0; i < max_choice; i++) {
         surface = TTF_RenderText_Shaded(sdl_font[0].font, choice[i], fg_color_choice, bg_color);
         texture[i] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
         SDL_FreeSurface(surface);
+        if (texture[i] == NULL) {
+            ERROR("SDL_CreateTextureFromSurface i=%d, %s\n", i, SDL_GetError());
+            goto done;
+        }
     }
 
     // loop until selection made, or aborted
@@ -1086,10 +1099,17 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         }
     }
 
+done:
     // free allocations
-    for (i = 0; i < max_choice; i++) {
-        SDL_DestroyTexture(texture[i]);
+    if (title_texture) {
+        SDL_DestroyTexture(title_texture);
     }
+    for (i = 0; i < max_choice; i++) {
+        if (texture[i]) {
+            SDL_DestroyTexture(texture[i]);
+        }
+    }
+    free(texture);
 }
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  ---------------------
