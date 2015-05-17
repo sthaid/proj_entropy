@@ -499,7 +499,21 @@ int32_t sim_container_display_select_params(int32_t curr_display, int32_t last_d
 int32_t sim_container_display_help(int32_t curr_display, int32_t last_display)
 {
     // display the help text
+#if 0
+    // XXX delete
+    char s[5000*100];
+    int i;
+    char * p;
+    p = s;
+    for (i = 0; i < 3000 ; i++) {
+        p += sprintf(p,"this is line number %d xxxxxxxxxxxxxxxx\n", i);
+    }
+    sdl_display_text(s);
+#else
     sdl_display_text(sim_container_help);
+#endif
+
+    //sdl_display_text(sim_container_help);
     
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;

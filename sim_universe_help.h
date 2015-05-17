@@ -75,6 +75,4 @@ Rapid expansion during the early universe.\n\
 Much of the universe lies beyond what we can see from our vantage point.\n\
 \n\
 As the universe ages, the size of the observable universe shrinks towards zero.\n\
-\n\
-\n\
 ";

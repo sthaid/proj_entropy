@@ -80,13 +80,16 @@ sed -i.orig \
      src/org/libsdl/app/SDLActivity.java 
 
 # populate jni/src 
-ln -s ../../../main.c           jni/src
-ln -s ../../../util.c           jni/src
-ln -s ../../../sim_container.c  jni/src
-ln -s ../../../sim_gravity.c    jni/src
-ln -s ../../../sim_universe.c   jni/src
-ln -s ../../../util.h           jni/src
-ln -s ../../../button_sound.h   jni/src
+ln -s ../../../main.c                jni/src
+ln -s ../../../util.c                jni/src
+ln -s ../../../sim_container.c       jni/src
+ln -s ../../../sim_gravity.c         jni/src
+ln -s ../../../sim_universe.c        jni/src
+ln -s ../../../util.h                jni/src
+ln -s ../../../button_sound.h        jni/src
+ln -s ../../../sim_container_help.h  jni/src
+ln -s ../../../sim_gravity_help.h    jni/src
+ln -s ../../../sim_universe_help.h   jni/src
 
 # replace jni/src/Android.mk
 cp jni/src/Android.mk jni/src/Android.mk.orig

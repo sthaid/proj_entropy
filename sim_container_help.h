@@ -59,7 +59,6 @@ Run the simulation with 4 particles, width set to 4, and at fastest speed. \n\
 After many cycles the simulation may detect low entropy, and automatically \n\
 stop. You can then set the Run Speed to 1, and playback the simulation \n\
 in reverse to observe how entropy can sometimes spontaneously decrease.  \n\
-XXX check this.\n\
 \n\
 Shrink the container, and observe the temperature increase. Wait a bit to\n\
 allow the temperature to equalize with the ambient temperature, of about\n\

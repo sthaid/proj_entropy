@@ -107,7 +107,6 @@ typedef struct {
 } sdl_event_reg_t;
 
 static sdl_event_reg_t sdl_event_reg_tbl[SDL_EVENT_MAX];
-static bool            sdl_enable_keybd_events;
 
 void sdl_event_init(void)
 {
@@ -142,13 +141,6 @@ sdl_event_t * sdl_poll_event(void)
         (x) == SDL_WINDOWEVENT_FOCUS_GAINED ? "SDL_WINDOWEVENT_FOCUS_GAINED" : \
         (x) == SDL_WINDOWEVENT_FOCUS_LOST   ? "SDL_WINDOWEVENT_FOCUS_LOST"   : \
         (x) == SDL_WINDOWEVENT_CLOSE        ? "SDL_WINDOWEVENT_CLOSE"        : \
-
-    #define SDL_EVENT_KEY_SHIFT         128
-    #define SDL_EVENT_KEY_BS            129
-    #define SDL_EVENT_KEY_TAB           130
-    #define SDL_EVENT_KEY_ENTER         131
-    #define SDL_EVENT_KEY_ESC           132
-    #define SDL_EVENT_FIELD_SELECT      140
 
     #define MOUSE_BUTTON_STATE_NONE     0
     #define MOUSE_BUTTON_STATE_DOWN     1
@@ -329,30 +321,27 @@ sdl_event_t * sdl_poll_event(void)
 
         case SDL_KEYDOWN: {
             int32_t  key = ev.key.keysym.sym;
-            bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+            bool     shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+            int32_t  possible_event = -1;
 
-            if (!sdl_enable_keybd_events) {
-                break;
+            if (key < 128) {
+                if (shift && key >= 'a' && key <= 'z') {
+                    possible_event = key = 'A' + (key - 'a');
+                } else {
+                    possible_event = key;
+                }
+            } else if (key == SDLK_HOME) {
+                possible_event = SDL_EVENT_KEY_HOME;
+            } else if (key == SDLK_END) {
+                possible_event = SDL_EVENT_KEY_END;
+            } else if (key == SDLK_PAGEUP) {
+                possible_event= SDL_EVENT_KEY_PGUP;
+            } else if (key == SDLK_PAGEDOWN) {
+                possible_event = SDL_EVENT_KEY_PGDN;
             }
 
-            if (key == 27) {
-                event.event = SDL_EVENT_KEY_ESC;
-            } else if (key == 8) {
-                event.event = SDL_EVENT_KEY_BS;
-            } else if (key == 9) {
-                event.event = SDL_EVENT_KEY_TAB;
-            } else if (key == 13) {
-                event.event = SDL_EVENT_KEY_ENTER;
-            } else if (!shift && ((key >= 'a' && key <= 'z') || (key >= '0' && key <= '9'))) {
-                event.event = key;
-            } else if (shift && (key >= 'a' && key <= 'z')) {
-                event.event = 'A' + (key - 'a');
-            } else if (shift && key == '-') {
-                event.event = '_';
-            } else if (key == ' ' || key == '.' || key == ',') {
-                event.event = key;
-            } else {
-                break;
+            if (possible_event != -1 && sdl_event_reg_tbl[possible_event].pos.w != 0) {
+                event.event = possible_event;
             }
             break; }
 
@@ -415,8 +404,8 @@ void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str
 void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
         int32_t field_cols, bool center, int32_t font_id)
 {
-    SDL_Surface    * surface; 
-    SDL_Texture    * texture; 
+    SDL_Surface    * surface = NULL;
+    SDL_Texture    * texture = NULL;
     SDL_Color        fg_color;
     SDL_Rect         pos;
     char             s[500];
@@ -457,7 +446,7 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
         col += (field_cols - slen) / 2;
     }
 
-    // render the text to a surface0
+    // render the text to a surface
     fg_color = (event != SDL_EVENT_NONE ? fg_color_event : fg_color_normal); 
     surface = TTF_RenderText_Shaded(sdl_font[font_id].font, s, fg_color, bg_color);
     if (surface == NULL) { 
@@ -470,13 +459,20 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
     pos.w = surface->w;
     pos.h = surface->h;
 
-    // create texture from the surface, and render the texture
+    // create texture from the surface, and 
+    // render the texture
     texture = SDL_CreateTextureFromSurface(sdl_renderer, surface); 
     SDL_RenderCopy(sdl_renderer, texture, NULL, &pos); 
 
     // clean up
-    SDL_FreeSurface(surface); 
-    SDL_DestroyTexture(texture); 
+    if (surface) {
+        SDL_FreeSurface(surface); 
+        surface = NULL;
+    }
+    if (texture) {
+        SDL_DestroyTexture(texture); 
+        texture = NULL;
+    }
 
     // if there is a event then save the location for the event handler
     if (event != SDL_EVENT_NONE) {
@@ -628,9 +624,13 @@ void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture)
 
 // - - - - - - - - -  PREDEFINED DISPLAYS  - - - - - - - - - - - - - - - 
 
-#define SDL_EVENT_BACK          (SDL_EVENT_USER_START+0)
-#define SDL_EVENT_MOUSE_MOTION  (SDL_EVENT_USER_START+1)
-#define SDL_EVENT_MOUSE_WHEEL   (SDL_EVENT_USER_START+2)
+// user events used in this file
+#define SDL_EVENT_KEY_SHIFT       (SDL_EVENT_USER_START+0)
+#define SDL_EVENT_MOUSE_MOTION    (SDL_EVENT_USER_START+1)
+#define SDL_EVENT_MOUSE_WHEEL     (SDL_EVENT_USER_START+2)
+#define SDL_EVENT_FIELD_SELECT    (SDL_EVENT_USER_START+3)    // through +9
+#define SDL_EVENT_LIST_CHOICE     (SDL_EVENT_USER_START+10)   // through +49
+#define SDL_EVENT_BACK            (SDL_EVENT_USER_START+50)
 
 void sdl_display_get_string(int32_t count, ...)
 {
@@ -651,9 +651,6 @@ void sdl_display_get_string(int32_t count, ...)
     if (count > 4) {
         ERROR("count %d too big, max 4\n", count);
     }
-
-    // set sdl_enable_keybd_events, to enable keyboard input
-    sdl_enable_keybd_events = true;
 
     // transfer variable arg list to array
     va_start(ap, count);
@@ -779,28 +776,60 @@ void sdl_display_get_string(int32_t count, ...)
             strcat(ret_str[field_select], s);
         }
     }
-
-    sdl_enable_keybd_events = false; 
 }
 
 void sdl_display_text(char * text)
 {
-    SDL_Surface  * surface = NULL;
-    SDL_Texture  * texture = NULL;
-    SDL_Rect       disp_pane;
-    SDL_Rect       disp_pane_last = {0,0,0,0};
     SDL_Rect       dstrect;
-    SDL_Rect       srcrect;
-    SDL_Color      white = {255,255,255,255};
-    SDL_Color      black = {0,0,0,255};
-    SDL_Color      text_color;
+    SDL_Texture ** texture = NULL;
+    SDL_Rect       disp_pane;
     sdl_event_t  * event;
-    int32_t        surface_y  = 0;
-    bool           done       = false;
-    bool           white_text = true;
+    char         * p;
+    int32_t        i;
+    int32_t        lines_per_display;
+    bool           done = false;
+    int32_t        max_texture = 0;
+    int32_t        max_texture_alloced = 0;
+    int32_t        text_y = 0;
 
-    text_color = (white_text ? white : black);
+    // create a texture for each line of text
+    //
+    // note - this could be improved by doing just the first portion initially,
+    //        and then finish up in the loop below
+    // note - my Android program crashes if number of lines is too large (> 3800);
+    //        this is probably because there is a limit on the number of textures
+    for (p = text; *p; ) {
+        SDL_Surface * surface;
+        SDL_Color     fg_color= {255,255,255,255}; 
+        SDL_Color     bg_color = {0,0,0,255}; 
+        char        * newline;
+        char          line[200];
 
+        newline = strchr(p, '\n');
+        if (newline) {
+            memcpy(line, p, newline-p);
+            line[newline-p] = '\0';
+            p = newline + 1;
+        } else {
+            strcpy(line, p);
+            p += strlen(line);
+        }
+
+        if (max_texture+1 > max_texture_alloced) {
+            max_texture_alloced += 1000;
+            texture = realloc(texture, max_texture_alloced*sizeof(void*));
+        }
+
+        surface = TTF_RenderText_Shaded(sdl_font[2].font, line, fg_color, bg_color);
+        texture[max_texture++] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
+        if (texture[max_texture-1] == NULL) {
+            ERROR("SDL_CreateTextureFromSurface, %s\n", SDL_GetError());
+        }
+        SDL_FreeSurface(surface);
+    }
+    INFO("DONE\n");
+
+    // loop until done
     while (!done) {
         // short delay
         usleep(5000);
@@ -808,66 +837,58 @@ void sdl_display_text(char * text)
         // init disp_pane and event 
         SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
         sdl_event_init();
-
-        // if window size has changed, or first call then
-        // init surface and texture for the text 
-        if (memcmp(&disp_pane, &disp_pane_last, sizeof(disp_pane)) != 0) {
-            if (texture) {
-                SDL_DestroyTexture(texture);
-                texture = NULL;
-            }
-            if (surface) {
-                SDL_FreeSurface(surface);
-                surface = NULL;
-            }
-
-            surface = TTF_RenderText_Blended_Wrapped(sdl_font[2].font, text, text_color, disp_pane.w);
-            if (surface == NULL) {
-                ERROR("TTF_RenderText_Blended_Wrapped\n");
-                break;   
-            }
-
-            texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
-            if (texture == NULL) {
-                ERROR("TTF_RenderText_Blended_Wrapped\n");
-                break;   
-            }
-
-            disp_pane_last = disp_pane;
-            surface_y = 0;
-        }
+        lines_per_display = sdl_win_height / 29;
 
         // clear display
-        if (white_text) {
-            SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        } else {
-            SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-        }
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(sdl_renderer);
 
-        // sanitize surface_y, this is the location of the text that is displayed
+        // sanitize text_y, this is the location of the text that is displayed
         // at the top of the display
-        if (surface->h - surface_y < disp_pane.h) {
-            surface_y = surface->h - disp_pane.h;
+        if (text_y > 29 * (max_texture - lines_per_display + 2)) {
+            text_y = 29 * (max_texture - lines_per_display + 2);
         }
-        if (surface_y < 0) {
-            surface_y = 0;
+        if (text_y < 0) {
+            text_y = 0;
         } 
 
         // display the text
-        srcrect.x = 0;
-        srcrect.y = surface_y;
-        srcrect.w = surface->w;
-        srcrect.h = surface->h - surface_y;
+        for (i = 0; ; i++) {
+            int32_t w,h;
 
-        dstrect.x = 0;
-        dstrect.y = 0;
-        dstrect.w = srcrect.w;
-        dstrect.h = srcrect.h;
+            if (i == max_texture) {
+                break;
+            }
 
-        SDL_RenderCopy(sdl_renderer, texture, &srcrect, &dstrect);
+            SDL_QueryTexture(texture[i], NULL, NULL, &w, &h);
+            dstrect.x = 0;
+            dstrect.y = i*29 - text_y;
+            dstrect.w = w;
+            dstrect.h = h;
+
+            if (dstrect.y + dstrect.h < 0) {
+                continue;
+            }
+            if (dstrect.y >= sdl_win_height) {
+                break;
+            }
+
+            SDL_RenderCopy(sdl_renderer, texture[i], NULL, &dstrect);
+        }
 
         // display controls 
+        sdl_render_text_font0(&disp_pane, 
+                              0, SDL_PANE_COLS(&disp_pane,0)-5, 
+                              "HOME", SDL_EVENT_KEY_HOME);
+        sdl_render_text_font0(&disp_pane, 
+                              2, SDL_PANE_COLS(&disp_pane,0)-5, 
+                              "END", SDL_EVENT_KEY_END);
+        sdl_render_text_font0(&disp_pane, 
+                              4, SDL_PANE_COLS(&disp_pane,0)-5, 
+                              "PGUP", SDL_EVENT_KEY_PGUP);
+        sdl_render_text_font0(&disp_pane, 
+                              6, SDL_PANE_COLS(&disp_pane,0)-5, 
+                              "PGDN", SDL_EVENT_KEY_PGDN);
         sdl_render_text_font0(&disp_pane, 
                               SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
@@ -881,10 +902,26 @@ void sdl_display_text(char * text)
         event = sdl_poll_event();
         switch (event->event) {
         case SDL_EVENT_MOUSE_MOTION:
-            surface_y -= event->mouse_motion.delta_y;
+            text_y -= event->mouse_motion.delta_y;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            surface_y -= event->mouse_wheel.delta_y * 2 * sdl_font[2].char_height;
+            text_y -= event->mouse_wheel.delta_y * 2 * 29;
+            break;
+        case SDL_EVENT_KEY_HOME:
+            sdl_play_event_sound();
+            text_y = 0;
+            break;
+        case SDL_EVENT_KEY_END:
+            sdl_play_event_sound();
+            text_y = INT_MAX;
+            break;
+        case SDL_EVENT_KEY_PGUP:
+            sdl_play_event_sound();
+            text_y -= (lines_per_display - 2) * 29;
+            break;
+        case SDL_EVENT_KEY_PGDN:
+            sdl_play_event_sound();
+            text_y += (lines_per_display - 2) * 29;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
@@ -893,73 +930,165 @@ void sdl_display_text(char * text)
         }
     }
 
-    if (texture) {
-        SDL_DestroyTexture(texture);
-        texture = NULL;
-    }
-    if (surface) {
-        SDL_FreeSurface(surface);
-        surface = NULL;
+    // free allocations
+    for (i = 0; i < max_texture; i++) {
+        SDL_DestroyTexture(texture[i]);
     }
 }
 
 void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max_choice, int32_t * selection)
 {
-    SDL_Rect       title_line_pane;
-    SDL_Rect       selection_pane;
-    int32_t        title_line_pane_height, i;
+    SDL_Texture  * title_texture;
+    SDL_Texture  * texture[3000];  // XXX malloc/free
+    SDL_Color      fg_color_title = {255,255,255,255}; 
+    SDL_Color      fg_color_choice = {0,255,255,255};
+    SDL_Color      bg_color = {0,0,0,255}; 
+    SDL_Rect       disp_pane;
+    SDL_Surface  * surface;
     sdl_event_t  * event;
+    int32_t        i;
+    int32_t        lines_per_display;
+    int32_t        text_y = 0;
+    bool           done = false;
 
-    // XXX needs scroll up/down
+    INFO("MAX_CHOICE %d\n", max_choice);
+    INFO("FONT HEIGHTS %d %d %d\n",
+        sdl_font[0].char_height, sdl_font[1].char_height, sdl_font[2].char_height);
 
     // preset return
     *selection = -1;
 
+    // create texture for title
+    surface = TTF_RenderText_Shaded(sdl_font[0].font, title_str, fg_color_title, bg_color);
+    title_texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
+    SDL_FreeSurface(surface);
+
+    // create textures for each choice string
+    for (i = 0; i < max_choice; i++) {
+        surface = TTF_RenderText_Shaded(sdl_font[0].font, choice[i], fg_color_choice, bg_color);
+        texture[i] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
+        SDL_FreeSurface(surface);
+    }
+
     // loop until selection made, or aborted
-    while (true) {
+    while (!done) {
         // short delay
         usleep(5000);
 
-        // this display has 2 panes
-        // - title_line_pane: the top 2 lines
-        // - selection_pane: the remainder
-        title_line_pane_height = sdl_font[0].char_height * 2;
-        SDL_INIT_PANE(title_line_pane, 
-                      0, 0,  
-                      sdl_win_width, title_line_pane_height);
-        SDL_INIT_PANE(selection_pane, 
-                      0, title_line_pane_height,
-                      sdl_win_width, sdl_win_height - title_line_pane_height);
+        // init disp_pane and event 
+        SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
         sdl_event_init();
+        lines_per_display = (sdl_win_height - 2*43) / 43;
 
         // clear window
         SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(sdl_renderer);
 
-        // render the title line and selection lines, and 'back' button
-        sdl_render_text_font0(&title_line_pane, 0, 0, title_str, SDL_EVENT_NONE);
-
-        for (i = 0; i < max_choice; i++) {
-            sdl_render_text_font0(&selection_pane, 2*i, 0, choice[i], SDL_EVENT_USER_START+i+1);
+        // sanitize text_y, this is the location of the text that is displayed
+        // at the top of the display
+        if (text_y > 43 * (2*(max_choice+1)-1 - lines_per_display+2)) {
+            text_y = 43 * (2*(max_choice+1)-1 - lines_per_display+2);
+        }
+        if (text_y < 0) {
+            text_y = 0;
         }
 
-        sdl_render_text_font0(&selection_pane, 
-                              SDL_PANE_ROWS(&selection_pane,0)-1, SDL_PANE_COLS(&selection_pane,0)-5, 
+        // display the title and choices, and register for choices events
+        for (i = 0; ; i++) {
+            int32_t w,h;
+            SDL_Rect dstrect;
+            SDL_Texture * t;
+
+            if (i == max_choice+1) {
+                break;
+            }
+
+            t = (i == 0 ? title_texture : texture[i-1]);
+
+            SDL_QueryTexture(t, NULL, NULL, &w, &h);
+            dstrect.x = 0;
+            dstrect.y = i * 2 * 43 - text_y;
+            dstrect.w = w;
+            dstrect.h = h;
+
+            if (dstrect.y + dstrect.h < 0) {
+                continue;
+            }
+            if (dstrect.y >= sdl_win_height) {
+                break;
+            }
+
+            SDL_RenderCopy(sdl_renderer, t, NULL, &dstrect);
+
+            if (i >= 1) {
+                sdl_event_register(SDL_EVENT_LIST_CHOICE+i-1, SDL_EVENT_TYPE_TEXT, &dstrect);
+            }
+        }
+
+        // display controls 
+        if (2*(max_choice+1)-1 > lines_per_display) {
+            sdl_render_text_font0(&disp_pane, 
+                                0, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "HOME", SDL_EVENT_KEY_HOME);
+            sdl_render_text_font0(&disp_pane, 
+                                2, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "END", SDL_EVENT_KEY_END);
+            sdl_render_text_font0(&disp_pane, 
+                                4, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "PGUP", SDL_EVENT_KEY_PGUP);
+            sdl_render_text_font0(&disp_pane, 
+                                6, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "PGDN", SDL_EVENT_KEY_PGDN);
+        }
+        sdl_render_text_font0(&disp_pane, 
+                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
+        sdl_event_register(SDL_EVENT_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &disp_pane);
+        sdl_event_register(SDL_EVENT_MOUSE_WHEEL, SDL_EVENT_TYPE_MOUSE_WHEEL, &disp_pane);
 
         // present the display
         SDL_RenderPresent(sdl_renderer);
 
-        // handle events
+        // wait for event
         event = sdl_poll_event();
-        if (event->event >= SDL_EVENT_USER_START+1 && event->event < SDL_EVENT_USER_START+max_choice+1) {
+        switch (event->event) {
+        case SDL_EVENT_LIST_CHOICE ... SDL_EVENT_LIST_CHOICE+39:
             sdl_play_event_sound();
-            *selection = event->event - SDL_EVENT_USER_START - 1;
+            *selection = event->event - SDL_EVENT_LIST_CHOICE;
+            done = true;
             break;
-        } else if (event->event == SDL_EVENT_BACK || event->event == SDL_EVENT_QUIT) {
+        case SDL_EVENT_MOUSE_MOTION:
+            text_y -= event->mouse_motion.delta_y;
+            break;
+        case SDL_EVENT_MOUSE_WHEEL:
+            text_y -= event->mouse_wheel.delta_y * 2 * 43;
+            break;
+        case SDL_EVENT_KEY_HOME:
             sdl_play_event_sound();
+            text_y = 0;
             break;
+        case SDL_EVENT_KEY_END:
+            sdl_play_event_sound();
+            text_y = INT_MAX;
+            break;
+        case SDL_EVENT_KEY_PGUP:
+            sdl_play_event_sound();
+            text_y -= (lines_per_display - 2) * 43;
+            break;
+        case SDL_EVENT_KEY_PGDN:
+            sdl_play_event_sound();
+            text_y += (lines_per_display - 2) * 43;
+            break;
+        case SDL_EVENT_BACK:
+        case SDL_EVENT_QUIT: 
+            sdl_play_event_sound();
+            done = true;
         }
+    }
+
+    // free allocations
+    for (i = 0; i < max_choice; i++) {
+        SDL_DestroyTexture(texture[i]);
     }
 }
 

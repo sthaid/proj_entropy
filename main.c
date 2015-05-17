@@ -59,8 +59,10 @@ int32_t main(int32_t argc, char **argv)
     // XXX ABOUT / copyright
 
     // exit 
+#if 0
     // XXX core dump here, argv corrupt
     PRINTF("XXX ARGV[0] %p\n", argv[0]);
+#endif
     INFO("TERMINATING %s\n", argv[0]);
     sdl_terminate();
     return 0;

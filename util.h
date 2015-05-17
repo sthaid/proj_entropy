@@ -78,14 +78,29 @@ sdl_font_t sdl_font[SDL_MAX_FONT];
     } while (0)
 
 // events
-#define SDL_EVENT_NONE              0
-#define SDL_EVENT_QUIT              1
-#define SDL_EVENT_WIN_SIZE_CHANGE   2
-#define SDL_EVENT_WIN_MINIMIZED     3
-#define SDL_EVENT_WIN_RESTORED      4
-#define SDL_EVENT_USER_START        10  
-#define SDL_EVENT_USER_END          255
-#define SDL_EVENT_MAX               256 
+// - no event
+#define SDL_EVENT_NONE            0
+// - ascii events 
+#define SDL_EVENT_KEY_BS          8
+#define SDL_EVENT_KEY_TAB         9
+#define SDL_EVENT_KEY_ENTER       13
+#define SDL_EVENT_KEY_ESC         27
+// - special keys
+#define SDL_EVENT_KEY_HOME        130
+#define SDL_EVENT_KEY_END         131
+#define SDL_EVENT_KEY_PGUP        132
+#define SDL_EVENT_KEY_PGDN        133
+// - window
+#define SDL_EVENT_WIN_SIZE_CHANGE 140
+#define SDL_EVENT_WIN_MINIMIZED   141
+#define SDL_EVENT_WIN_RESTORED    142
+// - quit
+#define SDL_EVENT_QUIT            150
+// - available to be defined by users
+#define SDL_EVENT_USER_START      160  
+#define SDL_EVENT_USER_END        255
+// - max event
+#define SDL_EVENT_MAX             256 
 
 // event types
 #define SDL_EVENT_TYPE_NONE         0
