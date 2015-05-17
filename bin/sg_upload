@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+  echo "Filename expected."
+  exit
+fi
+
+echo "Uploading $1."
+curl  -s --upload-file $1 http://wikiscience101.sthaid.org/public/sim_gravity/

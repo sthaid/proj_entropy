@@ -1,0 +1,3 @@
+#!/bin/bash
+
+curl  -s http://wikiscience101.sthaid.org/public/sim_gravity/ | grep "^<a href="

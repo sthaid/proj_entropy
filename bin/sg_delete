@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+  echo "Filename expected"
+  exit
+fi
+
+read -p "About to delete $1, proceed (y/n)? " yn
+if [ "$yn" != "y" ]
+then
+  exit
+fi
+
+echo "Deleting $1."
+curl  -s -X DELETE http://wikiscience101.sthaid.org/public/sim_gravity/$1
