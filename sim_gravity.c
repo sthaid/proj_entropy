@@ -1,18 +1,19 @@
+
 // XXX fix 3 body problem
+// XXX reset rate display
+// XXX rate display units
+// XXX document solar system file
+// XXX clean up this file
 
 
 // XXX flicker in path display
-
 // XXX display error if bad file
-
 // XXX add more files ...
 //      - globular cluster
 //      -  add more moons, on jupiter
 // XXX put some files on cloud
-
 // XXX run on android
 // XXX different dt values for androoid
-
 // XXX hover on planet to diplay name
 
 
