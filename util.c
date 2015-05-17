@@ -826,9 +826,6 @@ void sdl_display_text(char * text)
 
         surface = TTF_RenderText_Shaded(sdl_font[2].font, line, fg_color, bg_color);
         texture[max_texture++] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
-        if (texture[max_texture-1] == NULL) {
-            ERROR("SDL_CreateTextureFromSurface, %s\n", SDL_GetError());
-        }
         SDL_FreeSurface(surface);
     }
 
@@ -962,10 +959,6 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
     surface = TTF_RenderText_Shaded(sdl_font[0].font, title_str, fg_color_title, bg_color);
     title_texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
     SDL_FreeSurface(surface);
-    if (title_texture == NULL) {
-        ERROR("SDL_CreateTextureFromSurface title_texture, %s\n", SDL_GetError());
-        goto done;
-    }
 
     // create textures for each choice string
     texture = calloc(max_choice, sizeof(void*));
@@ -977,10 +970,6 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         surface = TTF_RenderText_Shaded(sdl_font[0].font, choice[i], fg_color_choice, bg_color);
         texture[i] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
         SDL_FreeSurface(surface);
-        if (texture[i] == NULL) {
-            ERROR("SDL_CreateTextureFromSurface i=%d, %s\n", i, SDL_GetError());
-            goto done;
-        }
     }
 
     // loop until selection made, or aborted
