@@ -637,7 +637,7 @@ void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture)
 
 void sdl_display_get_string(int32_t count, ...)
 {
-    char        * prompt_str[10];  //xxx why 10
+    char        * prompt_str[10]; 
     char        * curr_str[10];
     char        * ret_str[10];
 
@@ -794,6 +794,7 @@ void sdl_display_text(char * text)
     int32_t        max_texture = 0;
     int32_t        max_texture_alloced = 0;
     int32_t        text_y = 0;
+    int32_t        pixels_per_row = sdl_font[2].char_height + 2;
 
     // create a texture for each line of text
     //
@@ -839,7 +840,7 @@ void sdl_display_text(char * text)
         // init disp_pane and event 
         SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
         sdl_event_init();
-        lines_per_display = sdl_win_height / 29;
+        lines_per_display = sdl_win_height / pixels_per_row;
 
         // clear display
         SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -847,8 +848,8 @@ void sdl_display_text(char * text)
 
         // sanitize text_y, this is the location of the text that is displayed
         // at the top of the display
-        if (text_y > 29 * (max_texture - lines_per_display + 2)) {
-            text_y = 29 * (max_texture - lines_per_display + 2);
+        if (text_y > pixels_per_row * (max_texture - lines_per_display + 2)) {
+            text_y = pixels_per_row * (max_texture - lines_per_display + 2);
         }
         if (text_y < 0) {
             text_y = 0;
@@ -864,7 +865,7 @@ void sdl_display_text(char * text)
 
             SDL_QueryTexture(texture[i], NULL, NULL, &w, &h);
             dstrect.x = 0;
-            dstrect.y = i*29 - text_y;
+            dstrect.y = i*pixels_per_row - text_y;
             dstrect.w = w;
             dstrect.h = h;
 
@@ -900,14 +901,14 @@ void sdl_display_text(char * text)
         // present the display
         SDL_RenderPresent(sdl_renderer);
 
-        // wait for event
+        // check for event
         event = sdl_poll_event();
         switch (event->event) {
         case SDL_EVENT_MOUSE_MOTION:
             text_y -= event->mouse_motion.delta_y;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            text_y -= event->mouse_wheel.delta_y * 2 * 29;
+            text_y -= event->mouse_wheel.delta_y * 2 * pixels_per_row;
             break;
         case SDL_EVENT_KEY_HOME:
             sdl_play_event_sound();
@@ -919,11 +920,11 @@ void sdl_display_text(char * text)
             break;
         case SDL_EVENT_KEY_PGUP:
             sdl_play_event_sound();
-            text_y -= (lines_per_display - 2) * 29;
+            text_y -= (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_KEY_PGDN:
             sdl_play_event_sound();
-            text_y += (lines_per_display - 2) * 29;
+            text_y += (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
@@ -952,8 +953,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
     int32_t        lines_per_display;
     int32_t        text_y = 0;
     bool           done = false;
-
-// XXX 43
+    int32_t        pixels_per_row = sdl_font[0].char_height + 2;
 
     // preset return
     *selection = -1;
@@ -991,7 +991,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         // init disp_pane and event 
         SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
         sdl_event_init();
-        lines_per_display = (sdl_win_height - 2*43) / 43;
+        lines_per_display = (sdl_win_height - 2*pixels_per_row) / pixels_per_row;
 
         // clear window
         SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -999,8 +999,8 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
 
         // sanitize text_y, this is the location of the text that is displayed
         // at the top of the display
-        if (text_y > 43 * (2*(max_choice+1)-1 - lines_per_display+2)) {
-            text_y = 43 * (2*(max_choice+1)-1 - lines_per_display+2);
+        if (text_y > pixels_per_row * (2*(max_choice+1)-1 - lines_per_display+2)) {
+            text_y = pixels_per_row * (2*(max_choice+1)-1 - lines_per_display+2);
         }
         if (text_y < 0) {
             text_y = 0;
@@ -1020,7 +1020,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
 
             SDL_QueryTexture(t, NULL, NULL, &w, &h);
             dstrect.x = 0;
-            dstrect.y = i * 2 * 43 - text_y;
+            dstrect.y = i * 2 * pixels_per_row - text_y;
             dstrect.w = w;
             dstrect.h = h;
 
@@ -1062,7 +1062,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         // present the display
         SDL_RenderPresent(sdl_renderer);
 
-        // wait for event
+        // check for event
         event = sdl_poll_event();
         switch (event->event) {
         case SDL_EVENT_LIST_CHOICE ... SDL_EVENT_LIST_CHOICE+39:
@@ -1074,7 +1074,7 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
             text_y -= event->mouse_motion.delta_y;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            text_y -= event->mouse_wheel.delta_y * 2 * 43;
+            text_y -= event->mouse_wheel.delta_y * 2 * pixels_per_row;
             break;
         case SDL_EVENT_KEY_HOME:
             sdl_play_event_sound();
@@ -1086,11 +1086,11 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
             break;
         case SDL_EVENT_KEY_PGUP:
             sdl_play_event_sound();
-            text_y -= (lines_per_display - 2) * 43;
+            text_y -= (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_KEY_PGDN:
             sdl_play_event_sound();
-            text_y += (lines_per_display - 2) * 43;
+            text_y += (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 

@@ -1,4 +1,5 @@
 // XXX review this
+// XXX line widhts
 static char sim_universe_help[] = "\
 OVERVIEW\n\
 --------\n\
