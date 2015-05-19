@@ -1,11 +1,12 @@
 
 // XXX display error if bad file
-// XXX fix 3 body problem
 // XXX document solar system file
-// XXX clean up this file
 // XXX gravity boost
 // XXX different dt values for androoid
-// XXX path length display
+
+// MAYBE OK
+//   fix 3 body problem
+// - clean up this file
 
 // DONE
 // - use different colors for planets
@@ -24,6 +25,7 @@
 // - rate display units
 // - put some files on cloud
 // - flicker in path display
+// - path length display
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -740,7 +742,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             point_count = 0;
             while (true) {
                 if (path_idx < path_tail - MAX_PATH + 10) {
-                    INFO("XXXXXXXXXXXXXXXXXXXXXXXXXXX %d %d %d\n", path_max, path_count, point_count);
                     if (point_count > 0) {
                         point_count--;
                     }
@@ -846,7 +847,28 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         if (path_disp_days == 0) {
             sdl_render_text_font0(&ctl_pane, 13, 0, "PATH OFF", SDL_EVENT_NONE);
         } else if (path_disp_days < 0) {
-            sdl_render_text_font0(&ctl_pane, 13, 0, "PATH DEFAULT", SDL_EVENT_NONE);
+            if (sim.max_object == 0) {
+                sdl_render_text_font0(&ctl_pane, 13, 0, "PATH UNKNOWN", SDL_EVENT_NONE);
+            } else {
+                int32_t days = sim.object[0]->MAX_PATH_DISP_DFLT;
+                bool    varies = false;
+                for (i = 1; i < sim.max_object; i++) {
+                    if (sim.object[i]->MAX_PATH_DISP_DFLT != days) {
+                        varies = true;
+                        break;
+                    }
+                }
+                if (varies) {
+                    sdl_render_text_font0(&ctl_pane, 13, 0, "PATH VARIES", SDL_EVENT_NONE);
+                } else {
+                    if (days < 365.25) {
+                        sprintf(str, "PATH %0.2lf YEARS", days/365.25);
+                    } else {
+                        sprintf(str, "PATH %0.0lf YEARS", days/365.25);
+                    }
+                    sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
+                }
+            }
         } else {
             if (path_disp_days < 365.25) {
                 sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
