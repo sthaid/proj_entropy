@@ -1,11 +1,11 @@
 #include "util.h"
 
-// #define SELECTION 2
+#define SELECTION 1
 
 #ifndef SELECTION
 static char * choices[] = {
                 "Expanding Gas in a Container",
-                "Gravity in our Solar System and more",
+                "Gravity Simulation",         
                 "Our Expanding Universe",
                         };
 #endif
