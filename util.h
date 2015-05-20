@@ -176,6 +176,7 @@ void sdl_render_circle(int32_t x, int32_t y, SDL_Texture * circle_texture);
 void sdl_display_get_string(int32_t count, ...);
 void sdl_display_text(char * text);
 void sdl_display_choose_from_list(char * title_str, char ** choices, int32_t max_choices, int32_t * selection);
+void sdl_display_error(char * err_str0, char * err_str1, char * err_str2);
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  --------------------------------
 

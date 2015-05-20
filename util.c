@@ -877,6 +877,7 @@ void sdl_display_text(char * text)
         }
 
         // display controls 
+// XXX don't if short
         sdl_render_text_font0(&disp_pane, 
                               0, SDL_PANE_COLS(&disp_pane,0)-5, 
                               "HOME", SDL_EVENT_KEY_HOME);
@@ -1099,6 +1100,55 @@ done:
         }
     }
     free(texture);
+}
+
+void sdl_display_error(char * err_str0, char * err_str1, char * err_str2)
+{
+    SDL_Rect      disp_pane;
+    sdl_event_t * event;
+    int32_t       row, col;
+    bool          done = false;
+
+    // loop until done
+    while (!done) {
+        // short delay
+        usleep(5000);
+
+        // init disp_pane and event 
+        SDL_INIT_PANE(disp_pane, 0, 0, sdl_win_width, sdl_win_height);
+        sdl_event_init();
+
+        // clear display
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(sdl_renderer);
+
+        // display the error strings
+        row = SDL_PANE_ROWS(&disp_pane,0) / 2 - 2;
+        if (row < 0) {
+            row = 0;
+        }
+        col = 0;
+        sdl_render_text_ex(&disp_pane, row,   col, err_str0, SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        sdl_render_text_ex(&disp_pane, row+1, col, err_str1, SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        sdl_render_text_ex(&disp_pane, row+2, col, err_str2, SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
+
+        // display controls 
+        sdl_render_text_font0(&disp_pane, 
+                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
+                              "BACK", SDL_EVENT_BACK);
+
+        // present the display
+        SDL_RenderPresent(sdl_renderer);
+
+        // check for event
+        event = sdl_poll_event();
+        switch (event->event) {
+        case SDL_EVENT_BACK:
+        case SDL_EVENT_QUIT: 
+            sdl_play_event_sound();
+            done = true;
+        }
+    }
 }
 
 // -----------------  PTHREAD ADDITIONS FOR ANDROID  ---------------------

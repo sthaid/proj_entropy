@@ -104,12 +104,12 @@
      (s) == STATE_RUN               ? "RUN"               : \
      (s) == STATE_TERMINATE_THREADS ? "TERMINATE_THREADS"   \
                                     : "????")
-#define DISPLAY_NONE         0
 #define DISPLAY_TERMINATE    1
 #define DISPLAY_SIMULATION   2
 #define DISPLAY_SELECT_LOCAL 3
 #define DISPLAY_SELECT_CLOUD 4
 #define DISPLAY_HELP         5
+#define DISPLAY_ERROR        6
 
 #define MAX_VALID_DT (sizeof(valid_dt)/sizeof(valid_dt[0]))
 #define MAX_VALID_SIM_WIDTH (sizeof(valid_sim_width)/sizeof(valid_sim_width[0]))
@@ -173,6 +173,8 @@ static pthread_t    thread_id[MAX_THREAD];
 static double       path_disp_days = -1;
 static volatile int64_t path_tail;
 
+static char          error_str[3][200];
+
 static const int32_t valid_dt[] = {
                         1,2,3,4,5,6,7,8,9,
                         10,20,30,40,50,
@@ -203,6 +205,7 @@ void sim_gravity_display(void);
 int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_display);
 int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display);
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display);
+int32_t sim_gravity_display_error(int32_t curr_display, int32_t last_display);
 void * sim_gravity_thread(void * cx);
 int32_t sim_gravity_barrier(int32_t thread_id);
 
@@ -210,6 +213,7 @@ int32_t sim_gravity_barrier(int32_t thread_id);
 
 void sim_gravity(void) 
 {
+    //XXX errro
     sim_gravity_init(DEFAULT_SIM_GRAVITY_PATHNAME);
 
     sim_gravity_display();
@@ -219,7 +223,7 @@ void sim_gravity(void)
 
 // -----------------  INIT & TERMINATE  -----------------------------------------
 
-int32_t sim_gravity_init(char * pathname) 
+int32_t sim_gravity_init(char * pathname)
 {
     #define MAX_RELTO 100
 
@@ -256,6 +260,11 @@ int32_t sim_gravity_init(char * pathname)
     // print info msg
     INFO("initialize start, pathname %s\n", pathname);
 
+    // clear error strings
+    error_str[0][0] = '\0';
+    error_str[1][0] = '\0';
+    error_str[2][0] = '\0';
+
     // terminate threads
     state = STATE_TERMINATE_THREADS;
     for (i = 0; i < max_thread; i++) {
@@ -283,7 +292,8 @@ int32_t sim_gravity_init(char * pathname)
     // open pathname
     file = open_file(pathname);
     if (file == NULL) {
-        ERROR("open_file %s\n", pathname);
+        sprintf(error_str[0], "Open Failed");
+        sprintf(error_str[1], "%s", pathname);
         ret = -1;
         goto done;
     }
@@ -310,7 +320,9 @@ int32_t sim_gravity_init(char * pathname)
             double param_value;
 
             if (sscanf(s+6, "%s %lf %s", param_name, &param_value, param_units) != 3) {
-                ERROR("param line %d invalid in %s\n", line, pathname);
+                sprintf(error_str[0], "Invalid Parameter");
+                sprintf(error_str[1], "%s", pathname);
+                sprintf(error_str[2], "line %d", line);
                 ret = -1;
                 goto done;
             }
@@ -339,7 +351,9 @@ int32_t sim_gravity_init(char * pathname)
                     new_dt = valid_dt[0];
                 }
             } else {
-                ERROR("param line %d invalid in %s\n", line, pathname);
+                sprintf(error_str[0], "Invalid Parameter");
+                sprintf(error_str[1], "%s", pathname);
+                sprintf(error_str[2], "line %d", line);
                 ret = -1;
                 goto done;
             }
@@ -350,7 +364,9 @@ int32_t sim_gravity_init(char * pathname)
         cnt = sscanf(s, "%s %lf %lf %lf %lf %lf %lf %s %d",
                      NAME, &X, &Y, &VX, &VY, &MASS, &RADIUS, COLOR, &MAX_PATH_DISP_DFLT);
         if (cnt != 9) {
-            ERROR("line %d invalid in file %s\n", line, pathname);
+            sprintf(error_str[0], "Invalid Object");
+            sprintf(error_str[1], "%s", pathname);
+            sprintf(error_str[2], "line %d", line);
             ret = -1;
             goto done;
         }
@@ -366,7 +382,9 @@ int32_t sim_gravity_init(char * pathname)
         for (idx = 0; s[idx] == ' '; idx++) ;
         idx++;
         if (idx > last_idx+1) {
-            ERROR("invalid idx %d, last_idx=%d line=%d\n", idx, last_idx, line);
+            sprintf(error_str[0], "Invalid Indent");
+            sprintf(error_str[1], "%s", pathname);
+            sprintf(error_str[2], "line %d", line);
             ret = -1;
             goto done;
         }
@@ -375,7 +393,9 @@ int32_t sim_gravity_init(char * pathname)
         // initialize obj, note DISP_R field is initialized by call to sim_gravity_set_obj_disp_r below
         object_t * obj = calloc(1,sizeof(object_t));
         if (obj == NULL) {
-            ERROR("calloc obj failed, size %d\n", (int32_t)sizeof(object_t));
+            sprintf(error_str[0], "Out Of Memory");
+            sprintf(error_str[1], "%s", pathname);
+            sprintf(error_str[2], "line %d", line);
             ret = -1;
             goto done;
         }
@@ -479,7 +499,11 @@ done:
     }
 
     // success
-    INFO("initialize complete, ret=%d\n", ret);
+    if (ret == 0) {
+        INFO("initialize successful\n");
+    } else {
+        ERROR("%s '%s' '%s'\n", error_str[0], error_str[1], error_str[2]);  
+    }
     return ret;
 }
 
@@ -588,9 +612,11 @@ void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
 
 void sim_gravity_display(void)
 {
-    int32_t last_display = DISPLAY_NONE;
-    int32_t curr_display = DISPLAY_SIMULATION;
-    int32_t next_display = DISPLAY_SIMULATION;
+    int32_t last_display, curr_display, next_display;
+
+    last_display = DISPLAY_SIMULATION;
+    next_display = DISPLAY_SIMULATION;
+    curr_display = ((strlen(error_str[0]) > 0) ? DISPLAY_ERROR : DISPLAY_SIMULATION);
 
     while (true) {
         switch (curr_display) {
@@ -603,6 +629,9 @@ void sim_gravity_display(void)
             break;
         case DISPLAY_HELP:         
             next_display = sim_gravity_display_help(curr_display, last_display);
+            break;
+        case DISPLAY_ERROR:         
+            next_display = sim_gravity_display_error(curr_display, last_display);
             break;
         }
 
@@ -1084,14 +1113,18 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
     // if a selction has been made then call sim_gravity_init to initialize 
     // the simulation from the selected pathname
     if (selection != -1) {
-        sim_gravity_init(pathname[selection]);
+        int32_t ret = sim_gravity_init(pathname[selection]);
+        if (ret != 0) {
+            list_files_free(max_pathname, pathname);
+            return DISPLAY_ERROR;
+        }
     }
 
     // free the file list
     list_files_free(max_pathname, pathname);
 
     // return next_display
-    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
+    return DISPLAY_SIMULATION;
 }
 
 int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
@@ -1100,7 +1133,21 @@ int32_t sim_gravity_display_help(int32_t curr_display, int32_t last_display)
     sdl_display_text(sim_gravity_help);
 
     // return next_display
-    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
+    return DISPLAY_SIMULATION;
+}
+
+int32_t sim_gravity_display_error(int32_t curr_display, int32_t last_display)
+{
+    // display the error
+    sdl_display_error(error_str[0], error_str[1], error_str[2]);
+
+    // clear error strings
+    error_str[0][0] = '\0';
+    error_str[1][0] = '\0';
+    error_str[2][0] = '\0';
+
+    // go back to last display
+    return last_display;
 }
 
 // -----------------  THREAD  ---------------------------------------------------
