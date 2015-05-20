@@ -1,6 +1,6 @@
 #include "util.h"
 
-#define SELECTION 1
+// #define SELECTION 1
 
 #ifndef SELECTION
 static char * choices[] = {

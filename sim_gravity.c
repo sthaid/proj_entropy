@@ -1,8 +1,7 @@
-
-// XXX display error if bad file
-// XXX document solar system file
 // XXX gravity boost
 // XXX different dt values for androoid
+// XXX don't display text controls if just one page
+// XXX error message w/o curl installed
 
 // MAYBE OK
 //   fix 3 body problem
@@ -26,6 +25,8 @@
 // - put some files on cloud
 // - flicker in path display
 // - path length display
+// - display error if bad file
+// - document solar system file
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -1083,7 +1084,7 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
 {
     char  * location;
     char  * title;
-    int32_t selection, i;
+    int32_t selection, i, ret;
     char    temp_str[PATH_MAX];
     char ** pathname = NULL;
     int32_t max_pathname = 0;
@@ -1097,7 +1098,20 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
                 : "SIM GRAVITY - CLOUD SELECTIONS");
 
     // obtain list of files from the appropriate location
-    list_files(location, &max_pathname, &pathname);
+    ret = list_files(location, &max_pathname, &pathname);
+
+    // if failed then display error
+    if (ret < 0) {
+        sprintf(error_str[0], "List Files Failed");
+        sprintf(error_str[1], "%s", location);
+        error_str[2][0] = '\0';
+#ifndef ANDROID
+        if (curr_display != DISPLAY_SELECT_LOCAL) {
+            sprintf(error_str[2], "verify curl is installed");
+        }
+#endif
+        return DISPLAY_ERROR;
+    }
 
     // bring up display to choose 
     char * basenames[max_pathname];
@@ -1147,7 +1161,7 @@ int32_t sim_gravity_display_error(int32_t curr_display, int32_t last_display)
     error_str[2][0] = '\0';
 
     // go back to last display
-    return last_display;
+    return DISPLAY_SIMULATION;
 }
 
 // -----------------  THREAD  ---------------------------------------------------

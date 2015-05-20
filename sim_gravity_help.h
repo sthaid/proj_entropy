@@ -41,7 +41,7 @@ CONFIG FILES\n\
 ------------\n\
 \n\
 Config files provide the initial conditions for the simulation. The \n\
-config files can be stored locally or on the cloud. \n\
+config files can be stored locally or in the cloud. \n\
 \n\
 The location of Local config files is:\n\
   Linux Version:    ./sim_gravity\n\

@@ -1591,26 +1591,37 @@ typedef struct {
     size_t offset;
 } File_t;
 
-static void list_local_files(char * location, int32_t * max, char *** pathnames);
-static void list_cloud_files(char * location, int32_t * max, char *** pathnames);
+static int32_t list_local_files(char * location, int32_t * max, char *** pathnames);
+static int32_t list_cloud_files(char * location, int32_t * max, char *** pathnames);
 static void list_files_sort(char ** pathnames, int32_t max);
 
-void list_files(char * location, int32_t * max, char *** pathnames)
+int32_t list_files(char * location, int32_t * max, char *** pathnames)
 {
+    int32_t ret;
+
     if (location[strlen(location)-1] != '/') {
         ERROR("invalid location '%s'\n", location);
         *max = 0;
         *pathnames = NULL;
-        return;
+        return -1;
     }
 
     if (strncmp(location, "http://", 7) != 0) {
-        list_local_files(location, max, pathnames);
+        ret = list_local_files(location, max, pathnames);
     } else {
-        list_cloud_files(location, max, pathnames);
+        ret = list_cloud_files(location, max, pathnames);
+    }
+
+    if (ret != 0) {
+        list_files_free(*max, *pathnames);
+        *max = 0;
+        *pathnames = NULL;
+        return ret;
     }
 
     list_files_sort(*pathnames, *max);
+
+    return 0;
 }
 
 void list_files_free(int32_t max, char ** pathnames)
@@ -1624,7 +1635,7 @@ void list_files_free(int32_t max, char ** pathnames)
 
 void * open_file(char * pathname)
 {
-    #define MAX_BUFF  1000000 
+    #define MAX_BUFF  1000000  //xxx check for overflow
 
     File_t * F = NULL;
     void   * buff;
@@ -1655,7 +1666,6 @@ void * open_file(char * pathname)
         size_t offset;
         FILE * fp;
 
-        // xxx check for overun of buff
         sprintf(cmd, "curl %s 2>/dev/null", pathname); 
         fp = popen(cmd, "r");
         if (fp == NULL) {
@@ -1717,21 +1727,33 @@ void close_file(file_t * f)
     free(F);
 }
 
-static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
+static int32_t list_cloud_files(char * location, int32_t * max, char *** pathnames)
 {
-    FILE * fp;
-    char * fn, * tmp;
-    char   s[200];
-    char   cmd[200];
+    FILE  * fp;
+    char  * fn, * tmp;
+    char    s[200];
+    char    cmd[200];
+    int32_t ret = 0;
 
     *max = 0;
     *pathnames = calloc(1000,sizeof(char*)); //xxx, maybe realloc
+    if (*pathnames == NULL) {
+        ERROR("calloc\n");
+        return -1;
+    }
 
     sprintf(cmd, "curl %s 2>/dev/null", location);
     fp = popen(cmd, "r");
     if (fp == NULL) {
         ERROR("popen %s\n", cmd);
-        return;
+        return -1;
+    }
+
+    s[0] = '\0';
+    if (fgets(s, sizeof(s), fp) == NULL || strncmp(s, "<html>", 6) != 0) {
+        ERROR("invalid first line: %s\n", s);
+        fclose(fp);
+        return -1;
     }
 
     while (fgets(s, sizeof(s), fp) != NULL) {
@@ -1740,6 +1762,7 @@ static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
             tmp = strchr(fn, '\"');
             if (tmp == NULL) {
                 ERROR("no closing quote\n");
+                ret = -1;
                 break;
             }
             *tmp = '\0';
@@ -1751,10 +1774,11 @@ static void list_cloud_files(char * location, int32_t * max, char *** pathnames)
     }
 
     fclose(fp);
+    return ret;
 }
 
 #ifndef ANDROID
-static void list_local_files(char * location, int32_t * max, char *** pathnames)
+static int32_t list_local_files(char * location, int32_t * max, char *** pathnames)
 {
     DIR           * dir;
     struct dirent * dirent;
@@ -1764,10 +1788,14 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
 
     *max = 0;
     *pathnames = calloc(1000,sizeof(char*)); //xxx
+    if (*pathnames == NULL) {
+        ERROR("calloc\n");
+        return -1;
+    }
 
     dir = opendir(location);
     if (dir == NULL) {
-        return;
+        return -1;
     }
 
     while ((dirent = readdir(dir)) != NULL) {
@@ -1783,12 +1811,13 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     }
 
     closedir(dir);
+    return 0;
 }
 #else
 JNIEnv* Android_JNI_GetEnv(void);
 extern jclass mActivityClass;
 
-static void list_local_files(char * location, int32_t * max, char *** pathnames)
+static int32_t list_local_files(char * location, int32_t * max, char *** pathnames)
 {
     jmethodID       mid;
     jobject         context;
@@ -1804,7 +1833,11 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
     // src/core/android/SDL_android.c
 
     *max = 0;
-    *pathnames = calloc(1000,sizeof(char*)); //xxx
+    *pathnames = calloc(1000,sizeof(char*));
+    if (*pathnames == NULL) {
+        ERROR("calloc\n");
+        return -1;
+    }
 
     // xxx 
     (*mEnv)->PushLocalFrame(mEnv, 16);
@@ -1842,6 +1875,9 @@ static void list_local_files(char * location, int32_t * max, char *** pathnames)
 
     // xxx
     (*mEnv)->PopLocalFrame(mEnv, NULL);
+
+    // return success
+    return 0;
 }
 #endif
 

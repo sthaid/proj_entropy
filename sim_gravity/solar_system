@@ -1,14 +1,34 @@
 # SOLAR_SYSTEM
 
-# XXX Document format
+# Credit to NASA for the information below.
+# http://nssdc.gsfc.nasa.gov/planetary/factsheet/
 
-# units for SIM_WIDTH are 'AU' or '"LY"'
-# units for DT is SEC
+# 
+# PARAMETERS SECTION
+#
+# Units for SIM_WIDTH are 'AU' or '"LY"'.
+# Units for DT is SEC.
+#
 
 PARAM SIM_WIDTH 3.0 AU
 PARAM DT        10 SEC 
 
-#                                                               Min Orbital                                                     MAX_PATH_ XXX other files
+#
+# OBJECTS SECTION
+#
+# Units are MKS, except for MAX_PATH_DISP_DFLT which is in days.
+#
+# The indentation is part of the syntax. Indent is 1 space, and means that the 
+# position and velocity of the object being defined is relative to the prior 
+# object with one less indent.
+#
+# Objects being defined at indent level 0 are relative to the base X,Y 
+# coordinates.
+#
+# For example: the 'moon' X, Y, XV, YV are relative to the 'earth' position and velocity.
+#
+
+#                                                               Min Orbital                                                     MAX_PATH_ 
 #               Aphelion                                        Velocity                                                        DISP_DFLT
 # NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR           (days)
 

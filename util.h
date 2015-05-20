@@ -271,7 +271,7 @@ char * dur2str(char * str, int64_t duration);
 
 typedef void file_t;
 
-void list_files(char * location, int32_t * max, char *** pathnames);
+int32_t list_files(char * location, int32_t * max, char *** pathnames);
 void list_files_free(int32_t max, char ** pathnames);
 file_t * open_file(char * pathname);
 char * read_file_line(file_t * file);

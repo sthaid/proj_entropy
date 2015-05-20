@@ -8,7 +8,8 @@ This is a simulation of our expanding universe. The simulated universe \n\
 has the following characteristics:\n\
 - it is comprised of non interacting particles\n\
 - each particle is given an initial random velocity, which does not \n\
-  change - the radius of the universe increases with time, this causes \n\
+  change\n\
+- the radius of the universe increases with time, this causes \n\
   an additional apparent velocity which increases with distance.\n\
 \n\
 The vantage point is the center of the display. The color of a particle\n\

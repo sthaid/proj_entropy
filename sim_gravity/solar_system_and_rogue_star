@@ -6,9 +6,9 @@
 PARAM SIM_WIDTH 3.0 AU
 PARAM DT        5  SEC 
 
-#                                                               Min Orbital
-#               Aphelion                                        Velocity
-# NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR       MAX_PATH_DFLT (days)
+#                                                               Min Orbital                                                     MAX_PATH_ 
+#               Aphelion                                        Velocity                                                        DISP_DFLT
+# NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR           (days)
 
 sun             0               0               0               0               1989000E24      695800.0E3      YELLOW          45
  mercury        69.82E9         0               0               38.86E3         0.3301E24       2439.7E3        ORANGE          45
