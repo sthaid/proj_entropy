@@ -5,7 +5,7 @@
 
 PARAM SIM_WIDTH  3.0 AU
 PARAM DT_LINUX     1 SEC
-PARAM DT_ANDROID  10 SEC
+PARAM DT_ANDROID 120 SEC
 
 #                                                                                                                               MAX_PATH_ 
 #                                                                                                                               DISP_DFLT

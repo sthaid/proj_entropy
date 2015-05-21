@@ -8,8 +8,8 @@
 if [ "$1" != "" -a "$1" != clean ]
 then
   echo "usage:"
-  echo " $ setup"
-  echo " $ setup clean"
+  echo " $ setup-script"
+  echo " $ setup-script clean"
   exit
 fi
 

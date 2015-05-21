@@ -26,7 +26,11 @@
 #define DELTA_TIME                  100          // 100,000 years       units = 1,000 years 
 
 #define DEFAULT_DISPLAY_WIDTH       30000        // 3 billion LY        units = 100,000 LY
-#define DEFAULT_MAX_PARTICLE        100000       // 100,000         
+#ifndef ANDROID
+#define DEFAULT_MAX_PARTICLE        100000       // 100,000             Linux
+#else
+#define DEFAULT_MAX_PARTICLE        10000        // 10,000              Android
+#endif
 #define DEFAULT_INITIAL_TIME        1            // 1 thousand years    units = 1,000 years
 #define DEFAULT_INITIAL_AVG_SPEED   1000         // 0.1C                units = 0.0001 C
 
@@ -202,16 +206,12 @@ int32_t sim_universe_init(
     state = STATE_STOP;
 
     // create worker threads
-#ifndef ANDROID
     max_thread = sysconf(_SC_NPROCESSORS_ONLN) - 1;
     if (max_thread == 0) {
         max_thread = 1;
     } else if (max_thread > MAX_THREAD) {
         max_thread = MAX_THREAD;
     }
-#else
-    max_thread = 1;
-#endif
     INFO("max_thread=%dd\n", max_thread);
     for (i = 0; i < max_thread; i++) {
         pthread_create(&thread_id[i], NULL, sim_universe_thread, (void*)(long)i);
