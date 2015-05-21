@@ -89,6 +89,10 @@ the 3 body simulation is chaotic.\n\
 The solar_system simulation also contains Alpha Centauri. Find Alpha \n\
 Centauri by zooming out, drag display, zoom in.\n\
 \n\
+When running the solar_system simulation, zoom in on the sun, and\n\
+observe its small wobble. Observing the wobble of a star is one \n\
+technique used by astronomers to detect extrasolar planets.\n\
+\n\
 The solar_system_and_rogue_star simulates the impact that a close \n\
 approach of a rogue star would have on our solar system.\n\
 \n\
@@ -98,6 +102,6 @@ Observe the complicated paths the planets take from this perspective.\n\
 The loops are called Epicycles or Retrograde Motion.\n\
 \n\
 Using gravity_boost try tracking the large object. Notice the \n\
-similarities of the hyperbolic orbit of the all the small objects  \n\
+similarities of the hyperbolic orbit of all the small objects  \n\
 when viewed in the reference frame of the large obect.\n\
 ";
