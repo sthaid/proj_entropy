@@ -1,4 +1,27 @@
+/*
+Copyright (c) 2015 Steven Haid
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "util.h"
+#include "about.h"
 
 // #define SELECTION 1
 
@@ -7,6 +30,7 @@ static char * choices[] = {
                 "Expanding Gas in a Container",
                 "Gravity Simulation",         
                 "Our Expanding Universe",
+                "About",
                         };
 #endif
 
@@ -53,16 +77,15 @@ int32_t main(int32_t argc, char **argv)
         case 2:
             sim_universe();
             break;
+        case 3:
+            sdl_display_text(about);
+            break;
         }
     }
 
     // XXX ABOUT / copyright
 
     // exit 
-#if 0
-    // XXX core dump here, argv corrupt
-    PRINTF("XXX ARGV[0] %p\n", argv[0]);
-#endif
     INFO("TERMINATING %s\n", argv[0]);
     sdl_terminate();
     return 0;

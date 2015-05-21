@@ -39,7 +39,7 @@ clean:
 # compile rules
 #
 
-main.o: main.c util.h
+main.o: main.c util.h about.h
 util.o: util.c util.h button_sound.h
 sim_container.o: sim_container.c util.h sim_container_help.h
 sim_gravity.o: sim_gravity.c util.h sim_gravity_help.h

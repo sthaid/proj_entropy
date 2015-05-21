@@ -70,7 +70,7 @@ sed -i.orig \
 # update jni/Application.mk
 sed -i.orig \
     -e "$ aAPP_PLATFORM := android-12" \
-    -e "/APP_ABI :=/ cAPP_ABI := armeabi" \
+    -e "/APP_ABI :=/ cAPP_ABI := armeabi x86" \
     jni/Application.mk
   
 # update src/org/libsdl/app/SDLActivity.java
@@ -90,6 +90,7 @@ ln -s ../../../button_sound.h        jni/src
 ln -s ../../../sim_container_help.h  jni/src
 ln -s ../../../sim_gravity_help.h    jni/src
 ln -s ../../../sim_universe_help.h   jni/src
+ln -s ../../../about.h               jni/src
 
 # replace jni/src/Android.mk
 cp jni/src/Android.mk jni/src/Android.mk.orig

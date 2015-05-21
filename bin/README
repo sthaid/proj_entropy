@@ -1,0 +1,7 @@
+The Gravity Simulation can download initial condition files from the cloud.
+
+The intent is to provide a means for users to share their gravity simulations.
+
+The scripts in this directory provide the ability to upload, download, delete,
+and list these files.
+
