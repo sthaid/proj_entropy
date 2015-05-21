@@ -3,8 +3,9 @@
 # units for SIM_WIDTH are 'AU' or '"LY"'
 # units for DT is SEC
 
-PARAM SIM_WIDTH 3.0 AU
-PARAM DT        5  SEC 
+PARAM SIM_WIDTH  3.0 AU
+PARAM DT_LINUX     1 SEC
+PARAM DT_ANDROID  10 SEC
 
 #                                                               Min Orbital                                                     MAX_PATH_ 
 #               Aphelion                                        Velocity                                                        DISP_DFLT
@@ -16,11 +17,6 @@ sun             0               0               0               0               
  earth          152.10E9        0               0               29.29E3         5.9726E24       6378.1E3        LIGHT_BLUE      45
   moon          0.4055E9        0               0               0.964E3         0.07342E24      1738.1E3        WHITE           45
  mars          -249.23E9        0               0              -21.97E3         0.64174E24      3396.2E3        RED             45
-# jupiter        816.62E9        0               0               12.44E3         1898.3E24       71492.0E3       YELLOW          45
-# saturn        -1514.50E9       0               0              -9.09E3          568.36E24       60268.0E3       YELLOW          45
-# uranus         3003.62E9       0               0               6.49E3          86.816E24       25559.0E3       YELLOW          45
-# neptune       -4545.67E9       0               0              -5.37E3          102.42E24       24764.0E3       PURPLE          45
-# pluto          7375.93E9       0               0               3.71E3          0.0131E24       1195.0E3        GRAY            45
 
 rogue           1000E9         -1000E9          -5E3             3E3            1000000E24      400000.0E3      ORANGE          45
 

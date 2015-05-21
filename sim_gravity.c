@@ -1,7 +1,4 @@
-// XXX gravity boost
 // XXX different dt values for androoid
-// XXX don't display text controls if just one page
-// XXX error message w/o curl installed
 
 // MAYBE OK
 //   fix 3 body problem
@@ -27,6 +24,9 @@
 // - path length display
 // - display error if bad file
 // - document solar system file
+// - error message w/o curl installed
+// - gravity boost
+// - don't display text controls if just one page
 
 // NOT PLANNED
 // - if forces are not significant then don't inspect every time
@@ -340,7 +340,14 @@ int32_t sim_gravity_init(char * pathname)
                 if (i == -1) {
                     new_sim_width = valid_sim_width[0];
                 }
-            } else if (strcmp(param_name, "DT") == 0 && strcmp(param_units, "SEC") == 0) {
+            } else if ((strcmp(param_name, "DT_LINUX") == 0 || strcmp(param_name, "DT_ANDROID") == 0) &&
+                       (strcmp(param_units, "SEC") == 0)) 
+            {
+#ifdef ANDROID
+                if (strcmp(param_name, "DT_LINUX") == 0) continue;
+#else
+                if (strcmp(param_name, "DT_ANDROID") == 0) continue;
+#endif
                 new_dt = param_value;
                 for (i = MAX_VALID_DT-1; i >= 0; i--) {
                     if (new_dt >= valid_dt[i]) {

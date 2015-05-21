@@ -74,4 +74,8 @@ Using the solar_system click on the Earth. The simulation display will\n\
 track the Earth, that is the Earth will be displayed in the center.\n\
 Observe the complicated paths the planets take from this perspective.\n\
 The loops are called Epicycles or Retrograde Motion.\n\
+\n\
+Using gravity_boost try tracking the large object. Notice the \n\
+similarities of the hyperbolic orbit of the all the small objects  \n\
+when viewed in the reference frame of the large obect.\n\
 ";

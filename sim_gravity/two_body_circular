@@ -3,8 +3,9 @@
 # units for SIM_WIDTH are 'AU' or '"LY"'
 # units for DT is SEC
 
-PARAM SIM_WIDTH 3.0 AU
-PARAM DT        1 SEC 
+PARAM SIM_WIDTH  3.0 AU
+PARAM DT_LINUX     1 SEC
+PARAM DT_ANDROID  10 SEC
 
 #                                                                                                                               MAX_PATH_ 
 #                                                                                                                               DISP_DFLT

@@ -877,19 +877,20 @@ void sdl_display_text(char * text)
         }
 
         // display controls 
-// XXX don't if short
-        sdl_render_text_font0(&disp_pane, 
-                              0, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "HOME", SDL_EVENT_KEY_HOME);
-        sdl_render_text_font0(&disp_pane, 
-                              2, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "END", SDL_EVENT_KEY_END);
-        sdl_render_text_font0(&disp_pane, 
-                              4, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "PGUP", SDL_EVENT_KEY_PGUP);
-        sdl_render_text_font0(&disp_pane, 
-                              6, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "PGDN", SDL_EVENT_KEY_PGDN);
+        if (max_texture > lines_per_display) {
+            sdl_render_text_font0(&disp_pane, 
+                                0, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "HOME", SDL_EVENT_KEY_HOME);
+            sdl_render_text_font0(&disp_pane, 
+                                2, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "END", SDL_EVENT_KEY_END);
+            sdl_render_text_font0(&disp_pane, 
+                                4, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "PGUP", SDL_EVENT_KEY_PGUP);
+            sdl_render_text_font0(&disp_pane, 
+                                6, SDL_PANE_COLS(&disp_pane,0)-5, 
+                                "PGDN", SDL_EVENT_KEY_PGDN);
+        }
         sdl_render_text_font0(&disp_pane, 
                               SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
                               "BACK", SDL_EVENT_BACK);
