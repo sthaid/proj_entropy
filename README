@@ -43,10 +43,14 @@ To build this program (program name is 'entropy'), just run make.
 BUILD ANDROID VERSION
 =======================
 
-Install the Android SDK and NDK. The following should be in your PATH:
+Install the Android SDK and NDK. 
+
+The following must be in your PATH:
   android-sdk/tools
   android-sdk/platform-tools
   android-ndk
+
+The ANDROID_HOME environment variable must be set to the android-sdk directory.
 
 Build Steps:
   cd android-project

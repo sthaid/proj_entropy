@@ -23,7 +23,7 @@ SOFTWARE.
 static char about[] = "\
 Simulations to further understanding of physics.\n\
 \n\
-Version: 1.0.\n\
+Version: 1.0\n\
 \n\
 Source Code: https://github.com/sthaid/proj_entropy.git\n\
 ";
