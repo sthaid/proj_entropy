@@ -83,8 +83,6 @@ int32_t main(int32_t argc, char **argv)
         }
     }
 
-    // XXX ABOUT / copyright
-
     // exit 
     INFO("TERMINATING %s\n", argv[0]);
     sdl_terminate();

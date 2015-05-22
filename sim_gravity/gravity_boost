@@ -11,12 +11,13 @@ PARAM DT_ANDROID 120 SEC
 #                                                                                                                               DISP_DFLT
 # NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR           (days)
 
-large          -100E9           0               4E3             0               5000E24         100000E3         YELLOW           91
-small1         -70E9            100E9           0               -4E3            1               1                GREEN            91
-small2         -50E9            100E9           0               -4E3            1               1                GREEN            91
-small3         -30E9            100E9           0               -4E3            1               1                GREEN            91
-small4         -10E9            100E9           0               -4E3            1               1                GREEN            91
-small5          10E9            100E9           0               -4E3            1               1                ORANGE           91
-small6          30E9            100E9           0               -4E3            1               1                ORANGE           91
-small7          50E9            100E9           0               -4E3            1               1                ORANGE           91
-small8          70E9            100E9           0               -4E3            1               1                ORANGE           91
+large          -100E9           0               4E3             0              13000E24         100000E3         YELLOW           91
+
+small1        -105E9            135E9           0               -4E3            1               1                GREEN            91
+small2         -85E9            115E9           0               -4E3            1               1                GREEN            91
+small3         -65E9             95E9           0               -4E3            1               1                GREEN            91
+small4         -45E9             75E9           0               -4E3            1               1                GREEN            91
+small5         -25E9             55E9           0               -4E3            1               1                ORANGE           91
+small6          -5E9             35E9           0               -4E3            1               1                ORANGE           91
+small7          15E9             15E9           0               -4E3            1               1                ORANGE           91
+small8          35E9             -5E9           0               -4E3            1               1                ORANGE           91
