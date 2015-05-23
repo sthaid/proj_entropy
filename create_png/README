@@ -1,0 +1,5 @@
+This program creates the Android Launcher Icon.
+
+To run, for example:
+
+  create_png ic_launcher 72,72 512,512
