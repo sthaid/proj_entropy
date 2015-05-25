@@ -53,19 +53,6 @@ void sim_container(void);
 void sim_gravity(void);
 void sim_universe(void);
 
-// -----------------  VERSION  ------------------------------------------------------
-
-// xxx use this, and build date
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 0
-
-#define VERSION ( { version_t v = { VERSION_MAJOR, VERSION_MINOR }; v; } );
-
-typedef struct {
-    int major;
-    int minor;
-} version_t;
-
 // -----------------  SDL SUPPORT  --------------------------------------------------
 
 // window state
@@ -242,35 +229,46 @@ int config_write(char * filename, config_t * config);
 
 // -----------------  LOGGING  -------------------------------------------------------
 
-#define INFO(fmt, args...) \
-    do { \
-        logmsg("INFO", __func__, fmt, ## args); \
-    } while (0)
-#define WARN(fmt, args...) \
-    do { \
-        logmsg("WARN", __func__, fmt, ## args); \
-    } while (0)
-#define ERROR(fmt, args...) \
-    do { \
-        logmsg("ERROR", __func__, fmt, ## args); \
-    } while (0)
+// #define ENABLE_LOGGING
+// #define ENABLE_LOGGING_AT_DEBUG_LEVEL
+
+#ifdef ENABLE_LOGGING
+    #define INFO(fmt, args...) \
+        do { \
+            logmsg("INFO", __func__, fmt, ## args); \
+        } while (0)
+    #define WARN(fmt, args...) \
+        do { \
+            logmsg("WARN", __func__, fmt, ## args); \
+        } while (0)
+    #define ERROR(fmt, args...) \
+        do { \
+            logmsg("ERROR", __func__, fmt, ## args); \
+        } while (0)
+    #define PRINTF(fmt, args...) \
+        do { \
+            printmsg(fmt, ## args); \
+        } while (0)
+#else
+    #define INFO(fmt, args...)
+    #define WARN(fmt, args...)
+    #define ERROR(fmt, args...)
+    #define PRINTF(fmt, args...)
+#endif
+
+#ifdef ENABLE_LOGGING_AT_DEBUG_LEVEL
+    #define DEBUG(fmt, args...) \
+        do { \
+            logmsg("DEBUG", __func__, fmt, ## args); \
+        } while (0)
+#else
+    #define DEBUG(fmt, args...) 
+#endif
+
 #define FATAL(fmt, args...) \
     do { \
         logmsg("FATAL", __func__, fmt, ## args); \
         exit(1); \
-    } while (0)
-#ifdef DEBUG_PRINTS
-  #define DEBUG(fmt, args...) \
-      do { \
-          logmsg("DEBUG", __func__, fmt, ## args); \
-      } while (0)
-#else
-  #define DEBUG(fmt, args...) 
-#endif
-
-#define PRINTF(fmt, args...) \
-    do { \
-        printmsg(fmt, ## args); \
     } while (0)
 
 #define MAX_LOGMSG_FILE_SIZE 0x100000

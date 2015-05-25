@@ -77,7 +77,7 @@ void sdl_init(uint32_t w, uint32_t h)
     font0_path = "fonts/FreeMonoBold.ttf";
     font0_ptsize = 40;
     font1_path = "fonts/FreeMonoBold.ttf";
-    font1_ptsize = 60;
+    font1_ptsize = 54;
     font2_path = "fonts/FreeMonoBold.ttf";
     font2_ptsize = 26;
 
@@ -163,6 +163,7 @@ sdl_event_t * sdl_poll_event(void)
         (x) == SDL_WINDOWEVENT_FOCUS_GAINED ? "SDL_WINDOWEVENT_FOCUS_GAINED" : \
         (x) == SDL_WINDOWEVENT_FOCUS_LOST   ? "SDL_WINDOWEVENT_FOCUS_LOST"   : \
         (x) == SDL_WINDOWEVENT_CLOSE        ? "SDL_WINDOWEVENT_CLOSE"        : \
+                                              "????")
 
     #define MOUSE_BUTTON_STATE_NONE     0
     #define MOUSE_BUTTON_STATE_DOWN     1
@@ -376,6 +377,7 @@ sdl_event_t * sdl_poll_event(void)
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 sdl_win_width = ev.window.data1;
                 sdl_win_height = ev.window.data2;
+                INFO("XXX w,h %d %d\n", sdl_win_width, sdl_win_height);
                 event.event = SDL_EVENT_WIN_SIZE_CHANGE;
                 break;
             case SDL_WINDOWEVENT_MINIMIZED:
@@ -443,6 +445,14 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
     // if zero length string then nothing to do
     if (str[0] == '\0') {
         return;
+    }
+
+    // if row or col are less than zero then adjust 
+    if (row < 0) {
+        row += SDL_PANE_ROWS(pane,font_id);
+    }
+    if (col < 0) {
+        col += SDL_PANE_COLS(pane,font_id);
     }
 
     // verify row, col, and field_cold
@@ -900,22 +910,12 @@ void sdl_display_text(char * text)
 
         // display controls 
         if (max_texture > lines_per_display) {
-            sdl_render_text_font0(&disp_pane, 
-                                0, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "HOME", SDL_EVENT_KEY_HOME);
-            sdl_render_text_font0(&disp_pane, 
-                                2, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "END", SDL_EVENT_KEY_END);
-            sdl_render_text_font0(&disp_pane, 
-                                4, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "PGUP", SDL_EVENT_KEY_PGUP);
-            sdl_render_text_font0(&disp_pane, 
-                                6, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "PGDN", SDL_EVENT_KEY_PGDN);
+            sdl_render_text_font0(&disp_pane, 0, -5, "HOME", SDL_EVENT_KEY_HOME);
+            sdl_render_text_font0(&disp_pane, 2, -5, "END",  SDL_EVENT_KEY_END);
+            sdl_render_text_font0(&disp_pane, 4, -5, "PGUP", SDL_EVENT_KEY_PGUP);
+            sdl_render_text_font0(&disp_pane, 6, -5, "PGDN", SDL_EVENT_KEY_PGDN);
         }
-        sdl_render_text_font0(&disp_pane, 
-                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "BACK", SDL_EVENT_BACK);
+        sdl_render_text_font0(&disp_pane, -1, -5, "BACK", SDL_EVENT_BACK);
         sdl_event_register(SDL_EVENT_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &disp_pane);
         sdl_event_register(SDL_EVENT_MOUSE_WHEEL, SDL_EVENT_TYPE_MOUSE_WHEEL, &disp_pane);
 
@@ -1053,22 +1053,12 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
 
         // display controls 
         if (2*(max_choice+1)-1 > lines_per_display) {
-            sdl_render_text_font0(&disp_pane, 
-                                0, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "HOME", SDL_EVENT_KEY_HOME);
-            sdl_render_text_font0(&disp_pane, 
-                                2, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "END", SDL_EVENT_KEY_END);
-            sdl_render_text_font0(&disp_pane, 
-                                4, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "PGUP", SDL_EVENT_KEY_PGUP);
-            sdl_render_text_font0(&disp_pane, 
-                                6, SDL_PANE_COLS(&disp_pane,0)-5, 
-                                "PGDN", SDL_EVENT_KEY_PGDN);
+            sdl_render_text_font0(&disp_pane, 0, -5, "HOME", SDL_EVENT_KEY_HOME);
+            sdl_render_text_font0(&disp_pane, 2, -5, "END",  SDL_EVENT_KEY_END);
+            sdl_render_text_font0(&disp_pane, 4, -5, "PGUP", SDL_EVENT_KEY_PGUP);
+            sdl_render_text_font0(&disp_pane, 6, -5, "PGDN", SDL_EVENT_KEY_PGDN);
         }
-        sdl_render_text_font0(&disp_pane, 
-                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "BACK", SDL_EVENT_BACK);
+        sdl_render_text_font0(&disp_pane, -1, -5, "BACK", SDL_EVENT_BACK);
         sdl_event_register(SDL_EVENT_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &disp_pane);
         sdl_event_register(SDL_EVENT_MOUSE_WHEEL, SDL_EVENT_TYPE_MOUSE_WHEEL, &disp_pane);
 
@@ -1156,9 +1146,7 @@ void sdl_display_error(char * err_str0, char * err_str1, char * err_str2)
         sdl_render_text_ex(&disp_pane, row+2, col, err_str2, SDL_EVENT_NONE, SDL_FIELD_COLS_UNLIMITTED, true, 0);
 
         // display controls 
-        sdl_render_text_font0(&disp_pane, 
-                              SDL_PANE_ROWS(&disp_pane,0)-1, SDL_PANE_COLS(&disp_pane,0)-5, 
-                              "BACK", SDL_EVENT_BACK);
+        sdl_render_text_font0(&disp_pane, -1, -5, "BACK", SDL_EVENT_BACK);
 
         // present the display
         SDL_RenderPresent(sdl_renderer);

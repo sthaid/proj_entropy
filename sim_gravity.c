@@ -220,7 +220,6 @@ int32_t sim_gravity_init(char * pathname)
 
     int32_t     i, cnt;
     char      * s;
-    object_t  * obj;
     relto_t     relto[MAX_RELTO];
     char        shortname[200];
     double      X, Y, VX, VY, MASS, RADIUS;
@@ -453,14 +452,14 @@ int32_t sim_gravity_init(char * pathname)
         pthread_create(&thread_id[i], NULL, sim_gravity_thread, (void*)(long)i);
     }
 
-#if 1
+#ifdef ENABLE_LOGGING
     // print simulation config
     PRINTF("------ PATHNAME %s ------\n", pathname);   
     PRINTF("                                                                                                                        MAX_PATH_\n");
     PRINTF("NAME                    X            Y        X_VEL        Y_VEL         MASS       RADIUS        COLOR       DISP_R    DISP_DFLT\n");
          // ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------ ------------
     for (i = 0; i < sim.max_object; i++) {
-        obj = sim.object[i];
+        object_t * obj = sim.object[i];
         PRINTF("%-12s %12lg %12lg %12lg %12lg %12lg %12lg %12d %12d %12d\n",
             obj->NAME, 
             obj->X,
@@ -637,8 +636,8 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
 {
     #define MAX_CIRCLE_RADIUS 51
 
-    SDL_Rect       ctl_pane, sim_pane;
-    int32_t        i, col;
+    SDL_Rect       ctl_pane, sim_pane, below_sim_pane;
+    int32_t        i;
     double         sim_pane_width;
     sdl_event_t *  event;
     char           str[100], str1[100];
@@ -665,15 +664,22 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
 
         if (sdl_win_width > sdl_win_height) {
             sim_pane_width = sdl_win_height;
+            if (sim_pane_width + 480 > sdl_win_width) {
+                sim_pane_width = sdl_win_width - 480;
+            }
             SDL_INIT_PANE(sim_pane, 
                           0, 0,  
                           sim_pane_width, sim_pane_width);
+            SDL_INIT_PANE(below_sim_pane, 
+                          0, sim_pane.h,
+                          sim_pane_width, sdl_win_height-sim_pane.h);
             SDL_INIT_PANE(ctl_pane, 
                           sim_pane_width, 0, 
                           sdl_win_width-sim_pane_width, sdl_win_height);
         } else {
             sim_pane_width = sdl_win_width;
             SDL_INIT_PANE(sim_pane, 0, 0,  sim_pane_width, sim_pane_width);
+            SDL_INIT_PANE(below_sim_pane, 0, sim_pane.h, sim_pane_width, sdl_win_height-sim_pane.h);
             SDL_INIT_PANE(ctl_pane, 0, 0, 0, 0);
         }
         sdl_event_init();
@@ -812,14 +818,19 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
 
         // register sim_pane controls
-        col = SDL_PANE_COLS(&sim_pane,0)-2;
-        sdl_render_text_font0(&sim_pane,  0, col,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&sim_pane,  2, col,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_render_text_font0(&sim_pane,  0, -2,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
+        sdl_render_text_font0(&sim_pane,  2, -2,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
         sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK, SDL_EVENT_TYPE_MOUSE_CLICK, &sim_pane);
         sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
 
         // draw sim_pane border
         sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
+
+        // clear area below sim_pane, if it exists
+        if (below_sim_pane.h > 0) {
+            SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+            SDL_RenderFillRect(sdl_renderer, &below_sim_pane);
+        }
 
         //
         // CTLPANE ...
@@ -828,23 +839,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         // clear ctl_pane
         SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderFillRect(sdl_renderer, &ctl_pane);
-
-        // display controls  
-        sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
-                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
-        sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
-        sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
-        sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
-        sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
-        sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
-        sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
-        sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_PATH_DISP_OFF);
-        sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_PATH_DISP_PLUS);
-        sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_PATH_DISP_MINUS);
-
-        sdl_render_text_font0(&ctl_pane, 18, 0,  "HELP",      SDL_EVENT_HELP);
-        sdl_render_text_font0(&ctl_pane, 18,15,  "BACK",      SDL_EVENT_BACK);
 
         // display status lines
         sprintf(str, "%-4s %s", STATE_STR(state), dur2str(str1,sim.sim_time));
@@ -904,6 +898,23 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             sprintf(str, "RATE %0.3f YR/S", years_per_sec);
             sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
         }
+
+        // display controls  
+        sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
+                           SDL_FIELD_COLS_UNLIMITTED, true, 0);
+        sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
+        sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
+        sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
+        sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
+        sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
+        sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
+        sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_PATH_DISP_OFF);
+        sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_PATH_DISP_PLUS);
+        sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_PATH_DISP_MINUS);
+
+        sdl_render_text_font0(&ctl_pane, -1, 0,  "HELP",      SDL_EVENT_HELP);
+        sdl_render_text_font0(&ctl_pane, -1,-5,  "BACK",      SDL_EVENT_BACK);
 
         //
         // present the display

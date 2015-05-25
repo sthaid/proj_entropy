@@ -322,6 +322,9 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
 
         if (sdl_win_width > sdl_win_height) {
             simpane_width = sdl_win_height;
+            if (simpane_width + 480 > sdl_win_width) {
+                simpane_width = sdl_win_width - 480;
+            }
             SDL_INIT_PANE(simpane,
                           0, 0,                                             // x, y
                           simpane_width, simpane_width);                    // w, h
@@ -407,30 +410,6 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         SDL_RenderFillRect(sdl_renderer, &ctlpane);
 
         //
-        // display controls
-        //
-
-        char rs_str[20], suspend_str[20];
-        sprintf(rs_str, "%3d", run_speed);
-        sprintf(suspend_str, "%s", suspend_expansion ? "RES" : "SUS");
-
-        sdl_render_text_font0(&ctlpane,  0, 3,  "UNIVERSE",  SDL_EVENT_NONE);
-        sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctlpane,  2, 8,  "STOP",      SDL_EVENT_STOP);
-        sdl_render_text_font0(&ctlpane,  2, 16, suspend_str, SDL_EVENT_SUSPEND_EXPANSION);
-        sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
-        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
-        sdl_render_text_font0(&ctlpane,  4, 16, rs_str,      SDL_EVENT_NONE);
-        sdl_render_text_font0(&ctlpane,  6, 0,  "RESET",     SDL_EVENT_RESET);
-        sdl_render_text_font0(&ctlpane,  6, 8,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
-        sdl_render_text_font0(&ctlpane, 18, 0,  "HELP",      SDL_EVENT_HELP);
-        sdl_render_text_font0(&ctlpane, 18,15,  "BACK",      SDL_EVENT_BACK);
-
-        int32_t col = SDL_PANE_COLS(&simpane,0)-2;
-        sdl_render_text_font0(&simpane,  0, col,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&simpane,  2, col,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
-
-        //
         // display status lines
         //
 
@@ -463,6 +442,29 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         // - window width
         sprintf(str, "WIDTH %0.3lf BLY", (double)display_width*1E5/1E9);
         sdl_render_text_font0(&simpane,  0, 0, str, SDL_EVENT_NONE);
+
+        //
+        // display controls
+        //
+
+        char rs_str[20], suspend_str[20];
+        sprintf(rs_str, "%3d", run_speed);
+        sprintf(suspend_str, "%s", suspend_expansion ? "RES" : "SUS");
+
+        sdl_render_text_font0(&ctlpane,  0, 3,  "UNIVERSE",  SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
+        sdl_render_text_font0(&ctlpane,  2, 8,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  2, 16, suspend_str, SDL_EVENT_SUSPEND_EXPANSION);
+        sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
+        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 16, rs_str,      SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane,  6, 0,  "RESET",     SDL_EVENT_RESET);
+        sdl_render_text_font0(&ctlpane,  6, 8,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
+        sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
+        sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
+
+        sdl_render_text_font0(&simpane,  0, -2,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
+        sdl_render_text_font0(&simpane,  2, -2,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
 
         //
         // draw simpane border

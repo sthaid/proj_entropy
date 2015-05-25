@@ -303,6 +303,9 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
 
         if (sdl_win_width > sdl_win_height) {
             simpane_width = sdl_win_height;
+            if (simpane_width + 480 > sdl_win_width) {
+                simpane_width = sdl_win_width - 480;
+            }
             SDL_INIT_PANE(ctlpane,
                           simpane_width, 0,             // x, y
                           sdl_win_width-simpane_width, sdl_win_height);     // w, h
@@ -363,6 +366,29 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
         SDL_RenderFillRect(sdl_renderer, &ctlpane);
 
         //
+        // display status lines
+        //
+
+        sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
+        if (state == STATE_RUN || state == STATE_STOP || state == STATE_LOW_ENTROPY_STOP) {
+            if (cont_shrink_restore_speed < 0) {
+                strcat(str, "SHRINK");
+            } else if (cont_shrink_restore_speed > 0) {
+                strcat(str, "RESTORE");
+            }
+        }
+        sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
+
+        sprintf(str, "PARTICLES   = %d", sim->max_particle);    
+        sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "SIM_WIDTH   = %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
+        sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "RUN_SPEED   = %d", run_speed);    
+        sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "TEMPERATURE = %0.2f", temperature);
+        sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
+
+        //
         // display controls
         //
 
@@ -377,31 +403,8 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
         sdl_render_text_font0(&ctlpane,  8, 9,  "PB_FWD",    SDL_EVENT_PLAYBACK_FWD);
         sdl_render_text_font0(&ctlpane, 10, 0,  "RESET",     SDL_EVENT_RESET);
         sdl_render_text_font0(&ctlpane, 10, 9,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
-        sdl_render_text_font0(&ctlpane, 18, 0,  "HELP",      SDL_EVENT_HELP);
-        sdl_render_text_font0(&ctlpane, 18,15,  "BACK",      SDL_EVENT_BACK);
-
-        //
-        // display status lines
-        //
-
-        sprintf(str, "%s %"PRId64" ", STATE_STR(state), sim->state_num);
-        if (state == STATE_RUN || state == STATE_STOP || state == STATE_LOW_ENTROPY_STOP) {
-            if (cont_shrink_restore_speed < 0) {
-                strcat(str, "SHRINK");
-            } else if (cont_shrink_restore_speed > 0) {
-                strcat(str, "RESTORE");
-            }
-        }
-        sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
-
-        sprintf(str, "PARTICLES   = %d", sim->max_particle);    
-        sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "SIM_WIDTH   = %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
-        sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RUN_SPEED   = %d", run_speed);    
-        sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "TEMPERATURE = %0.2f", temperature);
-        sdl_render_text_font0(&ctlpane, 16, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
+        sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
 
         //
         // draw container border
@@ -422,6 +425,7 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
 
         //
         // handle events
+        // XXX click when resize screen
         //
 
         event = sdl_poll_event();
