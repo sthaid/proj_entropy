@@ -63,8 +63,10 @@ cd ..
 
 # update AndroidManifest.xml
 # - remove minSdkVersion
+# - add 'android:screenOrientation="landscape"'
 sed -i.orig \
     -e "s/android:minSdkVersion=\"[0-9]*\" //" \
+    -e "/android:configChanges=/ a \                  android:screenOrientation=\"landscape\"" \
     AndroidManifest.xml
 
 # update jni/Application.mk
