@@ -20,10 +20,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#define VERSION "1.0"
+
 static char about[] = "\
 Simulations to further understanding of physics.\n\
 \n\
-Version: 1.0\n\
+Version: " VERSION "\n\
+\n\
+Website: http://wikiscience101.sthaid.org/index.php?title=Entropy_App\n\
+\n\
+Author: Steven Haid\n\
+\n\
+Contact: StevenHaid@gmail.com\n\
 \n\
 Source Code: https://github.com/sthaid/proj_entropy.git\n\
+\n\
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n\
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n\
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n\
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n\
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n\
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n\
+SOFTWARE.\n\
 ";
