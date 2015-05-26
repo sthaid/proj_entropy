@@ -75,8 +75,9 @@ SOFTWARE.
 #define SDL_EVENT_BACK                     (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_SIMPANE_ZOOM_IN          (SDL_EVENT_USER_START + 20)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT         (SDL_EVENT_USER_START + 21)
-#define SDL_EVENT_SIMPANE_MOUSE_CLICK      (SDL_EVENT_USER_START + 22)
-#define SDL_EVENT_SIMPANE_MOUSE_MOTION     (SDL_EVENT_USER_START + 23)
+#define SDL_EVENT_SIMPANE_MOUSE_MOTION     (SDL_EVENT_USER_START + 22)
+#define SDL_EVENT_SIMPANE_MOUSE_CLICK      (SDL_EVENT_USER_START + 23)  // ... SDL_EVENT_USER_END
+#define SDL_EVENT_SIMPANE_MOUSE_CLICK_LAST (SDL_EVENT_USER_END)
 
 #define STATE_STOP               0
 #define STATE_RUN                1
@@ -820,8 +821,38 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         // register sim_pane controls
         sdl_render_text_font0(&sim_pane,  0, -2,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
         sdl_render_text_font0(&sim_pane,  2, -2,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
-        sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK, SDL_EVENT_TYPE_MOUSE_CLICK, &sim_pane);
         sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
+        for (i = 0; i < sim.max_object; i++) {
+            object_t * obj = sim.object[i];
+            int32_t disp_x, disp_y;
+            double X_ORIGIN, Y_ORIGIN;
+            SDL_Rect mouse_click_rect;
+
+            if (tracker_obj == -1) {
+                X_ORIGIN = sim_x;
+                Y_ORIGIN = sim_y;
+            } else {
+                X_ORIGIN = sim.object[tracker_obj]->X;
+                Y_ORIGIN = sim.object[tracker_obj]->Y;
+            }
+
+            // XXX overflow ?
+            disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+            disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
+
+            if (disp_x < 0 || disp_x >= sim_pane_width || 
+                disp_y < 0 || disp_y >= sim_pane_width) 
+            {
+                continue;
+            }
+
+            mouse_click_rect.x = disp_x - 40;
+            mouse_click_rect.y = disp_y - 40;
+            mouse_click_rect.w = 80;
+            mouse_click_rect.h = 80;
+
+            sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_CLICK+i, SDL_EVENT_TYPE_MOUSE_CLICK, &mouse_click_rect);
+        }
 
         // draw sim_pane border
         sdl_render_rect(&sim_pane, 3, sdl_pixel_rgba[GREEN]);
@@ -1030,37 +1061,9 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             }
             sdl_play_event_sound();
             break;
-        case SDL_EVENT_SIMPANE_MOUSE_CLICK: {
-            int32_t found_obj = -1;
-            for (i = 0; i < sim.max_object; i++) {
-                object_t * obj = sim.object[i];
-                int32_t disp_x, disp_y;
-                double X_ORIGIN, Y_ORIGIN;
-
-                if (tracker_obj == -1) {
-                    X_ORIGIN = sim_x;
-                    Y_ORIGIN = sim_y;
-                } else {
-                    X_ORIGIN = sim.object[tracker_obj]->X;
-                    Y_ORIGIN = sim.object[tracker_obj]->Y;
-                }
-
-                disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-                disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
-
-                if (disp_x >= event->mouse_click.x - 15 &&
-                    disp_x <= event->mouse_click.x + 15 &&
-                    disp_y >= event->mouse_click.y - 15 &&
-                    disp_y <= event->mouse_click.y + 15 &&
-                    (found_obj == -1 || sim.object[i]->MASS > sim.object[found_obj]->MASS))
-                {
-                    found_obj = i;
-                }
-            }
-            if (found_obj == -1) {
-                break;
-            }
-            tracker_obj = (found_obj == tracker_obj ? -1 : found_obj);
+        case SDL_EVENT_SIMPANE_MOUSE_CLICK ... SDL_EVENT_SIMPANE_MOUSE_CLICK_LAST: {
+            int32_t obj_idx = event->event - SDL_EVENT_SIMPANE_MOUSE_CLICK;
+            tracker_obj = (obj_idx == tracker_obj ? -1 : obj_idx);
             sdl_play_event_sound();
             break; }
         case SDL_EVENT_SIMPANE_MOUSE_MOTION:

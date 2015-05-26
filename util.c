@@ -41,6 +41,7 @@ SOFTWARE.
 #endif
 
 static Mix_Chunk * sdl_button_sound;
+static int32_t     sdl_event_max;
 
 void sdl_init(uint32_t w, uint32_t h)
 {
@@ -74,11 +75,11 @@ void sdl_init(uint32_t w, uint32_t h)
         FATAL("TTF_Init failed\n");
     }
 
-    font0_path = "fonts/FreeMonoBold.ttf";
+    font0_path = "fonts/FreeMonoBold.ttf";         // normal 
     font0_ptsize = 40;
-    font1_path = "fonts/FreeMonoBold.ttf";
+    font1_path = "fonts/FreeMonoBold.ttf";         // extra large, for keyboard
     font1_ptsize = 54;
-    font2_path = "fonts/FreeMonoBold.ttf";
+    font2_path = "fonts/FreeMonoBold.ttf";         // small, for help text
     font2_ptsize = 26;
 
     sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
@@ -133,20 +134,25 @@ static sdl_event_reg_t sdl_event_reg_tbl[SDL_EVENT_MAX];
 void sdl_event_init(void)
 {
     bzero(sdl_event_reg_tbl, sizeof(sdl_event_reg_tbl));
+    sdl_event_max = 0;
 }
 
 void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos)
 {
     sdl_event_reg_tbl[event_id].pos  = *pos;
     sdl_event_reg_tbl[event_id].type = event_type;
+
+    if (event_id >= sdl_event_max) {
+        sdl_event_max = event_id + 1;
+    }
 }
 
 sdl_event_t * sdl_poll_event(void)
 {
-    #define AT_POS(X,Y,pos,pad) (((X) >= (pos).x - (pad)) && \
-                                 ((X) < (pos).x + (pos).w + (pad)) && \
-                                 ((Y) >= (pos).y - (pad)) && \
-                                 ((Y) < (pos).y + (pos).h + (pad)))
+    #define AT_POS(X,Y,pos) (((X) >= (pos).x) && \
+                             ((X) < (pos).x + (pos).w) && \
+                             ((Y) >= (pos).y) && \
+                             ((Y) < (pos).y + (pos).h))
 
     #define SDL_WINDOWEVENT_STR(x) \
        ((x) == SDL_WINDOWEVENT_SHOWN        ? "SDL_WINDOWEVENT_SHOWN"        : \
@@ -220,10 +226,11 @@ sdl_event_t * sdl_poll_event(void)
             // reset mouse_button_state
             MOUSE_BUTTON_STATE_RESET;
 
-            // check for text event
-            for (i = 0; i < SDL_EVENT_MAX; i++) {
-                if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_TEXT &&
-                    AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos, 5)) 
+            // check for text or mouse-click event
+            for (i = 0; i < sdl_event_max; i++) {
+                if ((sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_TEXT ||
+                     sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_CLICK) &&
+                    AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos)) 
                 {
                     event.event = i;
                     break;
@@ -257,26 +264,8 @@ sdl_event_t * sdl_poll_event(void)
                 break;
             }
 
-            // if not in MOUSE_BUTTON_STATE_DOWN then reset mouse_button_state and get out,
+            // reset mouse_button_state,
             // this is where MOUSE_BUTTON_STATE_MOTION state is exitted
-            if (mouse_button_state != MOUSE_BUTTON_STATE_DOWN) {
-                MOUSE_BUTTON_STATE_RESET;
-                break;
-            }
-        
-            // check for mouse_click event
-            for (i = 0; i < SDL_EVENT_MAX; i++) {
-                if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_CLICK &&
-                    AT_POS(ev.button.x, ev.button.y, sdl_event_reg_tbl[i].pos, 0)) 
-                {
-                    event.event = i;
-                    event.mouse_click.x = ev.button.x;
-                    event.mouse_click.y = ev.button.y;
-                    break;
-                }
-            }
-
-            // reset mouse_button_state
             MOUSE_BUTTON_STATE_RESET;
             break; }
 
@@ -289,9 +278,9 @@ sdl_event_t * sdl_poll_event(void)
             // if in MOUSE_BUTTON_STATE_DOWN then check for mouse motion event; and if so
             // then set state to MOUSE_BUTTON_STATE_MOTION
             if (mouse_button_state == MOUSE_BUTTON_STATE_DOWN) {
-                for (i = 0; i < SDL_EVENT_MAX; i++) {
+                for (i = 0; i < sdl_event_max; i++) {
                     if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_MOTION &&
-                        AT_POS(ev.motion.x, ev.motion.y, sdl_event_reg_tbl[i].pos, 0)) 
+                        AT_POS(ev.motion.x, ev.motion.y, sdl_event_reg_tbl[i].pos)) 
                     {
                         mouse_button_state = MOUSE_BUTTON_STATE_MOTION;
                         mouse_button_motion_event = i;
@@ -300,13 +289,14 @@ sdl_event_t * sdl_poll_event(void)
                 }
             }
 
-            // if did not find mouse_motion_event then reset mouse_button_state, and get out
+            // if did not find mouse_motion_event and not already in MOUSE_BUTTON_STATE_MOTION then 
+            // reset mouse_button_state, and get out
             if (mouse_button_state != MOUSE_BUTTON_STATE_MOTION) {
                 MOUSE_BUTTON_STATE_RESET;
                 break;
             }
 
-            // get all dditional pending mouse motion events, and sum the motion
+            // get all additional pending mouse motion events, and sum the motion
             event.event = mouse_button_motion_event;
             event.mouse_motion.delta_x = 0;
             event.mouse_motion.delta_y = 0;
@@ -323,16 +313,16 @@ sdl_event_t * sdl_poll_event(void)
 
             // check if mouse wheel event is registered for the location of the mouse
             SDL_GetMouseState(&mouse_x, &mouse_y);
-            for (i = 0; i < SDL_EVENT_MAX; i++) {
+            for (i = 0; i < sdl_event_max; i++) {
                 if (sdl_event_reg_tbl[i].type == SDL_EVENT_TYPE_MOUSE_WHEEL &&
-                    AT_POS(mouse_x, mouse_y, sdl_event_reg_tbl[i].pos, 0)) 
+                    AT_POS(mouse_x, mouse_y, sdl_event_reg_tbl[i].pos)) 
                 {
                     break;
                 }
             }
 
             // if did not find a registered mouse wheel event then get out
-            if (i == SDL_EVENT_MAX) {
+            if (i == sdl_event_max) {
                 break;
             }
 
@@ -511,6 +501,11 @@ void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, i
 
     // if there is a event then save the location for the event handler
     if (event != SDL_EVENT_NONE) {
+        pos.x -= sdl_font[font_id].char_width/2;
+        pos.y -= sdl_font[font_id].char_height/2;
+        pos.w += sdl_font[font_id].char_width;
+        pos.h += sdl_font[font_id].char_height;
+
         sdl_event_register(event, SDL_EVENT_TYPE_TEXT, &pos);
     }
 }
@@ -1047,6 +1042,11 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
             SDL_RenderCopy(sdl_renderer, t, NULL, &dstrect);
 
             if (i >= 1) {
+                dstrect.x -= sdl_font[0].char_width/2;
+                dstrect.y -= sdl_font[0].char_height/2;
+                dstrect.w += sdl_font[0].char_width;
+                dstrect.h += sdl_font[0].char_height;
+
                 sdl_event_register(SDL_EVENT_LIST_CHOICE+i-1, SDL_EVENT_TYPE_TEXT, &dstrect);
             }
         }

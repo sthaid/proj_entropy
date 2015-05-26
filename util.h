@@ -107,9 +107,9 @@ sdl_font_t sdl_font[SDL_MAX_FONT];
 #define SDL_EVENT_QUIT            150
 // - available to be defined by users
 #define SDL_EVENT_USER_START      160  
-#define SDL_EVENT_USER_END        255
+#define SDL_EVENT_USER_END        999  
 // - max event
-#define SDL_EVENT_MAX             256 
+#define SDL_EVENT_MAX             1000
 
 // event types
 #define SDL_EVENT_TYPE_NONE         0
