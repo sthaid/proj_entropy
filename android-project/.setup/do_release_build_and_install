@@ -1,0 +1,24 @@
+#!/bin/bash
+
+ndk-build
+if [ $? -ne 0 ]
+then
+  echo FAILURE: NDK-BUILD
+  exit
+fi
+
+ant release -q
+if [ $? -ne 0 ]
+then
+  echo FAILURE: ANT RELEASE
+  exit
+fi
+
+adb install -r bin/Entropy-release.apk
+if [ $? -ne 0 ]
+then
+  echo FAILURE: ADB_INSTALL
+  exit
+fi
+
+echo SUCCESS

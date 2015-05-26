@@ -20,7 +20,7 @@ then
   rm -rf jni res src bin gen libs obj assets
   rm -f  AndroidManifest.xml ant.properties build.properties build.xml \
          default.properties local.properties proguard-project.txt project.properties
-  rm -f do_build do_build_and_install do_clean do_clobber do_install do_logcat do_logclear *.orig
+  rm -f do_* *.orig
   exit
 fi
 
@@ -69,10 +69,16 @@ sed -i.orig \
     -e "/android:configChanges=/ a \                  android:screenOrientation=\"landscape\"" \
     AndroidManifest.xml
 
+# update ant.properties for release signging
+cat << EOF >> ant.properties
+key.store=../../android/keystore/entropy-release-key.keystore
+key.alias=entropy
+EOF
+
 # update jni/Application.mk
 sed -i.orig \
     -e "$ aAPP_PLATFORM := android-12" \
-    -e "/APP_ABI :=/ cAPP_ABI := armeabi x86" \
+    -e "/APP_ABI :=/ cAPP_ABI := armeabi armeabi-v7a arm64-v8a x86 x86_64" \
     jni/Application.mk
   
 # update src/org/libsdl/app/SDLActivity.java

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+keytool -genkey -v \
+        -keystore ~/android/keystore/entropy-release-key.keystore \
+        -alias entropy \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000
+
