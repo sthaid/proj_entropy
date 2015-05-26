@@ -20,6 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+// Thanks go to Guillaume Cottenceau for png code example.
+// http://zarb.org/~gc/html/libpng.html
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
