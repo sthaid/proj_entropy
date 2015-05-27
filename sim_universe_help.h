@@ -24,43 +24,56 @@ static char sim_universe_help[] = "\
 OVERVIEW\n\
 --------\n\
 \n\
-This is a simulation of our expanding universe. The simulated universe \n\
-has the following characteristics:\n\
+This is a simulation of our expanding universe.\n\
+The simulated universe has the following \n\
+characteristics:\n\
 - it is comprised of non interacting particles\n\
-- each particle is given an initial random velocity, which does not \n\
-  change\n\
-- the radius of the universe increases with time, this causes \n\
-  an additional apparent velocity which increases with distance.\n\
+- each particle is given an initial random \n\
+  velocity, which does not change\n\
+- the radius of the universe increases with \n\
+  time, this causes an additional apparent \n\
+  velocity which increases with distance.\n\
 \n\
-The vantage point is the center of the display. The color of a particle\n\
-indicates its apparent velocity with respect to the vantage point. The\n\
-apparent velocity is the sum of the particle's actual velocity and \n\
-apparent velocity due to the expansion.\n\
+The vantage point is the center of the display.\n\
+The color of a particle indicates its apparent \n\
+velocity with respect to the vantage point. The\n\
+apparent velocity is the sum of the particle's \n\
+actual velocity and apparent velocity due to the\n\
+expansion.\n\
 \n\
 Particles shown in:\n\
-- blue  - apparent velocity is toward the vantage point\n\
+- blue  - apparent velocity is toward the \n\
+          vantage point\n\
 - green - no apparent velocity\n\
-- red   - apparent velocity away from the vantage point, near the speed\n\
-           of light\n\
-- purple- these particles are not visible from the vantage point, \n\
-          because their apparent velocity exceed the speed of light\n\
+- red   - apparent velocity away from the \n\
+          vantage point, near the speed of light\n\
+- purple- these particles are not visible from \n\
+          the vantage point, because their \n\
+          apparent velocity exceed the speed of\n\
+          light\n\
 \n\
-Note - All vantage points in the universe are equivalent. This means \n\
-that the universe appears generally the same from every vantage point.\n\
+Note - All vantage points in our universe are \n\
+equivalent. This means that the universe appears\n\
+generally the same from every vantage point.\n\
 \n\
-Note - The particles shown in purple have apparent recession velocities\n\
-from the vantage point in the center that exceed the speed of light. \n\
-This does not violate Special Relativity because their large velocities\n\
-are due to the expansion of space itself.\n\
+Note - The particles shown in purple have \n\
+apparent recession velocities, from the vantage \n\
+point in the center, that exceed the speed of \n\
+light.  This does not violate Special Relativity\n\
+because their large velocities are due to the \n\
+expansion of space itself.\n\
 \n\
 RADIUS OF THE UNIVERSE\n\
 ----------------------\n\
 \n\
-The simulation uses the following formula to calculate the radius of the\n\
-universe. This formula was chosen because it behavior which is similar \n\
-to some accepted theories of our universe:\n\
-- very rapid increase of radius at low values of time (inflation)\n\
-- rapid increase of radius at high values of time\n\
+The simulation uses the following formula to \n\
+calculate the radius of the universe. This \n\
+formula was chosen for this simulation because \n\
+its behavior is similar to accepted theories of\n\
+the expansion of our universe:\n\
+- very rapid increase of radius at low values \n\
+  of time (inflation)\n\
+- rapid increase of radius at high time values\n\
 \n\
 Radius = K1 * sqrt(T)  +  K2 * (2^(T/K3) - 1)\n\
 \n\
@@ -69,24 +82,27 @@ CONTROLS\n\
 \n\
 RUN/STOP:  Start and stop the simulation.\n\
 \n\
-SUS/RES:   Suspend and resume the expansion of the universe. The motion\n\
-           of the particles is not affected.\n\
+SUS/RES:   Suspend and resume the expansion of \n\
+           the universe. The motion of the \n\
+           particles is not affected.\n\
 \n\
 SLOW/FAST: Control the speed of the simulation.\n\
 \n\
-RESET:     Reset simulation to initial parameters.\n\
+RESET:     Reset simulation to initial params.\n\
 \n\
-PARAMS:    Supply new initial parameters, and reset the simulation to \n\
-           the new parameters.\n\
+PARAMS:    Supply new initial parameters, and \n\
+           reset to the new params\n\
 \n\
 PARAMETERS\n\
 ----------\n\
 \n\
-N_PART: Number of particles in the simulation. The simulation runs \n\
-        slower with larger number of particles.\n\
+N_PART: Number of particles in the simulation. \n\
+    The simulation runs slower with larger \n\
+    number of particles.\n\
 \n\
-START:  Initial time. The default start time is 0.000001 billion years,\n\
-        or 1000 years after the big bang.\n\
+START:  Initial time. The default start time is\n\
+     0.000001 billion years, or 1000 years after\n\
+     the big bang.\n\
 \n\
 AVGSPD: The average speed of the particles.\n\
 \n\
@@ -95,8 +111,9 @@ WHAT TO OBSERVE\n\
 \n\
 Rapid expansion during the early universe.\n\
 \n\
-Much of the universe lies beyond what we can see from our vantage point.\n\
+Much of the universe lies beyond what we can see\n\
+from our vantage point.\n\
 \n\
-As the universe ages, the size of the observable universe shrinks \n\
-towards zero.\n\
+As the universe ages, the size of the observable\n\
+universe shrinks towards zero.\n\
 ";

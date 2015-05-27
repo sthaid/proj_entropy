@@ -25,8 +25,9 @@ static char sim_gravity_help[] ="\
 OVERVIEW\n\
 --------\n\
 \n\
-This is a simulation of Newton's Law of Gravity. The motion of objects\n\
-is simulated using the following equations:\n\
+This is a simulation of Newton's Law of Gravity.\n\
+The motion of objects is simulated using the \n\
+following equations:\n\
 \n\
            M1 * M2\n\
     F = G --------\n\
@@ -34,14 +35,17 @@ is simulated using the following equations:\n\
 \n\
     F = M * A\n\
 \n\
-The simulation is in 2 dimensions. Newton's Laws work in 2 dimensions;\n\
-this is the case when the Z component of Force and the Z component of \n\
+The simulation is in 2 dimensions. Newton's \n\
+Laws work in 2 dimensions; this is the case when\n\
+the Z component of Force and the Z component of \n\
 Initial Velocity are zero.\n\
 \n\
-The default center of the display is X,Y=(0,0); this can be changed by \n\
-dragging the display. The center of the display can also be set to track\n\
-one of the objects. To enable this mode click on the desired object. The\n\
-object being tracked will be displayed in pink at the center of the \n\
+The default center of the display is X,Y=(0,0);\n\
+this can be changed by dragging the display. The\n\
+center of the display can also be set to track\n\
+one of the objects. To enable this mode click on\n\
+the desired object. The object being tracked \n\
+will be displayed in pink at the center of the \n\
 display.\n\
 \n\
 CONTROLS\n\
@@ -49,59 +53,77 @@ CONTROLS\n\
 \n\
 RUN/STOP:  Start and stop the simulation.\n\
 \n\
-DT+/DT-: Change the time step of the simulation. Smaller time steps\n\
-    provide a more accurate simulation; however the simulation runs\n\
+DT+/DT-: Change the time step of the simulation.\n\
+    Smaller time steps provide a more accurate \n\
+    simulation; however the simulation runs\n\
     more slowly.\n\
 \n\
-LOCAL/CLOUD: Select a config file either from the Local system or\n\
-    the Cloud. These config files describe the initial condition\n\
-    of the simulation. \n\
+LOCAL/CLOUD: Select a config file either from \n\
+    the Local system or the Cloud. These config\n\
+    files describe the initial condition of the\n\
+    simulation. \n\
 \n\
-PATH_DFLT/OFF/+/-: Adjust the displayed path length.\n\
+PTH_DFLT/OFF/+/-: Adjust the displayed path \n\
+    length.\n\
 \n\
 CONFIG FILES\n\
 ------------\n\
 \n\
-Config files provide the initial conditions for the simulation. The \n\
-config files can be stored locally or in the cloud. \n\
+Config files provide the initial conditions for\n\
+the simulation. The config files can be stored \n\
+locally or in the cloud. \n\
 \n\
 The location of Local config files is:\n\
   Linux Version:    ./sim_gravity\n\
-  Android Version:  embedded with the App (in Assets).\n\
+  Android Version:  embedded with the App Assets\n\
 \n\
 The location of Cloud config files is:\n\
-  http://wikiscience101.sthaid.org/public/sim_gravity/.\n\
-If you are running the Linux Version, be sure you have curl installed.\n\
-Curl is used to access the Cloud config files.\n\
+  http://wikiscience101.sthaid.org/public/\n\
+  sim_gravity/.\n\
+If you are running the Linux Version, be sure \n\
+you have curl installed.  Curl is used to access\n\
+the Cloud config files.\n\
 \n\
-You can share your config files by uploading to the Cloud:\n\
-  curl  -s --upload-file <your_config_file> \\ \n\
-       http://wikiscience101.sthaid.org/public/sim_gravity/\n\
+You can share your config files by uploading to\n\
+the Cloud:\n\
+  curl  -s --upload-file <your_config_file>  \n\
+       http://wikiscience101.sthaid.org/public/\n\
+       sim_gravity/\n\
 \n\
-The config file format is documented in the solar_system file.\n\
+The config file format is documented in the \n\
+solar_system file.\n\
 \n\
 WHAT TO OBSERVE\n\
 ---------------\n\
 \n\
-Try each config file. Notice the 2 body simulations are stable, and \n\
-the 3 body simulation is chaotic.\n\
+Try each config file. Notice the 2 body \n\
+simulations are stable, and the 3 body \n\
+simulation is chaotic.\n\
 \n\
-The solar_system simulation also contains Alpha Centauri. Find Alpha \n\
-Centauri by zooming out, drag display, zoom in.\n\
+The solar_system simulation also contains Alpha\n\
+Centauri. Find Alpha Centauri by zooming out, \n\
+drag the display, and zoom in.\n\
 \n\
-When running the solar_system simulation, zoom in on the sun, and\n\
-observe its small wobble. Observing the wobble of a star is one \n\
-technique used by astronomers to detect extrasolar planets.\n\
+When running the solar_system simulation, zoom \n\
+in on the sun, and observe its small wobble. \n\
+Observing the wobble of a star is one technique\n\
+used by astronomers to detect extrasolar \n\
+planets.\n\
 \n\
-The solar_system_and_rogue_star simulates the impact that a close \n\
-approach of a rogue star would have on our solar system.\n\
+The solar_system_and_rogue_star simulates the \n\
+impact that a close approach of a rogue star \n\
+would have on our solar system.\n\
 \n\
-Using the solar_system click on the Earth. The simulation display will\n\
-track the Earth, that is the Earth will be displayed in the center.\n\
-Observe the complicated paths the planets take from this perspective.\n\
-The loops are called Epicycles or Retrograde Motion.\n\
+Using the solar_system click on the Earth. The \n\
+simulation display will track the Earth, that \n\
+is the Earth will be displayed in the center.\n\
+Observe the complicated paths the planets take \n\
+from this perspective. The loops are called \n\
+Epicycles or Retrograde Motion.\n\
 \n\
-Using gravity_boost try tracking the large object. Notice the \n\
-similarities of the hyperbolic orbit of all the small objects  \n\
-when viewed in the reference frame of the large obect.\n\
+Using gravity_boost try tracking the large \n\
+object. Notice the similarities of the \n\
+hyperbolic orbit of all the small objects  when\n\
+viewed in the reference frame of the large \n\
+obect.\n\
 ";

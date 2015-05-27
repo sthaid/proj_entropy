@@ -819,8 +819,8 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
 
         // register sim_pane controls
-        sdl_render_text_font0(&sim_pane,  0, -2,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&sim_pane,  2, -2,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_render_text_font0(&sim_pane,  0, -5,  " + ", SDL_EVENT_SIMPANE_ZOOM_IN);
+        sdl_render_text_font0(&sim_pane,  2, -5,  " - ", SDL_EVENT_SIMPANE_ZOOM_OUT);
         sdl_event_register(SDL_EVENT_SIMPANE_MOUSE_MOTION, SDL_EVENT_TYPE_MOUSE_MOTION, &sim_pane);
         for (i = 0; i < sim.max_object; i++) {
             object_t * obj = sim.object[i];
@@ -939,10 +939,10 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
         sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
         sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
-        sdl_render_text_font0(&ctl_pane,  8, 0,  "PATH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
-        sdl_render_text_font0(&ctl_pane,  8, 11, "OFF",       SDL_EVENT_PATH_DISP_OFF);
-        sdl_render_text_font0(&ctl_pane,  8, 16, "+",         SDL_EVENT_PATH_DISP_PLUS);
-        sdl_render_text_font0(&ctl_pane,  8, 18, "-",         SDL_EVENT_PATH_DISP_MINUS);
+        sdl_render_text_font0(&ctl_pane,  8, 0,  "PTH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
+        sdl_render_text_font0(&ctl_pane,  8, 10, "OFF",       SDL_EVENT_PATH_DISP_OFF);
+        sdl_render_text_font0(&ctl_pane,  8, 15, " + ",         SDL_EVENT_PATH_DISP_PLUS);
+        sdl_render_text_font0(&ctl_pane,  8, 20, " - ",         SDL_EVENT_PATH_DISP_MINUS);
 
         sdl_render_text_font0(&ctl_pane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctl_pane, -1,-5,  "BACK",      SDL_EVENT_BACK);

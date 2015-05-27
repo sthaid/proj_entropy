@@ -463,8 +463,8 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
 
-        sdl_render_text_font0(&simpane,  0, -2,  "+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&simpane,  2, -2,  "-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_render_text_font0(&simpane,  0, -5,  " + ", SDL_EVENT_SIMPANE_ZOOM_IN);
+        sdl_render_text_font0(&simpane,  2, -5,  " - ", SDL_EVENT_SIMPANE_ZOOM_OUT);
 
         //
         // draw simpane border

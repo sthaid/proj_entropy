@@ -229,8 +229,8 @@ int config_write(char * filename, config_t * config);
 
 // -----------------  LOGGING  -------------------------------------------------------
 
-// #define ENABLE_LOGGING
-// #define ENABLE_LOGGING_AT_DEBUG_LEVEL
+//#define ENABLE_LOGGING
+//#define ENABLE_LOGGING_AT_DEBUG_LEVEL
 
 #ifdef ENABLE_LOGGING
     #define INFO(fmt, args...) \

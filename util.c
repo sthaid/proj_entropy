@@ -76,29 +76,32 @@ void sdl_init(uint32_t w, uint32_t h)
     }
 
     font0_path = "fonts/FreeMonoBold.ttf";         // normal 
-    font0_ptsize = 40;
+    font0_ptsize = 40 * sdl_win_height / 720;
     font1_path = "fonts/FreeMonoBold.ttf";         // extra large, for keyboard
-    font1_ptsize = 54;
-    font2_path = "fonts/FreeMonoBold.ttf";         // small, for help text
-    font2_ptsize = 26;
+    font1_ptsize = 54 * sdl_win_height / 720;
+    font2_path = "fonts/FreeMonoBold.ttf";         // for help text
+    font2_ptsize = 40 * sdl_win_height / 720;
 
     sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
         FATAL("failed TTF_OpenFont %s\n", font0_path);
     }
     TTF_SizeText(sdl_font[0].font, "X", &sdl_font[0].char_width, &sdl_font[0].char_height);
+    INFO("font0 width %d height %d\n", sdl_font[0].char_width, sdl_font[0].char_height);
 
     sdl_font[1].font = TTF_OpenFont(font1_path, font1_ptsize);
     if (sdl_font[1].font == NULL) {
         FATAL("failed TTF_OpenFont %s\n", font1_path);
     }
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
+    INFO("font1 width %d height %d\n", sdl_font[1].char_width, sdl_font[1].char_height);
 
     sdl_font[2].font = TTF_OpenFont(font2_path, font2_ptsize);
     if (sdl_font[2].font == NULL) {
         FATAL("failed TTF_OpenFont %s\n", font2_path);
     }
     TTF_SizeText(sdl_font[2].font, "X", &sdl_font[2].char_width, &sdl_font[2].char_height);
+    INFO("font2 width %d height %d\n", sdl_font[2].char_width, sdl_font[2].char_height);
 }
 
 void sdl_terminate(void)
@@ -367,7 +370,6 @@ sdl_event_t * sdl_poll_event(void)
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 sdl_win_width = ev.window.data1;
                 sdl_win_height = ev.window.data2;
-                INFO("XXX w,h %d %d\n", sdl_win_width, sdl_win_height);
                 event.event = SDL_EVENT_WIN_SIZE_CHANGE;
                 break;
             case SDL_WINDOWEVENT_MINIMIZED:
