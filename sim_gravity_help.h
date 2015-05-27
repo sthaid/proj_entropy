@@ -63,8 +63,7 @@ LOCAL/CLOUD: Select a config file either from \n\
     files describe the initial condition of the\n\
     simulation. \n\
 \n\
-PTH_DFLT/OFF/+/-: Adjust the displayed path \n\
-    length.\n\
+PTHSTD/OFF/+/-: Adjust displayed path length.\n\
 \n\
 CONFIG FILES\n\
 ------------\n\

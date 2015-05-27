@@ -934,15 +934,15 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_ex(&ctl_pane, 0, 0, sim.sim_name, SDL_EVENT_NONE,
                            SDL_FIELD_COLS_UNLIMITTED, true, 0);
         sdl_render_text_font0(&ctl_pane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctl_pane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctl_pane,  2, 7,  "STOP",      SDL_EVENT_STOP);
         sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
-        sdl_render_text_font0(&ctl_pane,  4, 9,  "DT-",       SDL_EVENT_DT_MINUS);
+        sdl_render_text_font0(&ctl_pane,  4, 7,  "DT-",       SDL_EVENT_DT_MINUS);
         sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
-        sdl_render_text_font0(&ctl_pane,  6, 9,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
-        sdl_render_text_font0(&ctl_pane,  8, 0,  "PTH_DFLT", SDL_EVENT_PATH_DISP_DEFAULT);
-        sdl_render_text_font0(&ctl_pane,  8, 10, "OFF",       SDL_EVENT_PATH_DISP_OFF);
-        sdl_render_text_font0(&ctl_pane,  8, 15, " + ",         SDL_EVENT_PATH_DISP_PLUS);
-        sdl_render_text_font0(&ctl_pane,  8, 20, " - ",         SDL_EVENT_PATH_DISP_MINUS);
+        sdl_render_text_font0(&ctl_pane,  6, 7,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
+        sdl_render_text_font0(&ctl_pane,  8, 0,  "PTHSTD",   SDL_EVENT_PATH_DISP_DEFAULT);
+        sdl_render_text_font0(&ctl_pane,  8, 7,  "OFF",       SDL_EVENT_PATH_DISP_OFF);
+        sdl_render_text_font0(&ctl_pane,  8, 11, " + ",       SDL_EVENT_PATH_DISP_PLUS);
+        sdl_render_text_font0(&ctl_pane,  8, 15, " - ",       SDL_EVENT_PATH_DISP_MINUS);
 
         sdl_render_text_font0(&ctl_pane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctl_pane, -1,-5,  "BACK",      SDL_EVENT_BACK);
