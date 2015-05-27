@@ -302,9 +302,10 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
         //
 
         if (sdl_win_width > sdl_win_height) {
+            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
             simpane_width = sdl_win_height;
-            if (simpane_width + 480 > sdl_win_width) {
-                simpane_width = sdl_win_width - 480;
+            if (simpane_width + min_ctlpane_width > sdl_win_width) {
+                simpane_width = sdl_win_width - min_ctlpane_width;
             }
             SDL_INIT_PANE(ctlpane,
                           simpane_width, 0,             // x, y

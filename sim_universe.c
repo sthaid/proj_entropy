@@ -321,9 +321,10 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         //
 
         if (sdl_win_width > sdl_win_height) {
+            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
             simpane_width = sdl_win_height;
-            if (simpane_width + 480 > sdl_win_width) {
-                simpane_width = sdl_win_width - 480;
+            if (simpane_width + min_ctlpane_width > sdl_win_width) {
+                simpane_width = sdl_win_width - min_ctlpane_width;
             }
             SDL_INIT_PANE(simpane,
                           0, 0,                                             // x, y
@@ -448,18 +449,18 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         //
 
         char rs_str[20], suspend_str[20];
-        sprintf(rs_str, "%3d", run_speed);
+        sprintf(rs_str, "%d", run_speed);
         sprintf(suspend_str, "%s", suspend_expansion ? "RES" : "SUS");
 
         sdl_render_text_font0(&ctlpane,  0, 3,  "UNIVERSE",  SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctlpane,  2, 8,  "STOP",      SDL_EVENT_STOP);
-        sdl_render_text_font0(&ctlpane,  2, 16, suspend_str, SDL_EVENT_SUSPEND_EXPANSION);
+        sdl_render_text_font0(&ctlpane,  2, 7,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  2, 14, suspend_str, SDL_EVENT_SUSPEND_EXPANSION);
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
-        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
-        sdl_render_text_font0(&ctlpane,  4, 16, rs_str,      SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane,  4, 7,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 14, rs_str,      SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  6, 0,  "RESET",     SDL_EVENT_RESET);
-        sdl_render_text_font0(&ctlpane,  6, 8,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
+        sdl_render_text_font0(&ctlpane,  6, 7,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
         sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
 

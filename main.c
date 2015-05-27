@@ -51,7 +51,7 @@ int32_t main(int32_t argc, char **argv)
     INFO("STARTING %s\n", argv[0]);
 
     // init sdl
-    sdl_init(1280,720);
+    sdl_init(1280,800);
 
     // processing
     while (!sdl_quit) {

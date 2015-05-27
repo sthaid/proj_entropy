@@ -664,9 +664,10 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         //
 
         if (sdl_win_width > sdl_win_height) {
+            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
             sim_pane_width = sdl_win_height;
-            if (sim_pane_width + 480 > sdl_win_width) {
-                sim_pane_width = sdl_win_width - 480;
+            if (sim_pane_width + min_ctlpane_width > sdl_win_width) {
+                sim_pane_width = sdl_win_width - min_ctlpane_width;
             }
             SDL_INIT_PANE(sim_pane, 
                           0, 0,  
