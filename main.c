@@ -30,6 +30,7 @@ static char * choices[] = {
                 "Expanding Gas in a Container",
                 "Gravity Simulation",         
                 "Our Expanding Universe",
+                "Random Walk",
                 "About",
                         };
 #endif
@@ -78,6 +79,9 @@ int32_t main(int32_t argc, char **argv)
             sim_universe();
             break;
         case 3:
+            sim_randomwalk();
+            break;
+        case 4:
             sdl_display_text(about);
             break;
         }

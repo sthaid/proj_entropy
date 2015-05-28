@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#define VERSION "1.1"
+#define VERSION "0.9"
 
 // Note max line length is 48 chars.
 

@@ -52,6 +52,7 @@ SOFTWARE.
 void sim_container(void);
 void sim_gravity(void);
 void sim_universe(void);
+void sim_randomwalk(void);
 
 // -----------------  SDL SUPPORT  --------------------------------------------------
 

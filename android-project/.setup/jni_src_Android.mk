@@ -15,7 +15,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
                     $(LOCAL_PATH)/$(SDL_MIXER_PATH) 
 
 LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.c \
-                   main.c util.c sim_container.c sim_gravity.c sim_universe.c
+                   main.c util.c sim_container.c sim_gravity.c sim_universe.c sim_randomwalk.c
 
 LOCAL_SHARED_LIBRARIES := SDL2 SDL2_ttf SDL2_mixer 
 

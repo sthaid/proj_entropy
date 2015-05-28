@@ -93,11 +93,13 @@ ln -s ../../../util.c                jni/src
 ln -s ../../../sim_container.c       jni/src
 ln -s ../../../sim_gravity.c         jni/src
 ln -s ../../../sim_universe.c        jni/src
+ln -s ../../../sim_randomwalk.c      jni/src
 ln -s ../../../util.h                jni/src
 ln -s ../../../button_sound.h        jni/src
 ln -s ../../../sim_container_help.h  jni/src
 ln -s ../../../sim_gravity_help.h    jni/src
 ln -s ../../../sim_universe_help.h   jni/src
+ln -s ../../../sim_randomwalk_help.h jni/src
 ln -s ../../../about.h               jni/src
 
 # replace jni/src/Android.mk
