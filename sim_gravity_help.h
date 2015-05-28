@@ -124,5 +124,5 @@ Using gravity_boost try tracking the large \n\
 object. Notice the similarities of the \n\
 hyperbolic orbit of all the small objects  when\n\
 viewed in the reference frame of the large \n\
-obect.\n\
+object.\n\
 ";

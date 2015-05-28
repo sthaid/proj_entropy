@@ -1,0 +1,136 @@
+== Introduction ==
+
+The purpose of this App is to gain a further understanding of Physics through computer simulations.
+
+The following simulations are included. These are described in more detail below.
+* Expanding Gas in a Container
+* Gravity Simulation
+* Our Expanding Universe
+* Random Walk
+
+You are encouraged to download the source code and add your own simulations. This App is coded in C, and utilizes the [https://www.libsdl.org/ Simple DirectMedia Layer] cross-platform development library. Use the Random Walk simulation as a template for your simulation. 
+
+Suggestions for additional simulations:
+* Elastic Collisions
+* Nuclear Fission Chain Reaction
+* Bacterial Life
+
+The source code is available at https://github.com/sthaid/proj_entropy.git.  Refer to the README for instructions on how to build for Linux or Android.
+
+Author: Steven Haid, stevenhaid@gmail.com
+
+== Expanding Gas in a Container ==
+
+This is a simulation of a gas expanding in a container. The gas is initially confined to a point located in the center of the container.  When the simulation runs the gas expands from this central point to fill the container.
+
+The gas particles do not interact with each other, they only interact with the walls of the container.
+
+The ability to shrink and expand the container is provided. When the container is shrinking, the particles bounce off the container walls with a higher velocity. This higher reflection velocity is due to the inward velocity of the container walls when the container is shrinking.
+
+The color of each particle represents its speed.  Slow moving particles are shown in purple, fast particles in red. The average speed of the particles is shown as a temperature value.
+
+=== What to Observe ===
+
+Increase of entropy when the simulation starts.
+
+There is a period of time after starting the simulation where the particles form a pattern that could be extrapolated back to the initial condition.
+
+Run the simulation with 4 particles, width set to 4, and at fastest speed.  After many cycles the simulation may detect low entropy, and automatically stop. You can then set the Run Speed to 1, and playback the simulation in reverse. This illustrates the statistical nature of entropy, and how entropy can very occasionally decrease.
+
+Shrink the container, and observe the temperature increase. Wait a bit to allow the temperature to equalize with the ambient temperature, of about 70 degrees. Then Restore the container, and notice the temperature fall.
+
+== Gravity Simulation ==
+
+This is a simulation of Newton's Law of Gravity.  The motion of objects is simulated using the following equations:
+
+           M1 * M2
+    F = G --------
+             R^2
+
+    F = M * A
+
+The simulation is in 2 dimensions. Newton's Laws work in 2 dimensions; this is the case when the Z component of Force and the Z component of Initial Velocity are zero.
+
+The default center of the display is X,Y=(0,0); this can be changed by dragging the display. The center of the display can also be set to track one of the objects. To enable this mode click on the desired object. The object being tracked will be displayed in pink at the center of the display.
+
+=== What to Observe ===
+
+Try each config file. Notice the 2 body simulations are stable, and the 3 body simulation is chaotic.
+
+The solar_system simulation also contains Alpha Centauri. Find Alpha Centauri by zooming out, drag the display, and zoom in.
+
+When running the solar_system simulation, zoom in on the sun, and observe its small wobble.  Observing the wobble of a star is one technique used by astronomers to detect extrasolar planets.
+
+The solar_system_and_rogue_star simulates the impact that a close approach of a rogue star would have on our solar system.
+
+Using the solar_system click on the Earth. The simulation display will track the Earth, that is the Earth will be displayed in the center.  Observe the complicated paths the planets take from this perspective. The loops are called Epicycles or Retrograde Motion.
+
+Using gravity_boost try tracking the large object. Notice the similarities of the hyperbolic orbit of all the small objects  when viewed in the reference frame of the large object.
+
+=== Develop and Share Gravity Config Files ===
+
+Config files provide the initial conditions for the simulation. 
+
+Config Files are stored locally or in the cloud. The local Config Files are embedded in the Android App's assets; or in the sim_gravity directory for the Linux version.  The location of the Cloud Config Files is: http://wikiscience101.sthaid.org/public/sim_gravity/. If you are running the Linux Version, be sure you have curl installed. Curl is used to access the Cloud Config Files.
+
+The Config File format is documented in the solar_system file. The solar_system file can be downloaded from the Cloud URL shown above.
+
+When you have created a Config File that you want to test, upload it to the Cloud; it will then be accessible to you and other users. Or, if you are using the Linux version, you can copy the Config File you want to test to the sim_gravity directory.
+
+Curl commands to maintain Config Files:
+* Download: curl  -s http://wikiscience101.sthaid.org/public/sim_gravity/<config_file_name>
+* Upload:   curl  -s --upload-file <config_file_name>  http://wikiscience101.sthaid.org/public/sim_gravity/
+* Delete:   curl  -s -X DELETE http://wikiscience101.sthaid.org/public/sim_gravity/$1
+* List:     curl  -s http://wikiscience101.sthaid.org/public/sim_gravity/ | grep "^<a href="
+
+== Our Expanding Universe ==
+
+This is a simulation of our expanding universe.  The simulated universe has the following characteristics:
+* it is comprised of non interacting particles
+* each particle is given an initial random velocity, which does not change
+* the radius of the universe increases with time, this causes an additional apparent velocity which increases with distance.
+
+The vantage point is the center of the display.  The color of a particle indicates its apparent velocity with respect to the vantage point. The apparent velocity is the sum of the particle's actual velocity and apparent velocity due to the expansion.
+
+Particles shown in:
+* blue - apparent velocity is toward the vantage point
+* green- no apparent velocity
+* red - apparent velocity away from the vantage point, near the speed of light
+* purple - these particles are not visible from the vantage point, because their apparent velocity exceed the speed of light
+
+Note - All vantage points in our universe are equivalent. This means that our universe appears generally the same from every vantage point.
+
+Note - The particles shown in purple have apparent recession velocities, from the vantage point in the center, that exceed the speed of light.  This does not violate Special Relativity because their large velocities are due to the expansion of space itself. Refer to [http://en.wikipedia.org/wiki/Alcubierre_drive Alcubierre drive] for a speculative idea on how the expansion and contraction of space could be used by a spaceship to travel faster than light.
+
+=== Radius of the Simulated Universe ===
+
+The simulation uses the following formula to calculate the radius of the universe. This formula was chosen for this simulation because its behavior is similar to accepted theories of the expansion of our universe:
+* very rapid increase of radius at low values of time (inflation)
+* rapid increase of radius at high time values
+
+  Radius = K1 * sqrt(T)  +  K2 * (2^(T/K3) - 1)
+
+=== What to Observe ===
+
+Rapid expansion during the early universe.
+
+Much of the universe lies beyond what we can see from our vantage point.
+
+As the universe ages, the size of the observable universe shrinks towards zero.
+
+== Random Walk ==
+
+Simulation of Random Walk in 2 Dimensions. Each walker randomly chooses to move 1 unit (take one step) in either the positive or negative X or Y direction.
+
+The average and expected distance from the origin is displayed. The expected distance from the origin is given by the following equation. Where N is the number of steps, and D is the number of dimensions. Also see [http://math.stackexchange.com/questions/103142/expected-value-of-random-walk Expected Value of Random Walk].
+
+                    GAMMA((D + 1) / 2)
+  SQRT(2 * N / D) * ------------------
+                      GAMMA(D / 2)
+
+
+=== What to Observe ===
+
+Observe the Ratio of the Actual and Expected Distance.
+
+Configure with a small number of walkers, and observe the individual paths.
