@@ -1,0 +1,196 @@
+- check button sound volume
+- test on uni linux
+- check in this file
+
+- final test
+  - recheck fonts on lauras phone, 
+- git tag
+
+
+
+- mediawiki logo
+
+DONE
+----
+- google developer acct
+- set to version 1.0
+- clean up code, 
+- disable logging
+
+
+
+DEVELOPER WEB SITES
+-------------------
+
+Launch Checklist
+  http://developer.android.com/distribute/tools/launch-checklist.html
+
+Device Dashboards
+  http://developer.android.com/about/dashboards/index.html
+
+Supporting Different Densities
+  http://developer.android.com/training/multiscreen/screendensities.html
+  looks like most are at least  720x1280
+
+
+LAUNCH CHECKLIST
+----------------
+
+Test For Quality
+- test on as many devices as possible
+- DONE test on my tablet and laura's phone
+
+Determine Content Rating 
+- Everyone,  Low maturity, Medium maturity, High maturity
+- DONE use Everyone  rating
+
+Determine Country Distribution
+- Reasons
+  . The need for localized resources in the app.
+  . The need for a localized app description in the Developer Console.
+  . Legal requirements for the app that may be specific to certain countries.
+  . Time zone support, local pricing, and so on
+- DONE distribute in US and England only
+
+Confirm App's Overall Size
+- The maximum size for an APK published on Google Play is 50 MB.
+- You can use up to two (2) APK Expansion Files, each up to 2GB in size, for each APK.
+- DONE build app for all ABI
+
+Confirm the App's Platform and Screen Compatibility Ranges
+- Check display orienttion   
+- Check minSdkVersion
+- Test on Tablet and Phone
+- Declare the minimum screen-size supported by your apps using <supports-screens>
+- DONE only allow horizontal
+- DONE change to work on 720x1280
+
+Decide Whether your App will be Free or Priced
+- Free apps must remain free
+
+Start Localization
+- Localizing the strings, images, and other resources in your apps.
+- Localizing your apps’ store listing details on Google Play.
+- Localizing the apps’ graphic assets, screenshots, and videos that accompany your store listing.
+- DONE English Only
+
+Prepare Promotional Graphics, Screenshots, and Videos
+- When you publish on Google Play, you can supply a variety of high-quality graphic assets to 
+  showcase your app or brand. After you publish, these appear on your store listing page, search 
+  results, and elsewhere.
+
+Build and Upload the Release-ready APK
+- Preparing for Release
+  . release apk is signed with my own certificate and optimized with zipalign tool
+- Main Tasks
+  . Gather Materials:        EULA, Launch ICON
+  . Configure App:           Remove debugging and logging, clean up code
+  . Build for Release:       Build release version and sign  (SEE APPENDIX: SIGINING)
+  . Prepare Remote Servers:  Web Page
+  . Test App:                Test the Signed App
+- DONE learn how to buile Release
+- DONE update About to inlcude: EULA, my name and email, web site
+- DONE build release without logging, 
+- DONE sign release
+- DONE test signed app
+- DONE code version number 1.0, in about.h
+- TODO clean up code
+- TODO tag git code
+
+Plan a Beta Release
+- Google Developer's Console supports this
+- TODO try this
+
+Complete the Apps’ Store Listing
+- TODO how to get screen shot
+
+- As you get near your target publishing date, you should become familiar with all the fields, 
+  options, and assets associated with the store listing configuration page in the Developer Console. 
+  As you collect the information and assets for the page, make sure that you can enter or upload 
+  it to the Developer Console, until the page is complete and ready for publishing.
+- TODO ^^^
+
+- After you've set your apps’ geographic targeting in the Developer Console, remember to add your 
+  localized store listing, promotional graphics, and so on, for all of the languages that you support.
+
+- If your app is targeting tablet devices, make sure to include at least one screenshot of the app 
+  running on a tablet, and highlight your apps’ support for tablets in the app description, 
+  release notes, promotional campaigns, and elsewhere.
+
+Final Checks and Publishing
+
+- When you think you’re ready to publish, sign in to the Developer Console and take a few 
+  moments for a few final checks.  Make sure that:
+
+  . Your developer profile has the correct information and is linked to the proper Google Wallet 
+    merchant account (if you’re selling products).
+  . You have the right version of the apps uploaded.
+  . All parts of your store listing are ready, including all graphic assets, screenshots, video, 
+    localized descriptions, and so on.
+  . You have set your app's pricing to free or priced.
+  . You have set country (and carrier) targeting and priced your products (if appropriate) in 
+    buyer currencies "Compatible devices" shows that your apps are reaching the devices that you’re targeting. 
+    If not, you should check with your development team on the apps’ requirements and filtering rules.
+  . You’ve provided the correct link to your website and the correct support email address.
+  . Your apps don’t violate content policy guidelines.
+  . You’ve acknowledged that your apps meets the guidelines for Android content on Google Play 
+    and also US export laws.
+  . Your apps are now ready to publish!
+
+- TODO the above
+
+- If you’re releasing an update, make sure to read the requirements for publishing updates.
+
+- When you’re ready, click the Publish button in the Developer Console. 
+  Within a few hours, your apps will become available to users and your product page will appear 
+  in Google Play for browsing, searching, or linking from your promotional campaigns.
+- TODO click Publish
+
+
+APPENDIX - GET GOOGLEL DEVELOPERS ACCT
+--------------------------------------
+
+TODO get acct
+
+
+APPENDIX - SIGING
+-----------------
+
+http://developer.android.com/tools/publishing/app-signing.html
+
+Signing Your App Manually ...
+You do not need Android Studio to sign your app. You can sign your app from the command line 
+using standard tools from the Android SDK and the JDK. 
+
+To sign an app in release mode from the command line:
+
+*) Generate a private key using keytool. For example:
+     $ keytool -genkey -v -keystore my-release-key.keystore
+               -alias alias_name -keyalg RSA -keysize 2048 -validity 10000
+
+     This example prompts you for passwords for the keystore and key, and to provide the Distinguished Name 
+     fields for your key. It then generates the keystore as a file called my-release-key.keystore. 
+     The keystore contains a single key, valid for 10000 days. 
+     The alias is a name that you will use later when signing your app.
+
+*) Compile your app in release mode to obtain an unsigned APK.
+
+*) Sign your app with your private key using jarsigner:
+
+    $ jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1
+                -keystore my-release-key.keystore my_application.apk alias_name
+
+     This example prompts you for passwords for the keystore and key. 
+     It then modifies the APK in-place to sign it. 
+     Note that you can sign an APK multiple times with different keys.
+
+*) Verify that your APK is signed. For example:
+
+    $ jarsigner -verify -verbose -certs my_application.apk
+
+*) Align the final APK package using zipalign.
+
+    $ zipalign -v 4 your_project_name-unaligned.apk your_project_name.apk
+
+    zipalign ensures that all uncompressed data starts with a particular byte alignment 
+    relative to the start of the file, which reduces the amount of RAM consumed by an app.

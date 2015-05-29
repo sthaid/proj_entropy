@@ -168,11 +168,14 @@ int32_t sim_container_init(int32_t max_particle, int64_t sim_width)
 
     // allocate sim
     free(sim);
-    sim = calloc(1, SIM_SIZE(max_particle));
-    if (sim == NULL) {
-        // xxx test this path
-        // xxx fake in a dummy sim that is malloced but with small max_particles
-        return -1;
+    while (true) {
+        sim = calloc(1, SIM_SIZE(max_particle));
+        if (sim != NULL) {
+            break;
+        }
+        ERROR("alloc sim failed, max_particle=%d size=%d MB, retrying with max_particle=%d\n",
+              max_particle, (int32_t)(SIM_SIZE(max_particle)/MB), max_particle/2);
+        max_particle /= 2;
     }
 
     // set simulation state

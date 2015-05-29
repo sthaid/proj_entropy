@@ -183,7 +183,7 @@ sdl_event_t * sdl_poll_event(void)
     int32_t i;
 
     static sdl_event_t event;
-    static int32_t     mouse_button_state;  // xxx how to ensure this is reset
+    static int32_t     mouse_button_state; 
     static int32_t     mouse_button_motion_event;
     static int32_t     mouse_button_x;
     static int32_t     mouse_button_y;
@@ -1185,7 +1185,9 @@ int Pthread_barrier_wait(Pthread_barrier_t *barrier)
 
 int Pthread_barrier_destroy(Pthread_barrier_t *barrier)
 {
-    // xxx should delete the mutex and cond
+    pthread_mutex_destroy(&barrier->mutex);
+    pthread_cond_destroy(&barrier->cond);
+    bzero(barrier, sizeof(Pthread_barrier_t));
     return 0;
 }
 
@@ -1575,7 +1577,6 @@ char * dur2str(char * str, int64_t duration)
 
 // -----------------  FILE ACCESS  ----------------------------------------
 
-// xxx this section needs work
 typedef struct {
     char * buff;
     size_t offset;
@@ -1726,7 +1727,7 @@ static int32_t list_cloud_files(char * location, int32_t * max, char *** pathnam
     int32_t ret = 0;
 
     *max = 0;
-    *pathnames = calloc(1000,sizeof(char*)); //xxx, maybe realloc
+    *pathnames = calloc(1000,sizeof(char*)); //xxx realloc
     if (*pathnames == NULL) {
         ERROR("calloc\n");
         return -1;
@@ -1777,7 +1778,7 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
     char            path[300];
 
     *max = 0;
-    *pathnames = calloc(1000,sizeof(char*)); //xxx
+    *pathnames = calloc(1000,sizeof(char*)); //xxx realloc
     if (*pathnames == NULL) {
         ERROR("calloc\n");
         return -1;
@@ -1819,7 +1820,7 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
     char            location_copy[200];
     int32_t         len;
 
-    // xxx comments
+    // this code is derived from 
     // src/core/android/SDL_android.c
 
     *max = 0;
@@ -1829,11 +1830,11 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
         return -1;
     }
 
-    // xxx 
+    // not sure what this is for, it was in SDL_android.c
     (*mEnv)->PushLocalFrame(mEnv, 16);
 
     // context = SDLActivity.getContext(); 
-    mid = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,   // xxx mActivityClass
+    mid = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
             "getContext","()Landroid/content/Context;");
     context = (*mEnv)->CallStaticObjectMethod(mEnv, mActivityClass, mid);
 
@@ -1842,17 +1843,17 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
             "getAssets", "()Landroid/content/res/AssetManager;");
     java_asset_manager = (*mEnv)->CallObjectMethod(mEnv, context, mid);
 
-    // xxx
+    // get pointer to asset_manager
     asset_manager = AAssetManager_fromJava(mEnv, java_asset_manager);
 
-    // xxx
+    // remove trailing '/' on the location arg
     strcpy(location_copy, location);
     len = strlen(location_copy);
     if (len > 0 && location_copy[len-1] == '/') {
         location_copy[len-1] = '\0';
     }
 
-    // xxx
+    // open asset_dir and get the asset filenames
     asset_dir = AAssetManager_openDir(asset_manager, location_copy);
     while ((fn = AAssetDir_getNextFileName(asset_dir)) != NULL) {
         (*pathnames)[*max] = malloc(strlen(location_copy)+strlen(fn)+2);
@@ -1860,10 +1861,10 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
         (*max)++;
     }
 
-    // xxx
+    // close the asset_dir
     AAssetDir_close(asset_dir);
 
-    // xxx
+    // not sure what this is for, it was in SDL_android.c
     (*mEnv)->PopLocalFrame(mEnv, NULL);
 
     // return success
@@ -1908,10 +1909,7 @@ static void list_files_sort(char ** pathnames, int32_t max)
 
 int32_t random_uniform(int32_t low, int32_t high)
 {
-    int32_t range = high - low + 1;
-
-    // XXX this needs work
-    return low + (random() % range);
+    return low + ((int64_t)random() * (high - low + 1) / ((int64_t)RAND_MAX + 1));
 }
 
 // Refer to:

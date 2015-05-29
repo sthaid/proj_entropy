@@ -837,7 +837,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                 Y_ORIGIN = sim.object[tracker_obj]->Y;
             }
 
-            // XXX overflow ?
             disp_x = sim_pane.x + (obj->X - X_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
             disp_y = sim_pane.y + (obj->Y - Y_ORIGIN + sim_width/2) * (sim_pane_width / sim_width);
 
