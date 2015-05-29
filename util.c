@@ -45,8 +45,8 @@ static int32_t     sdl_event_max;
 
 void sdl_init(uint32_t w, uint32_t h)
 {
-    char  * font0_path, * font1_path, * font2_path;
-    int32_t font0_ptsize, font1_ptsize, font2_ptsize;
+    char  * font0_path, * font1_path;
+    int32_t font0_ptsize, font1_ptsize;
 
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
@@ -76,11 +76,9 @@ void sdl_init(uint32_t w, uint32_t h)
     }
 
     font0_path = "fonts/FreeMonoBold.ttf";         // normal 
-    font0_ptsize = sdl_win_height / 20 - 1;
+    font0_ptsize = sdl_win_height / 18 - 1;
     font1_path = "fonts/FreeMonoBold.ttf";         // extra large, for keyboard
     font1_ptsize = sdl_win_height / 13 - 1;
-    font2_path = "fonts/FreeMonoBold.ttf";         // for help text
-    font2_ptsize = sdl_win_height / 20 - 1;
 
     sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
@@ -97,14 +95,6 @@ void sdl_init(uint32_t w, uint32_t h)
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
     INFO("font1 psize=%d width=%d height=%d\n", 
          font1_ptsize, sdl_font[1].char_width, sdl_font[1].char_height);
-
-    sdl_font[2].font = TTF_OpenFont(font2_path, font2_ptsize);
-    if (sdl_font[2].font == NULL) {
-        FATAL("failed TTF_OpenFont %s\n", font2_path);
-    }
-    TTF_SizeText(sdl_font[2].font, "X", &sdl_font[2].char_width, &sdl_font[2].char_height);
-    INFO("font2 psize=%d width=%d height=%d\n", 
-         font2_ptsize, sdl_font[2].char_width, sdl_font[2].char_height);
 }
 
 void sdl_terminate(void)
@@ -243,6 +233,7 @@ sdl_event_t * sdl_poll_event(void)
                 }
             }
             if (event.event != SDL_EVENT_NONE) {
+                sdl_play_event_sound();
                 break;
             }
 
@@ -361,8 +352,10 @@ sdl_event_t * sdl_poll_event(void)
                      sdl_event_reg_tbl[toupper(possible_event)].pos.w))
                 {
                     event.event = !shift ? possible_event : toupper(possible_event);
+                    sdl_play_event_sound();
                 } else if (sdl_event_reg_tbl[possible_event].pos.w) {
                     event.event = possible_event;
+                    sdl_play_event_sound();
                 }
             }
             break; }
@@ -390,6 +383,7 @@ sdl_event_t * sdl_poll_event(void)
             DEBUG("got event SDL_QUIT\n");
             sdl_quit = true;
             event.event = SDL_EVENT_QUIT;
+            sdl_play_event_sound();
             break; }
 
         default: {
@@ -773,25 +767,19 @@ void sdl_display_get_string(int32_t count, ...)
         // handle events 
         event = sdl_poll_event();
         if (event->event == SDL_EVENT_QUIT) {
-            sdl_play_event_sound();
             break;
         } else if (event->event == SDL_EVENT_KEY_SHIFT) {
-            sdl_play_event_sound();
             shift = !shift;
         } else if (event->event == SDL_EVENT_KEY_BS) {
             int32_t len = strlen(ret_str[field_select]);
-            sdl_play_event_sound();
             if (len > 0) {
                 ret_str[field_select][len-1] = '\0';
             }
         } else if (event->event == SDL_EVENT_KEY_TAB) {
-            sdl_play_event_sound();
             field_select = (field_select + 1) % count;
         } else if (event->event == SDL_EVENT_KEY_ENTER) {
-            sdl_play_event_sound();
             break;
         } else if (event->event == SDL_EVENT_KEY_ESC) {
-            sdl_play_event_sound();
             if (strcmp(ret_str[field_select], curr_str[field_select])) {
                 strcpy(ret_str[field_select], curr_str[field_select]);
             } else {
@@ -801,11 +789,9 @@ void sdl_display_get_string(int32_t count, ...)
                 break;
             }
         } else if (event->event >= SDL_EVENT_FIELD_SELECT && event->event < SDL_EVENT_FIELD_SELECT+count) {
-            sdl_play_event_sound();
             field_select = event->event - SDL_EVENT_FIELD_SELECT;
         } else if (event->event >= 0x20 && event->event <= 0x7e) {
             char s[2];
-            sdl_play_event_sound();
             s[0] = event->event;
             s[1] = '\0';
             strcat(ret_str[field_select], s);
@@ -826,7 +812,7 @@ void sdl_display_text(char * text)
     int32_t        max_texture = 0;
     int32_t        max_texture_alloced = 0;
     int32_t        text_y = 0;
-    int32_t        pixels_per_row = sdl_font[2].char_height;
+    int32_t        pixels_per_row = sdl_font[0].char_height;
 
     // create a texture for each line of text
     //
@@ -856,7 +842,7 @@ void sdl_display_text(char * text)
             texture = realloc(texture, max_texture_alloced*sizeof(void*));
         }
 
-        surface = TTF_RenderText_Shaded(sdl_font[2].font, line, fg_color, bg_color);
+        surface = TTF_RenderText_Shaded(sdl_font[0].font, line, fg_color, bg_color);
         texture[max_texture++] = SDL_CreateTextureFromSurface(sdl_renderer, surface);
         SDL_FreeSurface(surface);
     }
@@ -932,24 +918,19 @@ void sdl_display_text(char * text)
             text_y -= event->mouse_wheel.delta_y * 2 * pixels_per_row;
             break;
         case SDL_EVENT_KEY_HOME:
-            sdl_play_event_sound();
             text_y = 0;
             break;
         case SDL_EVENT_KEY_END:
-            sdl_play_event_sound();
             text_y = INT_MAX;
             break;
         case SDL_EVENT_KEY_PGUP:
-            sdl_play_event_sound();
             text_y -= (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_KEY_PGDN:
-            sdl_play_event_sound();
             text_y += (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
-            sdl_play_event_sound();
             done = true;
         }
     }
@@ -1074,7 +1055,6 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
         event = sdl_poll_event();
         switch (event->event) {
         case SDL_EVENT_LIST_CHOICE ... SDL_EVENT_LIST_CHOICE+39:
-            sdl_play_event_sound();
             *selection = event->event - SDL_EVENT_LIST_CHOICE;
             done = true;
             break;
@@ -1085,24 +1065,19 @@ void  sdl_display_choose_from_list(char * title_str, char ** choice, int32_t max
             text_y -= event->mouse_wheel.delta_y * 2 * pixels_per_row;
             break;
         case SDL_EVENT_KEY_HOME:
-            sdl_play_event_sound();
             text_y = 0;
             break;
         case SDL_EVENT_KEY_END:
-            sdl_play_event_sound();
             text_y = INT_MAX;
             break;
         case SDL_EVENT_KEY_PGUP:
-            sdl_play_event_sound();
             text_y -= (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_KEY_PGDN:
-            sdl_play_event_sound();
             text_y += (lines_per_display - 2) * pixels_per_row;
             break;
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
-            sdl_play_event_sound();
             done = true;
         }
     }
@@ -1161,7 +1136,6 @@ void sdl_display_error(char * err_str0, char * err_str1, char * err_str2)
         switch (event->event) {
         case SDL_EVENT_BACK:
         case SDL_EVENT_QUIT: 
-            sdl_play_event_sound();
             done = true;
         }
     }

@@ -29,7 +29,7 @@ SOFTWARE.
 
 #define DEFAULT_DISPLAY_WIDTH 1000
 
-#define DEFAULT_MAX_WALKER    10000
+#define DEFAULT_MAX_WALKER    1000
 #define MIN_MAX_WALKER        1
 #define MAX_MAX_WALKER        1000000 
 
@@ -246,7 +246,7 @@ int32_t sim_randomwalk_display_simulation(int32_t curr_display, int32_t last_dis
         //
 
         if (sdl_win_width > sdl_win_height) {
-            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
+            int32_t min_ctlpane_width = 18 * sdl_font[0].char_width;
             simpane_width = sdl_win_height;
             if (simpane_width + min_ctlpane_width > sdl_win_width) {
                 simpane_width = sdl_win_width - min_ctlpane_width;
@@ -321,24 +321,24 @@ int32_t sim_randomwalk_display_simulation(int32_t curr_display, int32_t last_dis
         // average distance, expected distance, and ratio of these
         // note: http://math.stackexchange.com/questions/103142/expected-value-of-random-walk
         avg_distance = sum_distance / sim->max_walker;
-        sprintf(str, "DIST = %d", (int32_t)avg_distance);
+        sprintf(str, "DIST   %d", (int32_t)avg_distance);
         sdl_render_text_font0(&ctlpane,  9, 0, str, SDL_EVENT_NONE);
 
         #define N_DIM 2.0
         exp_distance = sqrt(2*sim->steps/N_DIM) * tgamma((N_DIM+1)/2) / tgamma(N_DIM/2);
-        sprintf(str, "EXP  = %d", (int32_t)exp_distance);
+        sprintf(str, "EXP    %d", (int32_t)exp_distance);
         sdl_render_text_font0(&ctlpane, 10, 0, str, SDL_EVENT_NONE);
 
         if (exp_distance > 0) {
-            sprintf(str, "RATIO= %1.3f", avg_distance / exp_distance);
+            sprintf(str, "RATIO  %1.3f", avg_distance / exp_distance);
         } else {
-            sprintf(str, "RATIO=");
+            sprintf(str, "RATIO ");
         }
         sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
 
         // - params
         sdl_render_text_font0(&ctlpane, 13, 0, "PARAMS ...", SDL_EVENT_NONE);
-        sprintf(str, "N_WLK= %d", sim->max_walker);    
+        sprintf(str, "N_WLK  %d", sim->max_walker);    
         sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
 
         // - window width
@@ -383,15 +383,6 @@ int32_t sim_randomwalk_display_simulation(int32_t curr_display, int32_t last_dis
         //
 
         event = sdl_poll_event();
-
-        if (event->event != SDL_EVENT_NONE &&
-            event->event != SDL_EVENT_WIN_SIZE_CHANGE &&
-            event->event != SDL_EVENT_WIN_MINIMIZED &&
-            event->event != SDL_EVENT_WIN_RESTORED)
-        {
-            sdl_play_event_sound();
-        }
-
         switch (event->event) {
         case SDL_EVENT_RUN:
             state = STATE_RUN;
@@ -422,7 +413,7 @@ int32_t sim_randomwalk_display_simulation(int32_t curr_display, int32_t last_dis
             next_display = DISPLAY_HELP;
             break;
         case SDL_EVENT_SIMPANE_ZOOM_OUT:
-            if (display_width == 1000000000) {
+            if (display_width == 10000000) {
                 break;
             }
             if ((display_width % 3) != 0) {
@@ -498,7 +489,7 @@ void * sim_randomwalk_thread(void * cx)
             int32_t i, direction;
 
             for (i = 0; i < sim->max_walker; i++) {
-                direction = random() % 4;
+                direction = random() / (((unsigned)RAND_MAX+1)/4);
                 switch (direction) {
                 case 0:
                     sim->walker[i].x++;

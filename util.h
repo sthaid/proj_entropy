@@ -69,7 +69,7 @@ bool sdl_quit;
 // fonts
 #define SDL_PANE_COLS(p,fid)  ((p)->w / sdl_font[fid].char_width)
 #define SDL_PANE_ROWS(p,fid)  ((p)->h / sdl_font[fid].char_height)
-#define SDL_MAX_FONT 3
+#define SDL_MAX_FONT 2
 typedef struct {
     TTF_Font * font;
     int32_t    char_width;

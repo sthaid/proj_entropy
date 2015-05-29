@@ -321,7 +321,7 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         //
 
         if (sdl_win_width > sdl_win_height) {
-            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
+            int32_t min_ctlpane_width = 18 * sdl_font[0].char_width;
             simpane_width = sdl_win_height;
             if (simpane_width + min_ctlpane_width > sdl_win_width) {
                 simpane_width = sdl_win_width - min_ctlpane_width;
@@ -416,7 +416,7 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
 
         // - state, current_time
         char str[100];
-        sprintf(str, "%-6s %0.3lf BYR", STATE_STR(state), (double)sim->current_time*1000/1E9);
+        sprintf(str, "%-6s %0.3lf BY", STATE_STR(state), (double)sim->current_time*1000/1E9);
         sdl_render_text_font0(&ctlpane,  8, 0, str, SDL_EVENT_NONE);
 
         // - current_radius
@@ -427,17 +427,17 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         if (state == STATE_RUN && !suspend_expansion) {
             double perf = (double)(sim->current_time - perf_start_sim_current_time) / (microsec_timer() - perf_start_wall_time);
             //printf("current_time %d rsct %d \n", sim->current_time, perf_start_sim_current_time);
-            sprintf(str, "SIM_RT %0.3lf BYR/S", perf);
+            sprintf(str, "SIM_RT %0.3lf BY/S", perf);
             sdl_render_text_font0(&ctlpane, 10, 0, str, SDL_EVENT_NONE);
         }
 
         // - params
         sdl_render_text_font0(&ctlpane, 12, 0, "PARAMS ...", SDL_EVENT_NONE);
-        sprintf(str, "N_PART=%d", sim->max_particle);    
+        sprintf(str, "N_PART %d", sim->max_particle);    
         sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "START =%0.6lf BYR", (double)sim->initial_time*1E3/1E9);
+        sprintf(str, "START  %0.6lf BY", (double)sim->initial_time*1E3/1E9);
         sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "AVGSPD=%0.3lf C", (double)sim->initial_avg_speed*1E-4);
+        sprintf(str, "AVGSPD %0.3lf C", (double)sim->initial_avg_speed*1E-4);
         sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
 
         // - window width
@@ -484,9 +484,6 @@ int32_t sim_universe_display_simulation(int32_t curr_display, int32_t last_displ
         //
 
         event = sdl_poll_event();
-        if (event->event != SDL_EVENT_NONE) {
-            sdl_play_event_sound();
-        }
         switch (event->event) {
         case SDL_EVENT_RUN:
             state = STATE_RUN;
@@ -769,26 +766,26 @@ double sim_universe_compute_radius(int32_t time)
     //
     //    TIME          R1         R2          R1+R2
     // -----------    ------      ------      --------
-    // time=0 BYR:   0.000000  + 0.000000   = 0.000000
-    // time=1 BYR:   5.000000  + 0.227259   = 5.227259
-    // time=2 BYR:   7.071068  + 0.557810   = 7.628878
-    // time=3 BYR:   8.660254  + 1.038604   = 9.698858
-    // time=4 BYR:   10.000000 + 1.737926   = 11.737926
-    // time=5 BYR:   11.180340 + 2.755102   = 13.935442
-    // time=6 BYR:   12.247449 + 4.234602   = 16.482051
-    // time=7 BYR:   13.228757 + 6.386561   = 19.615318
-    // time=8 BYR:   14.142136 + 9.516623   = 23.658759
-    // time=9 BYR:   15.000000 + 14.069353  = 29.069353
-    // time=10 BYR:  15.811388 + 20.691377  = 36.502765
-    // time=11 BYR:  16.583124 + 30.323226  = 46.906350
-    // time=12 BYR:  17.320508 + 44.332918  = 61.653426
-    // time=13 BYR:  18.027756 + 64.710258  = 82.738015
-    // time=14 BYR:  18.708287 + 94.349454  = 113.057741
-    // time=15 BYR:  19.364917 + 137.460180 = 156.825097
-    // time=16 BYR:  20.000000 + 200.165481 = 220.165481
-    // time=17 BYR:  20.615528 + 291.371430 = 311.986958
-    // time=18 BYR:  21.213203 + 424.032069 = 445.245273
-    // time=19 BYR:  21.794495 + 616.989276 = 638.783770
+    // time=0  BY:  0.000000  + 0.000000   = 0.000000
+    // time=1  BY:  5.000000  + 0.227259   = 5.227259
+    // time=2  BY:  7.071068  + 0.557810   = 7.628878
+    // time=3  BY:  8.660254  + 1.038604   = 9.698858
+    // time=4  BY:  10.000000 + 1.737926   = 11.737926
+    // time=5  BY:  11.180340 + 2.755102   = 13.935442
+    // time=6  BY:  12.247449 + 4.234602   = 16.482051
+    // time=7  BY:  13.228757 + 6.386561   = 19.615318
+    // time=8  BY:  14.142136 + 9.516623   = 23.658759
+    // time=9  BY:  15.000000 + 14.069353  = 29.069353
+    // time=10 BY:  15.811388 + 20.691377  = 36.502765
+    // time=11 BY:  16.583124 + 30.323226  = 46.906350
+    // time=12 BY:  17.320508 + 44.332918  = 61.653426
+    // time=13 BY:  18.027756 + 64.710258  = 82.738015
+    // time=14 BY:  18.708287 + 94.349454  = 113.057741
+    // time=15 BY:  19.364917 + 137.460180 = 156.825097
+    // time=16 BY:  20.000000 + 200.165481 = 220.165481
+    // time=17 BY:  20.615528 + 291.371430 = 311.986958
+    // time=18 BY:  21.213203 + 424.032069 = 445.245273
+    // time=19 BY:  21.794495 + 616.989276 = 638.783770
 
     r1 = 50 * sqrt(time);
     r2 = 5000 * (exp(log(2) * time / 1850000) - 1);

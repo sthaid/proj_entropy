@@ -280,7 +280,7 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
     int32_t       i, simpane_width, cont_width, color;
     int32_t       win_x, win_y, win_r;
     double        sum_speed, temperature;
-    char          str[100];
+    char          str[100]; 
     int32_t       next_display = -1;
 
     static int32_t       win_r_last = -1;
@@ -302,7 +302,7 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
         //
 
         if (sdl_win_width > sdl_win_height) {
-            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
+            int32_t min_ctlpane_width = 18 * sdl_font[0].char_width;
             simpane_width = sdl_win_height;
             if (simpane_width + min_ctlpane_width > sdl_win_width) {
                 simpane_width = sdl_win_width - min_ctlpane_width;
@@ -378,32 +378,32 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
                 strcat(str, "RESTORE");
             }
         }
-        sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
-
-        sprintf(str, "PARTICLES   = %d", sim->max_particle);    
         sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "SIM_WIDTH   = %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
+
+        sprintf(str, "PARTICLES %d", sim->max_particle);    
         sdl_render_text_font0(&ctlpane, 13, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RUN_SPEED   = %d", run_speed);    
+        sprintf(str, "SIM_WIDTH %"PRId64, sim->sim_width / PARTICLE_DIAMETER);    
         sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "TEMPERATURE = %0.2f", temperature);
+        sprintf(str, "TEMP      %0.2f", temperature);
         sdl_render_text_font0(&ctlpane, 15, 0, str, SDL_EVENT_NONE);
 
         //
         // display controls
         //
 
+        sprintf(str, "%d", run_speed);
         sdl_render_text_font0(&ctlpane,  0, 3,  "CONTAINER", SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  2, 0,  "RUN",       SDL_EVENT_RUN);
-        sdl_render_text_font0(&ctlpane,  2, 9,  "STOP",      SDL_EVENT_STOP);
+        sdl_render_text_font0(&ctlpane,  2, 8,  "STOP",      SDL_EVENT_STOP);
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
-        sdl_render_text_font0(&ctlpane,  4, 9,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 14, str,         SDL_EVENT_NONE);
         sdl_render_text_font0(&ctlpane,  6, 0,  "SHRINK",    SDL_EVENT_SHRINK);
-        sdl_render_text_font0(&ctlpane,  6, 9,  "RESTORE",   SDL_EVENT_RESTORE);
+        sdl_render_text_font0(&ctlpane,  6, 8,  "RESTORE",   SDL_EVENT_RESTORE);
         sdl_render_text_font0(&ctlpane,  8, 0,  "PB_REV",    SDL_EVENT_PLAYBACK_REV);
-        sdl_render_text_font0(&ctlpane,  8, 9,  "PB_FWD",    SDL_EVENT_PLAYBACK_FWD);
+        sdl_render_text_font0(&ctlpane,  8, 8,  "PB_FWD",    SDL_EVENT_PLAYBACK_FWD);
         sdl_render_text_font0(&ctlpane, 10, 0,  "RESET",     SDL_EVENT_RESET);
-        sdl_render_text_font0(&ctlpane, 10, 9,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
+        sdl_render_text_font0(&ctlpane, 10, 8,  "PARAMS",    SDL_EVENT_SELECT_PARAMS);
         sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
 
@@ -426,13 +426,9 @@ int32_t sim_container_display_simulation(int32_t curr_display, int32_t last_disp
 
         //
         // handle events
-        // XXX click when resize screen
         //
 
         event = sdl_poll_event();
-        if (event->event != SDL_EVENT_NONE) {
-            sdl_play_event_sound();
-        }
         switch (event->event) {
         case SDL_EVENT_RUN:
             state = STATE_RUN;

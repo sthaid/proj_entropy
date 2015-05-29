@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+  echo "filename expected"
+  exit
+fi
+
+path=/storage/extSdCard/$1.png
+
+adb shell screencap -p $path
+adb pull $path
+

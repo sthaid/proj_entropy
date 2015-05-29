@@ -664,7 +664,7 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         //
 
         if (sdl_win_width > sdl_win_height) {
-            int32_t min_ctlpane_width = 20 * sdl_font[0].char_width;
+            int32_t min_ctlpane_width = 18 * sdl_font[0].char_width;
             sim_pane_width = sdl_win_height;
             if (sim_pane_width + min_ctlpane_width > sdl_win_width) {
                 sim_pane_width = sdl_win_width - min_ctlpane_width;
@@ -881,7 +881,7 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         } else if (DT >= 60) {
             sprintf(str, "DT   %d MINUTES", DT/60);
         } else{
-            sprintf(str, "DT   %d SECONDS", DT);
+            sprintf(str, "DT   %d SECS", DT);
         }
         sdl_render_text_font0(&ctl_pane, 11, 0, str, SDL_EVENT_NONE);
 
@@ -906,18 +906,18 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                     sdl_render_text_font0(&ctl_pane, 13, 0, "PATH VARIES", SDL_EVENT_NONE);
                 } else {
                     if (days < 365.25) {
-                        sprintf(str, "PATH %0.2lf YEARS", days/365.25);
+                        sprintf(str, "PATH %0.2lf Y", days/365.25);
                     } else {
-                        sprintf(str, "PATH %0.0lf YEARS", days/365.25);
+                        sprintf(str, "PATH %0.0lf Y", days/365.25);
                     }
                     sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
                 }
             }
         } else {
             if (path_disp_days < 365.25) {
-                sprintf(str, "PATH %0.2lf YEARS", path_disp_days/365.25);
+                sprintf(str, "PATH %0.2lf Y", path_disp_days/365.25);
             } else {
-                sprintf(str, "PATH %0.0lf YEARS", path_disp_days/365.25);
+                sprintf(str, "PATH %0.0lf Y", path_disp_days/365.25);
             }
             sdl_render_text_font0(&ctl_pane, 13, 0, str, SDL_EVENT_NONE);
         }
@@ -927,7 +927,7 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             years_per_sec = (double)(sim.sim_time * 1000000 - perf_start_sim_time) / 
                             (microsec_timer() - perf_start_wall_time) /
                             (365.25 * 86400);
-            sprintf(str, "RATE %0.3f YR/S", years_per_sec);
+            sprintf(str, "RATE %0.3f Y/S", years_per_sec);
             sdl_render_text_font0(&ctl_pane, 14, 0, str, SDL_EVENT_NONE);
         }
 
@@ -966,16 +966,13 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         switch (event->event) {
         case SDL_EVENT_RUN:
             state = STATE_RUN;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_STOP:
             state = STATE_STOP;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_BACK: 
         case SDL_EVENT_QUIT:
             next_display = DISPLAY_TERMINATE;  
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_DT_PLUS:
             for (i = 0; i < MAX_VALID_DT-1; i++) {
@@ -984,7 +981,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                     break;
                 }
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_DT_MINUS:
             for (i = 1; i < MAX_VALID_DT; i++) {
@@ -993,25 +989,20 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                     break;
                 }
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_SELECT_LOCAL:
             state = STATE_STOP;
             next_display = DISPLAY_SELECT_LOCAL;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_SELECT_CLOUD:
             state = STATE_STOP;
             next_display = DISPLAY_SELECT_CLOUD;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_PATH_DISP_DEFAULT:
             path_disp_days = -1;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_PATH_DISP_OFF:
             path_disp_days = 0;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_PATH_DISP_PLUS:
             if (path_disp_days <= 0) {
@@ -1024,7 +1015,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
                 path_disp_days = MAX_PATH_DISP_DAYS;
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_PATH_DISP_MINUS:
             if (path_disp_days <= 0) {
@@ -1037,12 +1027,10 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
             } else if (path_disp_days > MAX_PATH_DISP_DAYS) {
                 path_disp_days = MAX_PATH_DISP_DAYS;
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_HELP:
             state = STATE_STOP;
             next_display = DISPLAY_HELP;
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_SIMPANE_ZOOM_OUT:
             for (i = 0; i < MAX_VALID_SIM_WIDTH-1; i++) {
@@ -1051,7 +1039,6 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                     break;
                 }
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_SIMPANE_ZOOM_IN:
             for (i = 1; i < MAX_VALID_SIM_WIDTH; i++) {
@@ -1060,12 +1047,10 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                     break;
                 }
             }
-            sdl_play_event_sound();
             break;
         case SDL_EVENT_SIMPANE_MOUSE_CLICK ... SDL_EVENT_SIMPANE_MOUSE_CLICK_LAST: {
             int32_t obj_idx = event->event - SDL_EVENT_SIMPANE_MOUSE_CLICK;
             tracker_obj = (obj_idx == tracker_obj ? -1 : obj_idx);
-            sdl_play_event_sound();
             break; }
         case SDL_EVENT_SIMPANE_MOUSE_MOTION:
             if (tracker_obj == -1) {
