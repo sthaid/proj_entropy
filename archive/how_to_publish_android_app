@@ -1,24 +1,3 @@
-- check button sound volume
-- test on uni linux
-- check in this file
-
-- final test
-  - recheck fonts on lauras phone, 
-- git tag
-
-
-
-- mediawiki logo
-
-DONE
-----
-- google developer acct
-- set to version 1.0
-- clean up code, 
-- disable logging
-
-
-
 DEVELOPER WEB SITES
 -------------------
 
@@ -38,11 +17,9 @@ LAUNCH CHECKLIST
 
 Test For Quality
 - test on as many devices as possible
-- DONE test on my tablet and laura's phone
 
 Determine Content Rating 
 - Everyone,  Low maturity, Medium maturity, High maturity
-- DONE use Everyone  rating
 
 Determine Country Distribution
 - Reasons
@@ -50,20 +27,16 @@ Determine Country Distribution
   . The need for a localized app description in the Developer Console.
   . Legal requirements for the app that may be specific to certain countries.
   . Time zone support, local pricing, and so on
-- DONE distribute in US and England only
 
 Confirm App's Overall Size
 - The maximum size for an APK published on Google Play is 50 MB.
 - You can use up to two (2) APK Expansion Files, each up to 2GB in size, for each APK.
-- DONE build app for all ABI
 
 Confirm the App's Platform and Screen Compatibility Ranges
 - Check display orienttion   
 - Check minSdkVersion
 - Test on Tablet and Phone
 - Declare the minimum screen-size supported by your apps using <supports-screens>
-- DONE only allow horizontal
-- DONE change to work on 720x1280
 
 Decide Whether your App will be Free or Priced
 - Free apps must remain free
@@ -72,7 +45,6 @@ Start Localization
 - Localizing the strings, images, and other resources in your apps.
 - Localizing your apps’ store listing details on Google Play.
 - Localizing the apps’ graphic assets, screenshots, and videos that accompany your store listing.
-- DONE English Only
 
 Prepare Promotional Graphics, Screenshots, and Videos
 - When you publish on Google Play, you can supply a variety of high-quality graphic assets to 
@@ -88,27 +60,16 @@ Build and Upload the Release-ready APK
   . Build for Release:       Build release version and sign  (SEE APPENDIX: SIGINING)
   . Prepare Remote Servers:  Web Page
   . Test App:                Test the Signed App
-- DONE learn how to buile Release
-- DONE update About to inlcude: EULA, my name and email, web site
-- DONE build release without logging, 
-- DONE sign release
-- DONE test signed app
-- DONE code version number 1.0, in about.h
-- TODO clean up code
-- TODO tag git code
 
 Plan a Beta Release
 - Google Developer's Console supports this
-- TODO try this
 
 Complete the Apps’ Store Listing
-- TODO how to get screen shot
 
 - As you get near your target publishing date, you should become familiar with all the fields, 
   options, and assets associated with the store listing configuration page in the Developer Console. 
   As you collect the information and assets for the page, make sure that you can enter or upload 
   it to the Developer Console, until the page is complete and ready for publishing.
-- TODO ^^^
 
 - After you've set your apps’ geographic targeting in the Developer Console, remember to add your 
   localized store listing, promotional graphics, and so on, for all of the languages that you support.
@@ -121,7 +82,6 @@ Final Checks and Publishing
 
 - When you think you’re ready to publish, sign in to the Developer Console and take a few 
   moments for a few final checks.  Make sure that:
-
   . Your developer profile has the correct information and is linked to the proper Google Wallet 
     merchant account (if you’re selling products).
   . You have the right version of the apps uploaded.
@@ -137,21 +97,11 @@ Final Checks and Publishing
     and also US export laws.
   . Your apps are now ready to publish!
 
-- TODO the above
-
 - If you’re releasing an update, make sure to read the requirements for publishing updates.
 
 - When you’re ready, click the Publish button in the Developer Console. 
   Within a few hours, your apps will become available to users and your product page will appear 
   in Google Play for browsing, searching, or linking from your promotional campaigns.
-- TODO click Publish
-
-
-APPENDIX - GET GOOGLEL DEVELOPERS ACCT
---------------------------------------
-
-TODO get acct
-
 
 APPENDIX - SIGING
 -----------------

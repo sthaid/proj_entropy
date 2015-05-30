@@ -58,12 +58,12 @@ RUN/STOP:  Start and stop the simulation.\n\
 DT+/DT-: Change the time step of the \n\
     simulation.  Smaller time steps provide\n\
     a more accurate simulation; however the\n\
-     simulation runs more slowly.\n\
+    simulation runs more slowly.\n\
 \n\
 LOCAL/CLOUD: Select a config file either \n\
     from the Local system or the Cloud. \n\
     These config files describe the initial\n\
-     condition of the simulation. \n\
+    condition of the simulation. \n\
 \n\
 PTHSTD/OFF/+/-: Adjust displayed path len.\n\
 \n\

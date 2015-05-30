@@ -47,7 +47,7 @@ apparent velocity due to the expansion.\n\
 Particles shown in:\n\
 - blue  - apparent velocity is toward the \n\
           vantage point\n\
-- green - no apparent velocity\n\
+- green - small apparent velocity\n\
 - red   - apparent velocity away from the \n\
           vantage point, near the speed of \n\
           light\n\
@@ -110,8 +110,8 @@ N_PART: Number of particles in the \n\
     with larger number of particles.\n\
 \n\
 START:  Initial time. The default start time\n\
-     is 0.000001 billion years, or 1000 \n\
-     years after the big bang.\n\
+    is 0.000001 billion years, or 1000 \n\
+    years after the big bang.\n\
 \n\
 AVGSPD: The average speed of the particles.\n\
 \n\
@@ -120,7 +120,7 @@ WHAT TO OBSERVE\n\
 \n\
 Rapid expansion during the early universe.\n\
 \n\
-uch of the universe lies beyond what we can\n\
+much of the universe lies beyond what we can\n\
 see from our vantage point.\n\
 \n\
 As the universe ages, the size of the \n\
