@@ -175,7 +175,6 @@ void sdl_terminate(void);
 void sdl_event_init(void);
 void sdl_event_register(int32_t event_id, int32_t event_type, SDL_Rect * pos);
 sdl_event_t * sdl_poll_event(void);
-void sdl_play_event_sound(void);
 void sdl_render_text_font0(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
 void sdl_render_text_font1(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event);
 void sdl_render_text_ex(SDL_Rect * pane, int32_t row, int32_t col, char * str, int32_t event, 
@@ -230,7 +229,7 @@ int config_write(char * filename, config_t * config);
 
 // -----------------  LOGGING  -------------------------------------------------------
 
-//#define ENABLE_LOGGING
+#define ENABLE_LOGGING
 //#define ENABLE_LOGGING_AT_DEBUG_LEVEL
 
 #ifdef ENABLE_LOGGING

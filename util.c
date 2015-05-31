@@ -25,6 +25,7 @@ SOFTWARE.
 
 #ifndef ANDROID
 #include <dirent.h>
+#include <png.h>
 #else
 #include <android/asset_manager_jni.h>
 #endif
@@ -42,6 +43,9 @@ SOFTWARE.
 
 static Mix_Chunk * sdl_button_sound;
 static int32_t     sdl_event_max;
+
+static void sdl_play_event_sound(void);
+static void sdl_print_screen(void);
 
 void sdl_init(uint32_t w, uint32_t h)
 {
@@ -332,7 +336,16 @@ sdl_event_t * sdl_poll_event(void)
         case SDL_KEYDOWN: {
             int32_t  key = ev.key.keysym.sym;
             bool     shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+            bool     ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
             int32_t  possible_event = -1;
+
+            if (ctrl) {
+                if (key == 'p') {
+                    sdl_print_screen();
+                    sdl_play_event_sound();
+                }
+                break;
+            }
 
             if (key < 128) {
                 possible_event = key;
@@ -403,6 +416,125 @@ sdl_event_t * sdl_poll_event(void)
 void sdl_play_event_sound(void)
 {
     Mix_PlayChannel(-1, sdl_button_sound, 0);
+}
+
+void sdl_print_screen(void)
+{
+#ifndef ANDROID
+    int32_t   (*pixels)[4096] = NULL;
+    FILE       *fp = NULL;
+    SDL_Rect    rect;
+    int32_t    *row_pointers[4096];
+    char        file_name[1000];
+    png_structp png_ptr;
+    png_infop   info_ptr;
+    png_byte    color_type, bit_depth;
+    int32_t     y, ret;
+    time_t      t;
+    struct tm   tm;
+
+    //
+    // allocate and read the pixels
+    //
+
+    pixels = calloc(1, sdl_win_height*sizeof(pixels[0]));
+    if (pixels == NULL) {
+        ERROR("allocate pixels failed\n");
+        goto done;
+    }
+
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = sdl_win_width;
+    rect.h = sdl_win_height;   
+    ret = SDL_RenderReadPixels(sdl_renderer, &rect, SDL_PIXELFORMAT_ABGR8888, pixels, sizeof(pixels[0]));
+    if (ret < 0) {
+        ERROR("SDL_RenderReadPixels, %s\n", SDL_GetError());
+        goto done;
+    }
+
+    //
+    // creeate the file_name using localtime
+    //
+
+    t = time(NULL);
+    localtime_r(&t, &tm);
+    sprintf(file_name, "entropy_%2.2d%2.2d%2.2d_%2.2d%2.2d%2.2d.png",
+            tm.tm_year - 100, tm.tm_mon + 1, tm.tm_mday,
+            tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    //
+    // write pixels to file_name ...
+    //
+
+    // init
+    color_type = PNG_COLOR_TYPE_RGB_ALPHA;
+    bit_depth = 8;
+    for (y = 0; y < sdl_win_height; y++) {
+        row_pointers[y] = pixels[y];
+    }
+
+    // create file 
+    fp = fopen(file_name, "wb");
+    if (!fp) {
+        ERROR("fopen %s\n", file_name);
+        goto done;  
+    }
+
+    // initialize stuff 
+    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png_ptr) {
+        ERROR("png_create_write_struct\n");
+        goto done;  
+    }
+
+    info_ptr = png_create_info_struct(png_ptr);
+    if (!info_ptr) {
+        ERROR("png_create_info_struct\n");
+        goto done;  
+    }
+
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        ERROR("init_io failed\n");
+        goto done;  
+    }
+    png_init_io(png_ptr, fp);
+
+    // write header 
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        ERROR("writing header\n");
+        goto done;  
+    }
+    png_set_IHDR(png_ptr, info_ptr, sdl_win_width, sdl_win_height,
+                 bit_depth, color_type, PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    png_write_info(png_ptr, info_ptr);
+
+    // write bytes 
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        ERROR("writing bytes\n");
+        goto done;  
+    }
+    png_write_image(png_ptr, (void*)row_pointers);
+
+    // end write 
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        ERROR("end of write\n");
+        goto done;  
+    }
+    png_write_end(png_ptr, NULL);
+
+done:
+    //
+    // clean up and return
+    //
+    if (fp != NULL) {
+        fclose(fp);
+    }
+    free(pixels);
+#else
+    WARN("not supported on Andorid version\n");
+#endif
 }
 
 // - - - - - - - - -  RENDER TEXT WITH EVENT HANDLING - - - - - - - - - - 
