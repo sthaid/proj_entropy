@@ -38,6 +38,7 @@ In addition to Development Tools, the following packages must be installed:
   SDL2-devel
   SDL2_ttf-devel
   SDL2_mixer-devel
+  libpng-devel
 
 To build this program (program name is 'entropy'), just run make.
 
