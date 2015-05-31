@@ -20,7 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#define VERSION "1.0"
+// When updating VERSION_STR, also change version in android-project/build.xml
+#define VERSION_STR "1.1"
 
 // Note max line length is 44 chars.
 
@@ -28,7 +29,7 @@ static char about[] = "\
 Simulations to further understanding of \n\
 physics.\n\
 \n\
-Version: " VERSION "\n\
+Version: " VERSION_STR "\n\
 \n\
 Author: Steven Haid\n\
         StevenHaid@gmail.com\n\
