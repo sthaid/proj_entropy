@@ -123,9 +123,6 @@ sed -i.orig \
 mkdir assets
 cp -r ../fonts ../sim_gravity assets
 
-# copy in script files
-cp .setup/do_* .
-
 # change program name
 # - create src/org//sthaid/app/Entropy.java
 # - edit AndroidManifest.xml
@@ -151,5 +148,23 @@ sed -i \
     -e "/name=\"app_name\"/ s/SDL App/Entropy/" \
     res/values/strings.xml
 
+# change version-tag from '1' to 'custom' in build.xml
+sed -i \
+    -e "/version-tag: 1/ s/1/custom/" \
+    build.xml
+
 # update project
 android update project --target 1 --path .
+
+# copy in script files
+cp .setup/do_* .
+
+# provide additional instructions
+echo
+echo "SETUP-SCRIPT IS DONE."
+echo
+echo "YOU MUST DO THE FOLLOWING ..."
+echo
+echo "1) You must edit build.xml to set the correct version, which"
+echo "   should correspond to the VERSION_STR supplied in about.h"
+echo
