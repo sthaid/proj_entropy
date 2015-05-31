@@ -103,12 +103,14 @@ Final Checks and Publishing
   Within a few hours, your apps will become available to users and your product page will appear 
   in Google Play for browsing, searching, or linking from your promotional campaigns.
 
+
 APPENDIX - SIGING
 -----------------
 
 http://developer.android.com/tools/publishing/app-signing.html
 
 Signing Your App Manually ...
+
 You do not need Android Studio to sign your app. You can sign your app from the command line 
 using standard tools from the Android SDK and the JDK. 
 
@@ -144,3 +146,63 @@ To sign an app in release mode from the command line:
 
     zipalign ensures that all uncompressed data starts with a particular byte alignment 
     relative to the start of the file, which reduces the amount of RAM consumed by an app.
+
+Note the ant build system supports the above procedure. All that is needed is to create
+the key, using keytool, as in the first step above. And include the key.store and 
+key.alias in the ant.properties file.
+
+
+APPENDIX - GOOGLE PLAY APP DESCRIPTION
+--------------------------------------
+
+http://stackoverflow.com/questions/11071127/google-play-app-description-formatting
+
+- Single line breaks are ignored; double line breaks open a new paragraph.
+- Single line breaks can be enforced by ending a line with two spaces (similar to Markdown).
+- A limited set of HTML tags (optionally nested), specifically:
+    <b>...</b> for boldface,
+    <i>...</i> for italics,
+    <u>...</u> for underline,
+    <br /> to enforce a single line break,
+    <blockquote>...</blockquote> to indent a paragraph of text,
+    <small>...</small> for a slightly smaller text,
+    <sup>...</sup> and <sub>...</sub> for super- and subscripts.
+- A fully-formatted URL such as http://google.com; this appears as a hyperlink.
+    (Beware that trying to use an HTML <a> tag for a custom description does not work and breaks the formatting.)
+- HTML character entities are supported, such as &rarr; (→), &trade; (™) and &reg; (®);
+  consult this W3 reference for the exhaustive list.
+- UTF-8 encoded characters are supported, such as é, €, £, ‘, ’, ★ and ☆.
+- Indentation isn't strictly possible, but using a bullet and em space character
+  looks reasonable (&#8226;&#8195; yields "• ").
+
+--- entropy app description follows ---
+
+The purpose of this App is to gain a further understanding of Physics through computer simulations. Includes simulations of:  
+- Expanding Gas in a Container  
+- Gravity  
+- Expanding Universe  
+- Random Walk  
+
+Run the Simulations, Observe, and Learn.
+
+Run the Expanding Gas in a Container simulation, and observe:  
+- increase in entropy when the gas is released,  
+- shrink the container to observe Adiabatic heating,  
+- how entropy can occasionally spontaneously decrease.  
+
+Run the Gravity simulation, and observe:  
+- orbits of 2 and 3 body systems,  
+- impact a rogue star would have on our solar system,  
+- solar wobble, used by astronomers to detect extrasolar planets,  
+- view planet orbits as seen from the Earth, observe retrograde motion,  
+- see how gravity boost works.  
+
+Run the Expanding Universe simulation, and observe:  
+- rapid expansion during the early universe,  
+- much of the universe lies beyond what can be seen from our vantage point,  
+- as the universe ages the size of the observable universe shrinks towards zero.  
+
+Refer to http://wikiscience101.sthaid.org/index.php?title=Entropy_App for additional information.
+
+You are encouraged to download the source code and add your own simulations.  The source code is available at https://github.com/sthaid/proj_entropy.git.  Refer to the README for instructions on how to build this App for Linux or Android.  This App is coded in C, and utilizes the Simple DirectMedia Layer cross-platform development library.  The Random Walk simulation is a good template to use for new simulations. Some suggestions for new simulations are: Elastic Collisions, Nuclear Fission Chain Reaction, and Bacterial Life.
+
