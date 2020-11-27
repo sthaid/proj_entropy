@@ -43,8 +43,7 @@
 #define SDL_EVENT_RUN                      (SDL_EVENT_USER_START + 1)
 #define SDL_EVENT_DT_PLUS                  (SDL_EVENT_USER_START + 2)
 #define SDL_EVENT_DT_MINUS                 (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_SELECT_LOCAL             (SDL_EVENT_USER_START + 4)
-#define SDL_EVENT_SELECT_CLOUD             (SDL_EVENT_USER_START + 5)
+#define SDL_EVENT_SELECT                   (SDL_EVENT_USER_START + 4)
 #define SDL_EVENT_PATH_DISP_DEFAULT        (SDL_EVENT_USER_START + 6)
 #define SDL_EVENT_PATH_DISP_OFF            (SDL_EVENT_USER_START + 7)
 #define SDL_EVENT_PATH_DISP_PLUS           (SDL_EVENT_USER_START + 8)
@@ -68,8 +67,7 @@
                                     : "????")
 #define DISPLAY_TERMINATE    1
 #define DISPLAY_SIMULATION   2
-#define DISPLAY_SELECT_LOCAL 3
-#define DISPLAY_SELECT_CLOUD 4
+#define DISPLAY_SELECT       3
 #define DISPLAY_HELP         5
 #define DISPLAY_ERROR        6
 
@@ -202,7 +200,7 @@ int32_t sim_gravity_init(char * pathname)
     relto_t     relto[MAX_RELTO];
     char        shortname[200];
     double      X, Y, VX, VY, MASS, RADIUS;
-    char        NAME[100], COLOR[100];
+    char        NAME[MAX_NAME], COLOR[100];
     int32_t     MAX_PATH_DISP_DFLT;
 
     int32_t     ret           = 0;
@@ -366,7 +364,7 @@ int32_t sim_gravity_init(char * pathname)
             ret = -1;
             goto done;
         }
-        strncpy(obj->NAME, NAME, MAX_NAME-1);
+        strncpy(obj->NAME, NAME, MAX_NAME);
         obj->X                  = X + relto[idx-1].X;
         obj->Y                  = Y + relto[idx-1].Y;
         obj->VX                 = VX + relto[idx-1].VX;
@@ -590,8 +588,7 @@ void sim_gravity_display(void)
         case DISPLAY_SIMULATION:         
             next_display = sim_gravity_display_simulation(curr_display, last_display);
             break;
-        case DISPLAY_SELECT_LOCAL:         
-        case DISPLAY_SELECT_CLOUD:         
+        case DISPLAY_SELECT:         
             next_display = sim_gravity_display_select(curr_display, last_display);
             break;
         case DISPLAY_HELP:         
@@ -915,9 +912,8 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
         sdl_render_text_font0(&ctl_pane,  2, 7,  "STOP",      SDL_EVENT_STOP);
         sdl_render_text_font0(&ctl_pane,  4, 0,  "DT+",       SDL_EVENT_DT_PLUS);
         sdl_render_text_font0(&ctl_pane,  4, 7,  "DT-",       SDL_EVENT_DT_MINUS);
-        sdl_render_text_font0(&ctl_pane,  6, 0,  "LOCAL",     SDL_EVENT_SELECT_LOCAL);
-        sdl_render_text_font0(&ctl_pane,  6, 7,  "CLOUD",     SDL_EVENT_SELECT_CLOUD);
-        sdl_render_text_font0(&ctl_pane,  8, 0,  "PTHSTD",   SDL_EVENT_PATH_DISP_DEFAULT);
+        sdl_render_text_font0(&ctl_pane,  6, 0,  "SELECT",    SDL_EVENT_SELECT);
+        sdl_render_text_font0(&ctl_pane,  8, 0,  "PTHSTD",    SDL_EVENT_PATH_DISP_DEFAULT);
         sdl_render_text_font0(&ctl_pane,  8, 7,  "OFF",       SDL_EVENT_PATH_DISP_OFF);
         sdl_render_text_font0(&ctl_pane,  8, 11, " + ",       SDL_EVENT_PATH_DISP_PLUS);
         sdl_render_text_font0(&ctl_pane,  8, 15, " - ",       SDL_EVENT_PATH_DISP_MINUS);
@@ -967,13 +963,9 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
                 }
             }
             break;
-        case SDL_EVENT_SELECT_LOCAL:
+        case SDL_EVENT_SELECT:
             state = STATE_STOP;
-            next_display = DISPLAY_SELECT_LOCAL;
-            break;
-        case SDL_EVENT_SELECT_CLOUD:
-            state = STATE_STOP;
-            next_display = DISPLAY_SELECT_CLOUD;
+            next_display = DISPLAY_SELECT;
             break;
         case SDL_EVENT_PATH_DISP_DEFAULT:
             path_disp_days = -1;
@@ -1055,12 +1047,8 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
     int32_t max_pathname = 0;
 
     // init
-    location = (curr_display == DISPLAY_SELECT_LOCAL
-                ? "sim_gravity/" 
-                : "http://wikiscience101.sthaid.org/public/sim_gravity/");
-    title    = (curr_display == DISPLAY_SELECT_LOCAL
-                ? "SIM GRAVITY - LOCAL SELECTIONS"
-                : "SIM GRAVITY - CLOUD SELECTIONS");
+    location = "sim_gravity/";
+    title    = "SIM GRAVITY - SELECTIONS";
 
     // obtain list of files from the appropriate location
     ret = list_files(location, &max_pathname, &pathname);
@@ -1070,11 +1058,6 @@ int32_t sim_gravity_display_select(int32_t curr_display, int32_t last_display)
         sprintf(error_str[0], "List Files Failed");
         sprintf(error_str[1], "%s", location);
         error_str[2][0] = '\0';
-#ifndef ANDROID
-        if (curr_display != DISPLAY_SELECT_LOCAL) {
-            sprintf(error_str[2], "verify curl is installed");
-        }
-#endif
         return DISPLAY_ERROR;
     }
 

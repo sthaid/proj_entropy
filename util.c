@@ -24,8 +24,16 @@ static void sdl_print_screen(void);
 
 void sdl_init(uint32_t w, uint32_t h)
 {
-    char  * font0_path, * font1_path;
+    char   *font_path = NULL;
     int32_t font0_ptsize, font1_ptsize;
+    int32_t i;
+
+#ifndef ANDROID
+    char *font_search_path[] = { "/usr/share/fonts/gnu-free/FreeMonoBold.ttf",
+                                 "/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf" };
+#else
+    char *font_search_path[] = { "/system/fonts/DroidSansMono.ttf" };
+#endif
 
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
@@ -40,26 +48,40 @@ void sdl_init(uint32_t w, uint32_t h)
     INFO("sdl_win_width=%d sdl_win_height=%d\n", sdl_win_width, sdl_win_height);
 
     // initialize True Type Font
+    //
+    // note - fonts can be installed using:
+    //   sudo yum install gnu-free-mono-fonts       # rhel,centos,fedora
+    //   sudo apt-get install fonts-freefont-ttf    # raspberrypi, ubuntu
     if (TTF_Init() < 0) {
         FATAL("TTF_Init failed\n");
     }
 
-    font0_path = "fonts/FreeMonoBold.ttf";         // normal 
-    font0_ptsize = sdl_win_height / 18 - 1;
-    font1_path = "fonts/FreeMonoBold.ttf";         // extra large, for keyboard
-    font1_ptsize = sdl_win_height / 13 - 1;
+    for (i = 0; i < sizeof(font_search_path)/sizeof(char*); i++) {
+        struct stat buf;
+        font_path = font_search_path[i];
+        if (stat(font_path, &buf) == 0) {
+            break;
+        }
+    }
+    if (font_path == NULL) {
+        FATAL("failed to locate font file\n");
+    }
+    INFO("using font %s\n", font_path);
 
-    sdl_font[0].font = TTF_OpenFont(font0_path, font0_ptsize);
+    font0_ptsize = sdl_win_height / 18 - 1;  // normal
+    font1_ptsize = sdl_win_height / 13 - 1;  // extra large, for keyboard
+
+    sdl_font[0].font = TTF_OpenFont(font_path, font0_ptsize);
     if (sdl_font[0].font == NULL) {
-        FATAL("failed TTF_OpenFont %s\n", font0_path);
+        FATAL("failed TTF_OpenFont %s\n", font_path);
     }
     TTF_SizeText(sdl_font[0].font, "X", &sdl_font[0].char_width, &sdl_font[0].char_height);
     INFO("font0 psize=%d width=%d height=%d\n", 
          font0_ptsize, sdl_font[0].char_width, sdl_font[0].char_height);
 
-    sdl_font[1].font = TTF_OpenFont(font1_path, font1_ptsize);
+    sdl_font[1].font = TTF_OpenFont(font_path, font1_ptsize);
     if (sdl_font[1].font == NULL) {
-        FATAL("failed TTF_OpenFont %s\n", font1_path);
+        FATAL("failed TTF_OpenFont %s\n", font_path);
     }
     TTF_SizeText(sdl_font[1].font, "X", &sdl_font[1].char_width, &sdl_font[1].char_height);
     INFO("font1 psize=%d width=%d height=%d\n", 
@@ -1480,7 +1502,7 @@ void logmsg(char *lvl, const char *func, char *fmt, ...)
 
         // if file size greater than max then rename file to file.old, and create new file
         if (logmsg_file_size > MAX_LOGMSG_FILE_SIZE) {
-            char   dot_old[100];
+            char   dot_old[110];
             FILE * new_fp;
 
             if (logmsg_fp_old) {
@@ -1668,7 +1690,6 @@ typedef struct {
 } File_t;
 
 static int32_t list_local_files(char * location, int32_t * max, char *** pathnames);
-static int32_t list_cloud_files(char * location, int32_t * max, char *** pathnames);
 static void list_files_sort(char ** pathnames, int32_t max);
 
 int32_t list_files(char * location, int32_t * max, char *** pathnames)
@@ -1682,11 +1703,7 @@ int32_t list_files(char * location, int32_t * max, char *** pathnames)
         return -1;
     }
 
-    if (strncmp(location, "http://", 7) != 0) {
-        ret = list_local_files(location, max, pathnames);
-    } else {
-        ret = list_cloud_files(location, max, pathnames);
-    }
+    ret = list_local_files(location, max, pathnames);
 
     if (ret != 0) {
         list_files_free(*max, *pathnames);
@@ -1713,50 +1730,27 @@ void * open_file(char * pathname)
 {
     #define MAX_BUFF  1000000  //xxx check for overflow
 
-    File_t * F = NULL;
-    void   * buff;
+    File_t    * F = NULL;
+    void      * buff;
+    SDL_RWops * rw;
+    size_t      len;
 
     buff = calloc(1,MAX_BUFF);
 
-    if (strncmp(pathname, "http://", 7) != 0) {
-        SDL_RWops * rw;
-        size_t      len;
-
-        rw = SDL_RWFromFile(pathname, "r");
-        if (rw == NULL) {
-            ERROR("open %s, %s\n", pathname, SDL_GetError());
-            goto error;
-        }
-
-        len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
-        if (len == 0) {
-            ERROR("read %s, len=%d\n", pathname, (int32_t)len);
-            SDL_RWclose(rw);
-            goto error;
-        }
-
-        SDL_RWclose(rw);
-    } else {
-        char   cmd[200];
-        char   s[200];
-        size_t offset;
-        FILE * fp;
-
-        sprintf(cmd, "curl %s 2>/dev/null", pathname); 
-        fp = popen(cmd, "r");
-        if (fp == NULL) {
-            ERROR("popen %s\n", cmd);
-            goto error;
-        }
-
-        offset = 0;
-        while (fgets(s, sizeof(s), fp) != NULL) {
-            strcpy(buff+offset, s);
-            offset += strlen(s);
-        }
-
-        fclose(fp);
+    rw = SDL_RWFromFile(pathname, "r");
+    if (rw == NULL) {
+        ERROR("open %s, %s\n", pathname, SDL_GetError());
+        goto error;
     }
+
+    len = SDL_RWread(rw, buff, 1, MAX_BUFF-1);
+    if (len == 0) {
+        ERROR("read %s, len=%d\n", pathname, (int32_t)len);
+        SDL_RWclose(rw);
+        goto error;
+    }
+
+    SDL_RWclose(rw);
 
     F = calloc(1,sizeof(file_t));
     F->buff = buff;
@@ -1801,56 +1795,6 @@ void close_file(file_t * f)
 
     free(F->buff);
     free(F);
-}
-
-static int32_t list_cloud_files(char * location, int32_t * max, char *** pathnames)
-{
-    FILE  * fp;
-    char  * fn, * tmp;
-    char    s[200];
-    char    cmd[200];
-    int32_t ret = 0;
-
-    *max = 0;
-    *pathnames = calloc(1000,sizeof(char*)); //xxx realloc
-    if (*pathnames == NULL) {
-        ERROR("calloc\n");
-        return -1;
-    }
-
-    sprintf(cmd, "curl %s 2>/dev/null", location);
-    fp = popen(cmd, "r");
-    if (fp == NULL) {
-        ERROR("popen %s\n", cmd);
-        return -1;
-    }
-
-    s[0] = '\0';
-    if (fgets(s, sizeof(s), fp) == NULL || strncmp(s, "<html>", 6) != 0) {
-        ERROR("invalid first line: %s\n", s);
-        fclose(fp);
-        return -1;
-    }
-
-    while (fgets(s, sizeof(s), fp) != NULL) {
-        if (strncmp(s, "<a href=\"", 9) == 0) {
-            fn = s+9;
-            tmp = strchr(fn, '\"');
-            if (tmp == NULL) {
-                ERROR("no closing quote\n");
-                ret = -1;
-                break;
-            }
-            *tmp = '\0';
-
-            (*pathnames)[*max] = malloc(strlen(location)+strlen(fn)+1);
-            sprintf((*pathnames)[*max], "%s%s", location, fn);
-            (*max)++;
-        }
-    }
-
-    fclose(fp);
-    return ret;
 }
 
 #ifndef ANDROID
