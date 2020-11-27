@@ -1,0 +1,16 @@
+# TWO_BODY_CIRCULAR
+
+# units for SIM_WIDTH are 'AU' or '"LY"'
+# units for DT is SEC
+
+PARAM SIM_WIDTH  3.0 AU
+PARAM DT_LINUX     1 SEC
+PARAM DT_ANDROID  10 SEC
+
+#                                                                                                                               MAX_PATH_ 
+#                                                                                                                               DISP_DFLT
+# NAME          X (m)           Y (m)           XV (m/s)        YV (m/s)        MASS (kg)       RADIUS (m)      COLOR           (days)
+
+body1          -1.4E11          0               0               -8.8E3          2000000E24       20              YELLOW           800   
+body2           1.4E11          0               0               17.6E3          1000000E24       15              GREEN            800   
+
