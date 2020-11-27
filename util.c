@@ -1,5 +1,4 @@
 #include "util.h"
-#include "button_sound.h"
 
 #ifndef ANDROID
 #include <dirent.h>
@@ -19,10 +18,8 @@
 #define SDL_FLAGS SDL_WINDOW_FULLSCREEN
 #endif
 
-static Mix_Chunk * sdl_button_sound;
-static int32_t     sdl_event_max;
+static int32_t sdl_event_max;
 
-static void sdl_play_event_sound(void);
 static void sdl_print_screen(void);
 
 void sdl_init(uint32_t w, uint32_t h)
@@ -41,16 +38,6 @@ void sdl_init(uint32_t w, uint32_t h)
     }
     SDL_GetWindowSize(sdl_window, &sdl_win_width, &sdl_win_height);
     INFO("sdl_win_width=%d sdl_win_height=%d\n", sdl_win_width, sdl_win_height);
-
-    // init button_sound
-    if (Mix_OpenAudio( 22050, MIX_DEFAULT_FORMAT, 2, 4096) < 0) {
-        FATAL("Mix_OpenAudio failed\n");
-    }
-    sdl_button_sound = Mix_QuickLoad_WAV(button_sound_wav);
-    if (sdl_button_sound == NULL) {
-        FATAL("Mix_QuickLoadWAV failed\n");
-    }
-    Mix_VolumeChunk(sdl_button_sound,MIX_MAX_VOLUME/2);
 
     // initialize True Type Font
     if (TTF_Init() < 0) {
@@ -84,8 +71,6 @@ void sdl_terminate(void)
     int32_t i;
     
     // cleanup
-    Mix_FreeChunk(sdl_button_sound);
-    Mix_CloseAudio();
 
     for (i = 0; i < SDL_MAX_FONT; i++) {
         TTF_CloseFont(sdl_font[i].font);
@@ -215,7 +200,6 @@ sdl_event_t * sdl_poll_event(void)
                 }
             }
             if (event.event != SDL_EVENT_NONE) {
-                sdl_play_event_sound();
                 break;
             }
 
@@ -320,7 +304,6 @@ sdl_event_t * sdl_poll_event(void)
             if (ctrl) {
                 if (key == 'p') {
                     sdl_print_screen();
-                    sdl_play_event_sound();
                 }
                 break;
             }
@@ -343,10 +326,8 @@ sdl_event_t * sdl_poll_event(void)
                      sdl_event_reg_tbl[toupper(possible_event)].pos.w))
                 {
                     event.event = !shift ? possible_event : toupper(possible_event);
-                    sdl_play_event_sound();
                 } else if (sdl_event_reg_tbl[possible_event].pos.w) {
                     event.event = possible_event;
-                    sdl_play_event_sound();
                 }
             }
             break; }
@@ -374,7 +355,6 @@ sdl_event_t * sdl_poll_event(void)
             DEBUG("got event SDL_QUIT\n");
             sdl_quit = true;
             event.event = SDL_EVENT_QUIT;
-            sdl_play_event_sound();
             break; }
 
         default: {
@@ -389,11 +369,6 @@ sdl_event_t * sdl_poll_event(void)
     }
 
     return &event;
-}
-
-void sdl_play_event_sound(void)
-{
-    Mix_PlayChannel(-1, sdl_button_sound, 0);
 }
 
 void sdl_print_screen(void)

@@ -26,7 +26,7 @@ OBJS = main.o sim_container.o sim_gravity.o sim_universe.o sim_randomwalk.o util
 all: $(TARGETS)
 
 entropy: $(OBJS) 
-	$(CC) -pthread -lrt -lSDL2 -lSDL2_ttf -lSDL2_mixer -lm -lpng -o $@ $(OBJS)
+	$(CC) -pthread -lrt -lSDL2 -lSDL2_ttf -lm -lpng -o $@ $(OBJS)
 
 #
 # clean rule
