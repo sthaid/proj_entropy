@@ -1,0 +1,65 @@
+=======================
+OVERVIEW       
+=======================
+
+The purpose of this program is to further understanding of physics
+through simulations.
+
+Simulation              What Can Be Learned
+----------              -------------------
+Expanding Gas           Entropy, and Adiabatic Heating & Cooling
+
+Gravity                 Orbits, Gravity Boost, Solar Wobble
+
+Expanding Universe      Red Shift, Size of the Universe
+
+Random Walk             Expected distance in a random walk.
+                    
+=======================
+ACKNOWLEDGMENTS
+=======================
+
+Simple Direct Media Layer (SDL) 
+  http://www.libsdl.org/
+
+NASA Planetary Fact Sheets
+  http://nssdc.gsfc.nasa.gov/planetary/factsheet/
+
+Button Sounds
+  http://www.soundjay.com/button-sounds-5.html
+
+================================================
+BUILD LINUX VERSION
+================================================
+
+I build on Fedora 20. 
+
+In addition to Development Tools, the following packages must be installed:
+  SDL2-devel
+  SDL2_ttf-devel
+  SDL2_mixer-devel
+  libpng-devel
+
+To build this program (program name is 'entropy'), just run make.
+
+=======================
+BUILD ANDROID VERSION
+=======================
+
+Install the Android SDK and NDK. 
+
+The following must be in your PATH:
+  android-sdk/tools
+  android-sdk/platform-tools
+  android-ndk
+
+The ANDROID_HOME environment variable must be set to the android-sdk directory.
+
+Build Steps:
+  cd android-project
+  ./setup-script
+  ./do_build
+
+Note that the setup-script configures 
+'APP_ABI := armeabi armeabi-v7a arm64-v8a x86 x86_64".
+
