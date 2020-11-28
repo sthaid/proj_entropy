@@ -24,6 +24,10 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 
+#ifdef ANDROID
+#define bzero(ptr,len) memset(ptr,0,len)
+#endif
+
 // -----------------  SIMULATIONS  --------------------------------------------------
 
 void sim_container(void);
