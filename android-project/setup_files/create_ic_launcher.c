@@ -1,6 +1,6 @@
 // build and run example:
 //
-// gcc -Wall `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher create_ic_launcher.c
+// gcc -Wall -g `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher create_ic_launcher.c
 // ./create_ic_launcher icon.png 512
 
 #include <stdio.h>
@@ -72,16 +72,53 @@ void write_png_file(char* file_name, int width, int height, void * pixels, int p
 
 // -----------------  DRAW YOUR LAUNCHER HERE  -----------------------------
 
-void draw_launcher(int width, int height)
+#define MAX_CIRCLE_INFO (sizeof(circle_info)/sizeof(circle_info[0]))
+
+// x,y range 0-99
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t color;
+} circle_info_t;
+
+circle_info_t circle_info[] = {
+    { 30, 25, GREEN      },
+    { 82, 18, GREEN      },
+    { 47, 53, GREEN      },
+    { 15, 86, GREEN      },
+    { 70, 90, GREEN      },
+    { 15, 10, YELLOW     },
+    { 80, 60, RED        },
+    { 40, 80, LIGHT_BLUE },
+    { 65, 35, BLUE       },
+    { 10, 40, PURPLE     },
+    { 55, 15, RED        },
+    { 22, 62, YELLOW     },
+            };
+
+void draw_launcher(int32_t width, int32_t height)
 {
-    SDL_Rect rect = {0,0,width,height};
-    TTF_Font *font;
+    SDL_Rect      rect;
+    int32_t       i, x, y, r, color;
 
-    font = sdl_create_font(height);
+    // set circle radius
+    r = 2 * width / 48;
 
-    sdl_render_fill_rect(&rect, GREEN);
-    sdl_render_text(font, width*.2, 0, BLACK, GREEN, "R");
-    sdl_render_rect(&rect, 2, BLACK);
+    // draw cicles
+    for (i = 0; i < MAX_CIRCLE_INFO; i++) {
+        x     = circle_info[i].x * width / 100;
+        y     = circle_info[i].y * height / 100;
+        color = circle_info[i].color;
+
+        sdl_render_circle(x, y, r, color);
+    }
+
+    // draw perimeter rect, with 2 pixel line width
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = width;
+    rect.h = height;
+    sdl_render_rect(&rect, 2, GREEN);
 }
 
 // -----------------  MAIN  ------------------------------------------------
