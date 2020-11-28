@@ -985,6 +985,10 @@ void sdl_display_text(char * text)
                 break;
             }
 
+            if (texture[i] == NULL) {
+                continue;
+            }
+
             SDL_QueryTexture(texture[i], NULL, NULL, &w, &h);
             dstrect.x = 0;
             dstrect.y = i*pixels_per_row - text_y;
@@ -1044,7 +1048,9 @@ void sdl_display_text(char * text)
 
     // free allocations
     for (i = 0; i < max_texture; i++) {
-        SDL_DestroyTexture(texture[i]);
+        if (texture[i]) {
+            SDL_DestroyTexture(texture[i]);
+        }
     }
 }
 
@@ -1253,6 +1259,7 @@ void sdl_display_error(char * err_str0, char * err_str1, char * err_str2)
 #ifdef ANDROID
 
 // Android NDK does not include pthread_barrier support, so add it here
+// XXX is this still true
 
 int Pthread_barrier_init(Pthread_barrier_t *barrier,
     const Pthread_barrierattr_t *attr, unsigned count)
@@ -1273,7 +1280,7 @@ int Pthread_barrier_wait(Pthread_barrier_t *barrier)
     uint64_t done;
 
     if (barrier->count == 1) {
-        return;
+        return 0;
     }
 
     pthread_mutex_lock(&barrier->mutex);
@@ -1834,9 +1841,6 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
     return 0;
 }
 #else
-JNIEnv* Android_JNI_GetEnv(void);
-extern jclass mActivityClass;
-
 static int32_t list_local_files(char * location, int32_t * max, char *** pathnames)
 {
     jmethodID       mid;
@@ -1845,7 +1849,6 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
     AAssetManager * asset_manager;
     AAssetDir     * asset_dir;
     const char    * fn;
-    JNIEnv        * mEnv = Android_JNI_GetEnv();
     char            location_copy[200];
     int32_t         len;
 
@@ -1858,6 +1861,14 @@ static int32_t list_local_files(char * location, int32_t * max, char *** pathnam
         ERROR("calloc\n");
         return -1;
     }
+
+    // reference: https://wiki.libsdl.org/SDL_AndroidGetActivity
+    // - retrieve the JNI environment.
+    // - retrieve the Java instance of the SDLActivity
+    // - find the Java class of the activity. It should be SDLActivity or a subclass of it.
+    JNIEnv* mEnv = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    jobject activity = (jobject)SDL_AndroidGetActivity();
+    jclass mActivityClass = (*mEnv)->GetObjectClass(mEnv,activity);
 
     // not sure what this is for, it was in SDL_android.c
     (*mEnv)->PushLocalFrame(mEnv, 16);
