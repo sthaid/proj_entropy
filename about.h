@@ -1,5 +1,4 @@
-// When updating VERSION_STR, also change version in android-project/build.xml
-#define VERSION_STR "1.1"
+#define VERSION_STR "2.0"
 
 // Note max line length is 44 chars.
 
