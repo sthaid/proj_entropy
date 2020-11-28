@@ -1,2 +1,3 @@
 *.o
 entropy
+SDL2-2.0.12

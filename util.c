@@ -1259,7 +1259,6 @@ void sdl_display_error(char * err_str0, char * err_str1, char * err_str2)
 #ifdef ANDROID
 
 // Android NDK does not include pthread_barrier support, so add it here
-// XXX is this still true
 
 int Pthread_barrier_init(Pthread_barrier_t *barrier,
     const Pthread_barrierattr_t *attr, unsigned count)

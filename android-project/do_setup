@@ -65,20 +65,17 @@ cd $TOP/SDL2-2.0.12
 patch -p1 < $TOP/setup_files/setup.patch
 echo
 
-# XXX later
-echo EARLY EXIT
-exit
-
 # create the launcher icon
 echo "Creating launcher icons"
-cd $BUILD/app/src/main/res
-gcc -Wall `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher \
-     ../../../../../../../setup_files/create_ic_launcher.c
-./create_ic_launcher  mipmap-mdpi/ic_launcher.png      48
-./create_ic_launcher  mipmap-hdpi/ic_launcher.png      72
-./create_ic_launcher  mipmap-xhdpi/ic_launcher.png     96
-./create_ic_launcher  mipmap-xxhdpi/ic_launcher.png   144
-./create_ic_launcher  mipmap-xxxhdpi/ic_launcher.png  192
+cd $TOP/setup_files
+RES_PATH=../SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/res
+gcc -Wall -g `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher create_ic_launcher.c
+./create_ic_launcher  $RES_PATH/mipmap-mdpi/ic_launcher.png      48
+./create_ic_launcher  $RES_PATH/mipmap-hdpi/ic_launcher.png      72
+./create_ic_launcher  $RES_PATH/mipmap-xhdpi/ic_launcher.png     96
+./create_ic_launcher  $RES_PATH/mipmap-xxhdpi/ic_launcher.png   144
+./create_ic_launcher  $RES_PATH/mipmap-xxxhdpi/ic_launcher.png  192
+./create_ic_launcher  google_play_store/icon_512x512.png        512
 rm create_ic_launcher
 echo
 
