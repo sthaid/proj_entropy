@@ -1,0 +1,3 @@
+#!/bin/bash
+
+rm -rf SDL2-2.0.12

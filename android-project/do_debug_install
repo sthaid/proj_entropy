@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd SDL2-2.0.12/build/org.sthaid.entropy
+
+adb install -r ./app/build/outputs/apk/debug/app-debug.apk

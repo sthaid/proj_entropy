@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# set directory variables
+TOP=`pwd`
+SDL_DIR=$TOP/SDL2-2.0.12
+BUILD=$SDL_DIR/build/org.sthaid.entropy
+
+# if SDL_DIR exists it must be removed
+if [ -d $SDL_DIR ]; then
+  read -p "$SDL_DIR exists, remove and proceed with setyp (y/n)? " yn
+  if [ "$yn" != y ]; then
+    echo ABORT
+    exit 1
+  fi
+  rm -rf $SDL_DIR
+fi
+
+# extract the SDL2 src from tar file
+echo "Extracting SDL2-2.0.12.tar.gz"
+tar -xf setup_files/SDL2-2.0.12.tar.gz
+echo
+
+# create a template for building entropy
+echo "Creating template build directory org.sthaid.entropy"
+touch stub.c
+./SDL2-2.0.12/build-scripts/androidbuild.sh org.sthaid.entropy stub.c
+rm stub.c
+echo
+
+# $BUILD/app/jni: add additional subdirs (with source code and Android.mk), for the 
+# additional libraries that are needed, which is SDL2_ttf-2.0.15
+echo "Extractng SDL2_ttf-2.0.15.tar.gz"
+cd $BUILD/app/jni
+tar -xf $TOP/setup_files/SDL2_ttf-2.0.15.tar.gz
+echo
+
+# $BUILD/app/jni/src: add symbolic links to the source code needed to build entropy
+echo "Creating symbolic links for entropy source code"
+cd $BUILD/app/jni/src
+rm stub.c
+ln -s ../../../../../../../main.c
+ln -s ../../../../../../../sim_container.c
+ln -s ../../../../../../../sim_container_help.h
+ln -s ../../../../../../../sim_gravity.c
+ln -s ../../../../../../../sim_gravity_help.h
+ln -s ../../../../../../../sim_randomwalk.c
+ln -s ../../../../../../../sim_randomwalk_help.h
+ln -s ../../../../../../../sim_universe.c
+ln -s ../../../../../../../sim_universe_help.h
+ln -s ../../../../../../../util.c
+ln -s ../../../../../../../util.h
+ln -s ../../../../../../../about.h
+echo
+
+# $BUILD/app/src/main: create assets dir, and create link assets/entropy.book
+echo "Creating assets directory"
+cd $BUILD/app/src/main
+mkdir assets
+cd assets
+ln -s ../../../../../../../../sim_gravity .
+
+# patch various files
+echo "Applying patches to template build directory"
+cd $TOP/SDL2-2.0.12
+patch -p1 < $TOP/setup_files/setup.patch
+echo
+
+# XXX later
+echo EARLY EXIT
+exit
+
+# create the launcher icon
+echo "Creating launcher icons"
+cd $BUILD/app/src/main/res
+gcc -Wall `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher \
+     ../../../../../../../setup_files/create_ic_launcher.c
+./create_ic_launcher  mipmap-mdpi/ic_launcher.png      48
+./create_ic_launcher  mipmap-hdpi/ic_launcher.png      72
+./create_ic_launcher  mipmap-xhdpi/ic_launcher.png     96
+./create_ic_launcher  mipmap-xxhdpi/ic_launcher.png   144
+./create_ic_launcher  mipmap-xxxhdpi/ic_launcher.png  192
+rm create_ic_launcher
+echo
+
+echo "SETUP COMPLETE"

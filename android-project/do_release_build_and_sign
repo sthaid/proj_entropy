@@ -1,0 +1,38 @@
+#!/bin/bash
+
+cd SDL2-2.0.12/build/org.sthaid.entropy
+
+#XXX echo "CREATE VERSION FILE app/jni/src/version.c"
+#XXX echo "char *version = \"`git log -1 --format=%h`\";" > app/jni/src/version.c
+#XXX echo
+
+echo "BUILD"
+./gradlew assemble
+if [ $? -ne 0 ]; then
+  echo "*** ERROR BUILD FAILED ***"
+  exit 1
+fi
+echo
+
+echo "ZIPALIGN"
+$ANDROID_HOME/build-tools/30.0.2/zipalign \
+   -p 4 \
+   ./app/build/outputs/apk/release/app-release-unsigned.apk \
+   ./app/build/outputs/apk/release/app-release-aligned.apk 
+echo
+
+echo "SIGN"
+$ANDROID_HOME/build-tools/30.0.2/apksigner sign --ks ../../../entropy.keystore \
+   ./app/build/outputs/apk/release/app-release-aligned.apk 
+if [ $? -ne 0 ]; then
+  echo "*** ERROR SIGN FAILED ***"
+  exit 1
+fi
+echo
+
+echo "VERIFY"
+$ANDROID_HOME/build-tools/30.0.2/apksigner verify --print-certs \
+    ./app/build/outputs/apk/release/app-release-aligned.apk 
+echo 
+
+echo "DONE"

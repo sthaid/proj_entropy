@@ -1,0 +1,9 @@
+#!/bin/bash
+
+cd SDL2-2.0.12/build/org.sthaid.entropy
+
+#XXX echo "char *version = \"`git log -1 --format=%h`\";" > app/jni/src/version.c
+
+./gradlew assembleDebug
+
+
