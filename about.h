@@ -1,18 +1,7 @@
-#define VERSION_STR "2.0"
-
 // Note max line length is 44 chars.
 
 static char about[] = "\
-Simulations to further understanding of \n\
-physics.\n\
-\n\
-Version: " VERSION_STR "\n\
-\n\
-Author: Steven Haid\n\
-        StevenHaid@gmail.com\n\
-\n\
-Website: wikiscience101.sthaid.org/\n\
-         index.php?title=Entropy_App\n\
+Simulations in Physics.\n\
 \n\
 Source Code: https://github.com/sthaid/\n\
              proj_entropy.git\n\

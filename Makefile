@@ -26,7 +26,8 @@ OBJS = main.o sim_container.o sim_gravity.o sim_universe.o sim_randomwalk.o util
 all: $(TARGETS)
 
 entropy: $(OBJS) 
-	$(CC) -pthread -lrt -lSDL2 -lSDL2_ttf -lm -lpng -o $@ $(OBJS)
+	echo "char *version = \"`git log -1 --format=%h`\";" > version.c
+	$(CC) -pthread -lrt -lSDL2 -lSDL2_ttf -lm -lpng -o $@ $(OBJS) version.c
 
 #
 # clean rule

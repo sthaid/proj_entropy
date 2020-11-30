@@ -24,6 +24,8 @@ static char * choices[] = {
                 "About",
                         };
 
+extern char *version;
+
 //
 // prototypes
 //
@@ -40,6 +42,7 @@ int32_t main(int32_t argc, char **argv)
     int32_t         selection;
     int32_t         width  = DEFAULT_WIDTH;
     int32_t         height = DEFAULT_HEIGHT;
+    char            about_and_version[2000];
 
     // init core dumps
     rl.rlim_cur = RLIM_INFINITY;
@@ -72,7 +75,7 @@ int32_t main(int32_t argc, char **argv)
             return 0;
             break;
         case 'v':
-            printf("Version %s\n", VERSION_STR);
+            printf("Version %s\n", version);
             return 0;
         default:
             return 1;
@@ -82,6 +85,9 @@ int32_t main(int32_t argc, char **argv)
     // print options
     INFO("args: width,height = %dx%d\n", width, height);
 #endif
+
+    // combine the versin and about strings
+    snprintf(about_and_version, sizeof(about_and_version), "Version %s\n\n%s", version, about);
 
     // init sdl
     sdl_init(width, height);
@@ -110,7 +116,7 @@ int32_t main(int32_t argc, char **argv)
             sim_randomwalk();
             break;
         case 4:
-            sdl_display_text(about);
+            sdl_display_text(about_and_version);
             break;
         }
     }
