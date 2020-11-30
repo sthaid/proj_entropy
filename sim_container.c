@@ -648,7 +648,7 @@ void * sim_container_thread(void * cx)
                         new_x = -cont_width/2;
                         new_speed = p->speed - cont_speed;
                         new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->y_speed / abs(p->x_speed) * rand_dir;
+                        q = (double)p->y_speed / fabs(p->x_speed) * rand_dir;
                         new_x_speed = sqrt( (new_speed * new_speed) / (1. + q * q) );
                         new_y_speed = q * new_x_speed;
                     }
@@ -657,7 +657,7 @@ void * sim_container_thread(void * cx)
                         new_x = cont_width/2;
                         new_speed = p->speed - cont_speed;
                         new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->y_speed / -abs(p->x_speed) * rand_dir;
+                        q = (double)p->y_speed / -fabs(p->x_speed) * rand_dir;
                         new_x_speed = -sqrt( (new_speed * new_speed) / (1. + q * q) );
                         new_y_speed = q * new_x_speed;
                     }
@@ -666,7 +666,7 @@ void * sim_container_thread(void * cx)
                         new_y = -cont_width/2;
                         new_speed = p->speed - cont_speed;
                         new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->x_speed / abs(p->y_speed) * rand_dir;
+                        q = (double)p->x_speed / fabs(p->y_speed) * rand_dir;
                         new_y_speed = sqrt( (new_speed * new_speed) / (1. + q * q) );
                         new_x_speed = q * new_y_speed;
                     }
@@ -675,7 +675,7 @@ void * sim_container_thread(void * cx)
                         new_y = cont_width/2;
                         new_speed = p->speed - cont_speed;
                         new_speed += ((SPEED_AVG - new_speed) / 50.) + random_triangular(-100,100)/100.;
-                        q = (double)p->x_speed / -abs(p->y_speed) * rand_dir;
+                        q = (double)p->x_speed / -fabs(p->y_speed) * rand_dir;
                         new_y_speed = -sqrt( (new_speed * new_speed) / (1. + q * q) );
                         new_x_speed = q * new_y_speed;
                     }
@@ -801,7 +801,7 @@ bool sim_container_should_auto_stop(void)
 
     for (i = 0; i < sim->max_particle; i++) {
         particle_t * p = &sim->particle[i];
-        if (abs(p->x) > PARTICLE_DIAMETER/4 || abs(p->y) > PARTICLE_DIAMETER/4) {
+        if (labs(p->x) > PARTICLE_DIAMETER/4 || labs(p->y) > PARTICLE_DIAMETER/4) {
             break;
         }
     }
