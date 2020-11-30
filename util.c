@@ -1758,7 +1758,7 @@ void * open_file(char * pathname)
 
     SDL_RWclose(rw);
 
-    F = calloc(1,sizeof(file_t));
+    F = calloc(1,sizeof(File_t));
     F->buff = buff;
     F->offset = 0;
     return F;
