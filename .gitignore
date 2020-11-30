@@ -1,3 +1,4 @@
 *.o
 entropy
 SDL2-2.0.12
+version.c
