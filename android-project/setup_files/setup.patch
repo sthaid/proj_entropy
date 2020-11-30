@@ -12,7 +12,7 @@
  
  # Add your application source files here...
 -LOCAL_SRC_FILES :=  stub.c
-+LOCAL_SRC_FILES :=  main.c sim_container.c sim_gravity.c sim_randomwalk.c sim_universe.c util.c
++LOCAL_SRC_FILES :=  main.c sim_container.c sim_gravity.c sim_randomwalk.c sim_universe.c util.c version.c
  
 -LOCAL_SHARED_LIBRARIES := SDL2
 +LOCAL_SHARED_LIBRARIES := SDL2 SDL2_ttf
@@ -21,15 +21,15 @@
 +LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -llog -landroid
  
  include $(BUILD_SHARED_LIBRARY)
---- pristine/build/org.sthaid.entropy/app/src/main/res/values/strings.xml	2020-11-28 10:14:10.401944224 -0500
-+++ SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/res/values/strings.xml	2020-11-28 09:41:27.145134503 -0500
+--- pristine/build/org.sthaid.entropy/app/src/main/res/values/strings.xml	2020-09-14 19:51:27.644129724 -0400
++++ SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/res/values/strings.xml	2020-09-13 19:38:52.284118088 -0400
 @@ -1,3 +1,3 @@
  <resources>
 -    <string name="app_name">Game</string>
 +    <string name="app_name">Entropy</string>
  </resources>
---- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-28 10:14:10.425943990 -0500
-+++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-11-28 08:55:19.630368991 -0500
+--- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-22 19:26:30.386873912 -0500
++++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-11-22 19:28:32.952625272 -0500
 @@ -8,13 +8,13 @@
  }
  
@@ -46,8 +46,19 @@
          versionCode 1
          versionName "1.0"
          externalNativeBuild {
---- pristine/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-28 10:14:10.434943902 -0500
-+++ SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-28 09:44:58.817065458 -0500
+--- pristine/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-29 07:16:29.971685670 -0500
++++ SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-29 07:19:02.919111518 -0500
+@@ -4,8 +4,8 @@
+ -->
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+     package="org.sthaid.entropy"
+-    android:versionCode="1"
+-    android:versionName="1.0"
++    android:versionCode="1"
++    android:versionName="1.0"
+     android:installLocation="auto">
+ 
+     <!-- OpenGL ES 2.0 -->
 @@ -71,6 +71,7 @@
              android:alwaysRetainTaskState="true"
              android:launchMode="singleInstance"
@@ -56,3 +67,16 @@
              >
              <intent-filter>
                  <action android:name="android.intent.action.MAIN" />
+--- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-28 21:54:36.249243688 -0500
++++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-11-28 21:54:54.317071628 -0500
+@@ -15,8 +15,8 @@
+         }
+         minSdkVersion 16
+         targetSdkVersion 29
+-        versionCode 1
+-        versionName "1.0"
++        versionCode 1
++        versionName "1.0"
+         externalNativeBuild {
+             ndkBuild {
+                 arguments "APP_PLATFORM=android-16"

@@ -163,7 +163,7 @@ int main(int argc, char ** argv)
     SDL_RenderPresent(sdl_renderer);
 
     // delay so the disaplay can be seen briefly
-    sleep(2);
+    sleep(1);
 
     // read the pixels
     rect.x = 0;

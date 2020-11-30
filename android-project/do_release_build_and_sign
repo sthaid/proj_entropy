@@ -2,12 +2,12 @@
 
 cd SDL2-2.0.12/build/org.sthaid.entropy
 
-#XXX echo "CREATE VERSION FILE app/jni/src/version.c"
-#XXX echo "char *version = \"`git log -1 --format=%h`\";" > app/jni/src/version.c
-#XXX echo
+echo "CREATE VERSION FILE app/jni/src/version.c"
+echo "char *version = \"`git log -1 --format=%h`\";" > app/jni/src/version.c
+echo
 
 echo "BUILD"
-./gradlew assemble
+./gradlew assembleRelease
 if [ $? -ne 0 ]; then
   echo "*** ERROR BUILD FAILED ***"
   exit 1

@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # set directory variables
+PACKAGE_NAME=org.sthaid.entropy
 TOP=`pwd`
 SDL_DIR=$TOP/SDL2-2.0.12
-BUILD=$SDL_DIR/build/org.sthaid.entropy
+BUILD=$SDL_DIR/build/$PACKAGE_NAME
 
 # if SDL_DIR exists it must be removed
 if [ -d $SDL_DIR ]; then
@@ -20,22 +21,22 @@ echo "Extracting SDL2-2.0.12.tar.gz"
 tar -xf setup_files/SDL2-2.0.12.tar.gz
 echo
 
-# create a template for building entropy
-echo "Creating template build directory org.sthaid.entropy"
+# create template build directory
+echo "Creating template build directory"
 touch stub.c
-./SDL2-2.0.12/build-scripts/androidbuild.sh org.sthaid.entropy stub.c
+$SDL_DIR/build-scripts/androidbuild.sh $PACKAGE_NAME stub.c
 rm stub.c
 echo
 
-# $BUILD/app/jni: add additional subdirs (with source code and Android.mk), for the 
+# add additional subdirs (with source code and Android.mk), for the 
 # additional libraries that are needed, which is SDL2_ttf-2.0.15
 echo "Extractng SDL2_ttf-2.0.15.tar.gz"
 cd $BUILD/app/jni
 tar -xf $TOP/setup_files/SDL2_ttf-2.0.15.tar.gz
 echo
 
-# $BUILD/app/jni/src: add symbolic links to the source code needed to build entropy
-echo "Creating symbolic links for entropy source code"
+# add symbolic links to the source code
+echo "Creating symbolic links to source code"
 cd $BUILD/app/jni/src
 rm stub.c
 ln -s ../../../../../../../main.c
@@ -52,23 +53,23 @@ ln -s ../../../../../../../util.h
 ln -s ../../../../../../../about.h
 echo
 
-# $BUILD/app/src/main: create assets dir, and create link assets/entropy.book
+# create assets dir, and create symbolic links to assets
 echo "Creating assets directory"
 cd $BUILD/app/src/main
 mkdir assets
 cd assets
 ln -s ../../../../../../../../sim_gravity .
 
-# patch various files
+# patch android build files
 echo "Applying patches to template build directory"
-cd $TOP/SDL2-2.0.12
+cd $SDL_DIR
 patch -p1 < $TOP/setup_files/setup.patch
 echo
 
 # create the launcher icon
 echo "Creating launcher icons"
 cd $TOP/setup_files
-RES_PATH=../SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/res
+RES_PATH=$BUILD/app/src/main/res
 gcc -Wall -g `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher create_ic_launcher.c
 ./create_ic_launcher  $RES_PATH/mipmap-mdpi/ic_launcher.png      48
 ./create_ic_launcher  $RES_PATH/mipmap-hdpi/ic_launcher.png      72
