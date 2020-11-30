@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#
+# Notes:
+# - to list the keystore contents:
+#     keytool -list -v -keystore entropy.keystore
+#
+
+if [ -e entropy.keystore ]; then
+  echo "*** ERROR entropy.keystore exists ***"
+  exit 1
+fi
+
+keytool -genkey -v -keystore entropy.keystore -keyalg RSA -keysize 2048 -validity 10000 -alias entropy
+
