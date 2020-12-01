@@ -11,29 +11,14 @@
 
 // - - - - - - - - -  SDL INIT & TERMINATE  - - - - - - - - - - - - - - - 
 
-// window init
-#ifndef ANDROID 
-#define SDL_FLAGS SDL_WINDOW_RESIZABLE
-#else
-#define SDL_FLAGS SDL_WINDOW_FULLSCREEN
-#endif
-
 static int32_t sdl_event_max;
 
 static void sdl_print_screen(void);
 
 void sdl_init(uint32_t w, uint32_t h)
 {
-    char   *font_path = NULL;
+    char   *font_path;
     int32_t font0_ptsize, font1_ptsize;
-    int32_t i;
-
-#ifndef ANDROID
-    char *font_search_path[] = { "/usr/share/fonts/gnu-free/FreeMonoBold.ttf",
-                                 "/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf" };
-#else
-    char *font_search_path[] = { "/system/fonts/DroidSansMono.ttf" };
-#endif
 
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
@@ -41,11 +26,30 @@ void sdl_init(uint32_t w, uint32_t h)
     }
 
     // create SDL Window and Renderer
-    if (SDL_CreateWindowAndRenderer(w, h, SDL_FLAGS, &sdl_window, &sdl_renderer) != 0) {
+#ifndef ANDROID
+    if (SDL_CreateWindowAndRenderer(w, h, SDL_WINDOW_RESIZABLE, &sdl_window, &sdl_renderer) != 0) {
         FATAL("SDL_CreateWindowAndRenderer failed\n");
+    }
+    sdl_poll_event();
+    SDL_GetWindowSize(sdl_window, &sdl_win_width, &sdl_win_height);
+    INFO("sdl_win_width=%d sdl_win_height=%d\n", sdl_win_width, sdl_win_height);
+#else
+    int i;
+    if (SDL_CreateWindowAndRenderer(0, 0, SDL_WINDOW_FULLSCREEN, &sdl_window, &sdl_renderer) != 0) {
+        FATAL("SDL_CreateWindowAndRenderer failed\n");
+    }
+    for (i = 0; i < 50; i++) {
+        sdl_event_t *event;
+        event = sdl_poll_event();
+        if (event->event == SDL_EVENT_WIN_SIZE_CHANGE) {
+            INFO("got SDL_EVENT_WIN_SIZE_CHANGE, i = %d\n", i);
+            break;
+        }
+        usleep(10000);
     }
     SDL_GetWindowSize(sdl_window, &sdl_win_width, &sdl_win_height);
     INFO("sdl_win_width=%d sdl_win_height=%d\n", sdl_win_width, sdl_win_height);
+#endif
 
     // initialize True Type Font
     //
@@ -56,18 +60,7 @@ void sdl_init(uint32_t w, uint32_t h)
         FATAL("TTF_Init failed\n");
     }
 
-    for (i = 0; i < sizeof(font_search_path)/sizeof(char*); i++) {
-        struct stat buf;
-        font_path = font_search_path[i];
-        if (stat(font_path, &buf) == 0) {
-            break;
-        }
-    }
-    if (font_path == NULL) {
-        FATAL("failed to locate font file\n");
-    }
-    INFO("using font %s\n", font_path);
-
+    font_path = "fonts/FreeMonoBold.ttf";
     font0_ptsize = sdl_win_height / 18 - 1;  // normal
     font1_ptsize = sdl_win_height / 13 - 1;  // extra large, for keyboard
 
