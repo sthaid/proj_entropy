@@ -59,6 +59,7 @@ cd $BUILD/app/src/main
 mkdir assets
 cd assets
 ln -s ../../../../../../../../sim_gravity .
+ln -s ../../../../../../../../fonts .
 
 # patch android build files
 echo "Applying patches to template build directory"

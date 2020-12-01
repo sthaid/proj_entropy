@@ -28,24 +28,6 @@
 -    <string name="app_name">Game</string>
 +    <string name="app_name">Entropy</string>
  </resources>
---- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-22 19:26:30.386873912 -0500
-+++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-11-22 19:28:32.952625272 -0500
-@@ -8,13 +8,13 @@
- }
- 
- android {
--    compileSdkVersion 26
-+    compileSdkVersion 29
-     defaultConfig {
-         if (buildAsApplication) {
-             applicationId "org.sthaid.entropy"
-         }
-         minSdkVersion 16
--        targetSdkVersion 26
-+        targetSdkVersion 29
-         versionCode 1
-         versionName "1.0"
-         externalNativeBuild {
 --- pristine/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-29 07:16:29.971685670 -0500
 +++ SDL2-2.0.12/build/org.sthaid.entropy/app/src/main/AndroidManifest.xml	2020-11-29 07:19:02.919111518 -0500
 @@ -4,8 +4,8 @@
@@ -67,14 +49,23 @@
              >
              <intent-filter>
                  <action android:name="android.intent.action.MAIN" />
---- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-28 21:54:36.249243688 -0500
-+++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-11-28 21:54:54.317071628 -0500
-@@ -15,8 +15,8 @@
+--- pristine/build/org.sthaid.entropy/app/build.gradle	2020-11-29 07:32:11.772992512 -0500
++++ SDL2-2.0.12/build/org.sthaid.entropy/app/build.gradle	2020-12-01 08:13:43.970066344 -0500
+@@ -8,15 +8,15 @@
+ }
+ 
+ android {
+-    compileSdkVersion 26
++    compileSdkVersion 29
+     defaultConfig {
+         if (buildAsApplication) {
+             applicationId "org.sthaid.entropy"
          }
          minSdkVersion 16
-         targetSdkVersion 29
+-        targetSdkVersion 26
 -        versionCode 1
 -        versionName "1.0"
++        targetSdkVersion 29
 +        versionCode 1
 +        versionName "1.0"
          externalNativeBuild {
