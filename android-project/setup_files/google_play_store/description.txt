@@ -1,0 +1,24 @@
+The purpose of this App is to gain a better understanding of Physics through computer simulations. Includes simulations of:
+- Expanding Gas in a Container
+- Gravity
+- Expanding Universe
+- Random Walk
+
+Expanding Gas in a Container simulation - observe:
+- increase in entropy when the gas is released
+- shrink the container to observe Adiabatic heating
+- how entropy can occasionally spontaneously decrease
+
+Gravity simulation - observe:
+- orbits of 2 and 3 body systems
+- impact a rogue star would have on our solar system
+- solar wobble, used by astronomers to detect extrasolar planets
+- view planet orbits as seen from the Earth, observe retrograde motion
+- how gravity boost works
+
+Expanding Universe simulation - observe:
+- rapid expansion during the early universe
+- much of the universe lies beyond what can be seen from our vantage point
+- as the universe ages the size of the observable universe shrinks
+
+The source code is available at https://github.com/sthaid/proj_entropy.git. This App is coded in C, and utilizes the Simple DirectMedia Layer cross-platform development library. The Random Walk simulation is a good template to use for new simulations. Suggestions for new simulations are: Elastic Collisions, and Bacterial Life.
