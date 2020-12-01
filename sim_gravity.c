@@ -144,6 +144,7 @@ static const int32_t valid_dt[] = {
                         86400, };
 
 static const double valid_sim_width[] = {
+#if 0
                         .01*AU, .03*AU,
                         .1*AU, .3*AU,
                         1*AU, 3*AU,
@@ -153,6 +154,17 @@ static const double valid_sim_width[] = {
                         10000*AU, 30000*AU,
                         100000*AU, 300000*AU,
                         1000000*AU, 3000000*AU, };
+#endif
+                            .01*AU,     .02*AU,     .05*AU, 
+                             .1*AU,      .2*AU,      .5*AU, 
+                              1*AU,       2*AU,       5*AU, 
+                             10*AU,      20*AU,      50*AU, 
+                            100*AU,     200*AU,     500*AU, 
+                           1000*AU,    2000*AU,    5000*AU, 
+                          10000*AU,   20000*AU,   50000*AU, 
+                         100000*AU,  200000*AU,  500000*AU, 
+                        1000000*AU, 2000000*AU, 5000000*AU, 
+                                };
 
 // 
 // prototypes
@@ -505,8 +517,8 @@ void sim_gravity_set_obj_disp_r(object_t ** obj, int32_t max_object)
     double min_radius, max_radius, min_disp_r, max_disp_r, delta;
     int32_t i;
 
-    #define MIN_DISP_R (2.)
-    #define MAX_DISP_R (5. * MIN_DISP_R)
+    #define MIN_DISP_R (8.)
+    #define MAX_DISP_R (3. * MIN_DISP_R)
     #define CENTER_DISP_R ((MAX_DISP_R + MIN_DISP_R) / 2.)
 
     // fill in radius raw values with cube root of mass
@@ -789,10 +801,11 @@ int32_t sim_gravity_display_simulation(int32_t curr_display, int32_t last_displa
 
         // display sim_pane title
         sprintf(str, "WIDTH %0.2lf AU", sim_width/AU);
-        if (sim_width >= 999*AU) {
-            sprintf(str+strlen(str), " %0.2lf LY", sim_width/LY);
-        }
         sdl_render_text_font0(&sim_pane,  0, 0,  str, SDL_EVENT_NONE);
+        if (sim_width >= 999*AU) {
+            sprintf(str, "WIDTH %0.2lf LY", sim_width/LY);
+            sdl_render_text_font0(&sim_pane,  1, 0,  str, SDL_EVENT_NONE);
+        }
 
         // register sim_pane controls
         sdl_render_text_font0(&sim_pane,  0, -5,  " + ", SDL_EVENT_SIMPANE_ZOOM_IN);

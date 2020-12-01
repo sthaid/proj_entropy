@@ -3,7 +3,7 @@
 # units for SIM_WIDTH are 'AU' or '"LY"'
 # units for DT is SEC 
 
-PARAM SIM_WIDTH  3.0 AU
+PARAM SIM_WIDTH  5.0 AU
 PARAM DT_LINUX     1 SEC
 PARAM DT_ANDROID   1 SEC
 
