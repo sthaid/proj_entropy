@@ -38,10 +38,9 @@ DT+/DT-: Change the time step of the \n\
     a more accurate simulation; however the\n\
     simulation runs more slowly.\n\
 \n\
-LOCAL/CLOUD: Select a config file either \n\
-    from the Local system or the Cloud. \n\
-    These config files describe the initial\n\
-    condition of the simulation. \n\
+SELECT: Select a config file, the config file\n\
+    describe the initial condition of the\n\
+    simulation. \n\
 \n\
 PTHSTD/OFF/+/-: Adjust displayed path len.\n\
 \n\
@@ -49,25 +48,11 @@ CONFIG FILES\n\
 ------------\n\
 \n\
 Config files provide the initial conditions\n\
-for the simulation. The config files can be\n\
-stored locally or in the cloud. \n\
+for the simulation.\n\
 \n\
-The location of Local config files is:\n\
+The config files are in:\n\
   Linux Version:    ./sim_gravity\n\
-  Android Version:  embedded with the App \n\
-\n\
-The location of Cloud config files is:\n\
-  http://wikiscience101.sthaid.org/public/\n\
-  sim_gravity/.\n\
-If you are running the Linux Version, be \n\
-sure you have curl installed.  Curl is used \n\
-to access the Cloud config files.\n\
-\n\
-You can share your config files by uploading\n\
-to the Cloud:\n\
-  curl  -s --upload-file <your_config_file> \n\
-    http://wikiscience101.sthaid.org/public/\n\
-    sim_gravity/\n\
+  Android Version:  embedded in the App \n\
 \n\
 The config file format is documented in the \n\
 solar_system file.\n\

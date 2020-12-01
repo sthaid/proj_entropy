@@ -138,7 +138,6 @@ entropy: [-g WxH] [-h] [-v]\n\
   -v: version\n\
 \n\
 Refer to Help selection provided by each simulation.\n\
-Also refer to http://wikiscience101.sthaid.org/index.php?title=Entropy_App.\n\
 \n\
 Use Ctrl-P for screen capture, only supported on the Linux version.\n\
 \n\

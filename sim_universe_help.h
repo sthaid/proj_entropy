@@ -26,6 +26,8 @@ Particles shown in:\n\
 - blue  - apparent velocity is toward the \n\
           vantage point\n\
 - green - small apparent velocity\n\
+- yellow- medium apparent velocity away\n\
+          from the vantage point\n\
 - red   - apparent velocity away from the \n\
           vantage point, near the speed of \n\
           light\n\
@@ -34,12 +36,12 @@ Particles shown in:\n\
           their apparent velocity exceed \n\
           the speed of light\n\
 \n\
-Note - All vantage points in our universe \n\
+All vantage points in our universe \n\
 are equivalent. This means that the universe\n\
 appears generally the same from every \n\
 vantage point.\n\
 \n\
-Note - The particles shown in purple have \n\
+The particles shown in purple have \n\
 apparent recession velocities, from the \n\
 vantage point in the center, that exceed the\n\
 speed of light. This does not violate \n\
@@ -53,7 +55,7 @@ RADIUS OF THE UNIVERSE\n\
 The simulation uses the following formula to\n\
 calculate the radius of the universe. This \n\
 formula was chosen for this simulation \n\
-because its behavior is similar to accepted\n\
+because its behavior is similar to some\n\
 theories of the expansion of our universe:\n\
 - very rapid increase of radius at low \n\
   values of time (inflation)\n\
@@ -98,9 +100,9 @@ WHAT TO OBSERVE\n\
 \n\
 Rapid expansion during the early universe.\n\
 \n\
-much of the universe lies beyond what we can\n\
+Much of the universe lies beyond what we can\n\
 see from our vantage point.\n\
 \n\
 As the universe ages, the size of the \n\
-observable universe shrinks towards zero.\n\
+observable universe shrinks.\n\
 ";
