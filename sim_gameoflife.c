@@ -91,9 +91,22 @@ void sim_gameoflife(void)
 
 // -----------------  SIMULATION  -----------------------------------------------
 
+#if 0
+static inline bool sim_curr_gen_live_cell(int r, int c)
+{
+    return (*curr_gen)[r][c] & 0x80;  // xxx define
+}
+#endif
+
 // XXX 
+#define LIVE_MASK 0x80
+#define LIVE_WITH_2_LIVE_NEIGHBORS  (LIVE_MASK | 2)
+#define LIVE_WITH_3_LIVE_NEIGHBORS  (LIVE_MASK | 3)
+#define DEAD_WITH_3_LIVE_NEIGHBORS  (3)
+
 static int32_t sim_init(void)
 {
+    int r,c;
     // init 
     state = STATE_STOP;
 
@@ -102,26 +115,143 @@ static int32_t sim_init(void)
     bzero(next_gen, sizeof(gen_t));
 
     // init curr_gen xxx
-#if 1
-    int r,c;
-    for (r = 0; r < MAX_WIDTH; r++) {
-        for (c = 0; c < MAX_WIDTH; c++) {
+#if 0 //AAA
+    for (r = 1; r < MAX_WIDTH-1; r++) {
+        for (c = 1; c < MAX_WIDTH-1; c++) {
             if ((r+c) & 1) {
-                (*curr_gen)[r][c] = 0x80;
+                (*curr_gen)[r][c] = LIVE_MASK;
             }
         }
     }
+#else
+    (*curr_gen)[500][500] = LIVE_MASK;
+    (*curr_gen)[500][501] = LIVE_MASK;
+    (*curr_gen)[501][500] = LIVE_MASK;
+    (*curr_gen)[501][501] = LIVE_MASK;
+
+    (*curr_gen)[520][499] = LIVE_MASK;
+    (*curr_gen)[520][500] = LIVE_MASK;
+    (*curr_gen)[520][501] = LIVE_MASK;
+
+    (*curr_gen)[480][499] = LIVE_MASK;
+    (*curr_gen)[480][500] = LIVE_MASK;
+    (*curr_gen)[480][501] = LIVE_MASK;
+    (*curr_gen)[481][500] = LIVE_MASK;
+    (*curr_gen)[481][501] = LIVE_MASK;
+    (*curr_gen)[481][502] = LIVE_MASK;
 #endif
-    //(*curr_gen)[500][500] = 0x80;
+
+    for (r = 1; r < MAX_WIDTH-1; r++) {
+        for (c = 1; c < MAX_WIDTH-1; c++) {
+            int live_neighbors = 0;
+            if ((*curr_gen)[r-1][c-1] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r-1][c  ] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r-1][c+1] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r  ][c-1] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r  ][c+1] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r+1][c-1] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r+1][c  ] & LIVE_MASK) live_neighbors++;
+            if ((*curr_gen)[r+1][c+1] & LIVE_MASK) live_neighbors++;
+
+            //if (live_neighbors) {
+                //INFO("cell %d %d has %d live_neighbors\n", r, c, live_neighbors);
+            //}
+
+            (*curr_gen)[r][c] |= live_neighbors;
+        }
+    }
 
     // success
     INFO("initialize complete\n");
     return 0;
 }
 
-static inline bool sim_curr_gen_live_cell(int r, int c)
+#define SWAP(a,b) \
+    do { \
+        typeof(a) temp;  \
+        temp = (a);  \
+        (a) = (b);  \
+        (b) = temp;  \
+    } while (0)
+
+
+static void sim_set_next_gen_cell_live(int r, int c);
+static void sim_set_next_gen_cell_dead(int r, int c);
+
+static void sim_compute_next_gen(void)
 {
-    return (*curr_gen)[r][c] & 0x80;  // xxx define
+    int r, c;
+    unsigned char cell;
+
+//return; //AAA
+    // https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life
+    // 
+    // 1. Any live cell with two or three live neighbours survives.
+    // 2. Any dead cell with three live neighbours becomes a live cell.
+    // 3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
+
+    memcpy(next_gen, curr_gen, sizeof(gen_t));
+
+    for (r = 1; r < MAX_WIDTH-1; r++) {
+        for (c = 1; c < MAX_WIDTH-1; c++) {
+            cell = (*curr_gen)[r][c];
+            if (cell == LIVE_WITH_2_LIVE_NEIGHBORS || cell == LIVE_WITH_3_LIVE_NEIGHBORS) {
+                // survives in next gen
+            } else if (cell == DEAD_WITH_3_LIVE_NEIGHBORS) {
+                // set to live in next_gen
+                sim_set_next_gen_cell_live(r, c);
+            } else if (cell & LIVE_MASK) {
+                // set to dead in next_gen
+                sim_set_next_gen_cell_dead(r, c);
+            }
+        }
+    }
+
+    SWAP(curr_gen, next_gen);
+
+// XXX sanity check next gen neighbors count
+}
+
+static void sim_set_next_gen_cell_live(int r, int c)
+{
+    // fatal error if the next_gen cell is already live
+    if ((*next_gen)[r][c] & LIVE_MASK) {
+        FATAL("cell already live %d,%d\n", r,c);
+    }
+
+    // set the cell live
+    (*next_gen)[r][c] |= LIVE_MASK;
+
+    // for all neighbors, increment their neightbor count
+    (*next_gen)[r-1][c-1]++;
+    (*next_gen)[r-1][c  ]++;
+    (*next_gen)[r-1][c+1]++;
+    (*next_gen)[r  ][c-1]++;
+    (*next_gen)[r  ][c+1]++;
+    (*next_gen)[r+1][c-1]++;
+    (*next_gen)[r+1][c  ]++;
+    (*next_gen)[r+1][c+1]++;
+}
+
+static void sim_set_next_gen_cell_dead(int r, int c)
+{
+    // fatal error if the next_gen cell is already dead
+    if (((*next_gen)[r][c] & LIVE_MASK) == 0) {
+        FATAL("cell already dead %d,%d\n", r,c);
+    }
+
+    // set the cell dead
+    (*next_gen)[r][c] &= ~LIVE_MASK;
+
+    // for all neighbors, decrement their neightbor count
+    (*next_gen)[r-1][c-1]--;
+    (*next_gen)[r-1][c  ]--;
+    (*next_gen)[r-1][c+1]--;
+    (*next_gen)[r  ][c-1]--;
+    (*next_gen)[r  ][c+1]--;
+    (*next_gen)[r+1][c-1]--;
+    (*next_gen)[r+1][c  ]--;
+    (*next_gen)[r+1][c+1]--;
 }
 
 // -----------------  DISPLAY  --------------------------------------------------
@@ -163,9 +293,11 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
     sdl_event_t * event;
     int32_t       r, c, start, end;
 
+    uint64_t time_now, time_of_last_compute=0;
+
     // loop until next_display has been set
     while (next_display == -1) {
-        // short delay
+        // short delay xxx or 5?
         usleep(1000);
 
         // init simpane and ctlpane locations
@@ -204,7 +336,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         end   = start + width - 1;
         for (r = start; r <= end; r++) {
             for (c = start; c <= end; c++) {
-                if (sim_curr_gen_live_cell(r,c)) {
+                if ((*curr_gen)[r][c] & LIVE_MASK) {
                     SDL_Rect *rect = rc_to_rect(&simpane, r, c, start);
                     SDL_RenderFillRect(sdl_renderer, rect);
                 }
@@ -213,7 +345,14 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
 
         // compute the next generation
         // XXX if running AND time has elpased
-        //    compute_next_gen();
+        // XXX maybe this should move below,  or to the top
+        // XXX should time this
+        time_now = microsec_timer();
+        if (time_now - time_of_last_compute > 1000000) {
+            INFO("COMPUTE\n");
+            sim_compute_next_gen();
+            time_of_last_compute = time_now;
+        }
         
         // clear area below simpane, if it exists
         if (below_simpane.h > 0) {
@@ -315,6 +454,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
 
 static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start)
 {
+#if 0
     static int sq_beg[MAX_WIDTH+1];
     static int width_save;
     static SDL_Rect rect;
@@ -341,6 +481,34 @@ static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start)
     rect.h = sq_beg[r+1] - sq_beg[r];
 
     return &rect;
+#else
+    static int sq_beg[MAX_WIDTH+1];
+    static int width_save;
+    static SDL_Rect rect;
+
+    int i;
+    double tmp;
+
+    if (width != width_save) {
+        tmp = (double)(simpane->w - 5) / width;
+        for (i = 0; i < width; i++) {
+            sq_beg[i] = rint(3 + i * tmp);
+        }
+        sq_beg[width] = simpane->w - 2;
+
+        width_save = width;
+    }
+
+    r -= start;
+    c -= start;
+
+    rect.x = sq_beg[c];
+    rect.y = sq_beg[r];
+    rect.w = sq_beg[c+1] - sq_beg[c] - 1;
+    rect.h = sq_beg[r+1] - sq_beg[r] - 1;
+
+    return &rect;
+#endif
 }
 
 // - - - - - - - - -  DISPLAY : SELECT_PARAMS  - - - - - - - - - - - - - - - -
