@@ -21,6 +21,7 @@ static char * choices[] = {
                 "Gravity Simulation",         
                 "Our Expanding Universe",
                 "Random Walk",
+                "Conway's Game of Life",
                 "About",
                         };
 
@@ -116,6 +117,9 @@ int32_t main(int32_t argc, char **argv)
             sim_randomwalk();
             break;
         case 4:
+            sim_gameoflife();
+            break;
+        case 5:
             sdl_display_text(about_and_version);
             break;
         }
