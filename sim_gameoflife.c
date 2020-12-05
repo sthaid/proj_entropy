@@ -8,10 +8,10 @@
 // defines
 //
 
-#define DEFAULT_WIDTH           50
-#define DEFAULT_RUN_SPEED       4
-#define DEFAULT_PARAM_INIT_COND 12
-#define DEFAULT_PARAM_RAND_SEED 2 
+#define DEFAULT_WIDTH              100
+#define DEFAULT_RUN_SPEED          4
+#define DEFAULT_PARAM_INIT_PERCENT 12
+#define DEFAULT_PARAM_RAND_SEED    2 
 
 #define MAX_WIDTH 1000
 
@@ -58,7 +58,7 @@ static int32_t width;
 static int32_t ctr_row;
 static int32_t ctr_col;
 static int32_t run_speed;
-static int32_t param_init_cond;
+static int32_t param_init_percent;
 static int32_t param_rand_seed;
 
 // 
@@ -81,7 +81,7 @@ static int32_t display_help(int32_t curr_display, int32_t last_display);
 
 void sim_gameoflife(void) 
 {
-    param_init_cond = DEFAULT_PARAM_INIT_COND;
+    param_init_percent = DEFAULT_PARAM_INIT_PERCENT;
     param_rand_seed = DEFAULT_PARAM_RAND_SEED;
     curr_gen        = malloc(sizeof(gen_t));
     next_gen        = malloc(sizeof(gen_t));
@@ -164,7 +164,7 @@ static int32_t sim_init(bool reset)
     // xxx
     bzero(curr_gen, sizeof(gen_t));
     bzero(next_gen, sizeof(gen_t));
-    if (param_init_cond == 0) {
+    if (param_init_percent == 0) {
         r = 485, c = 485;
         INIT_PATTERN(block);
         INIT_PATTERN(blinker);
@@ -175,7 +175,7 @@ static int32_t sim_init(bool reset)
         INIT_PATTERN(lwss);
     } else {
         // xxx later
-        int32_t tmp = param_init_cond * 1024 / 100;
+        int32_t tmp = param_init_percent * 1024 / 100;
         srandom(param_rand_seed);
         for (r = 1; r < MAX_WIDTH-1; r++) {
             for (c = 1; c < MAX_WIDTH-1; c++) {
@@ -424,9 +424,9 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         // - row 10: PARAMS ...
         // - row 11: - INIT    n
         sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_SELECT_PARAMS);
-        sprintf(str, "INIT_COND  %d", param_init_cond);
+        sprintf(str, "INIT_PERCENT %d", param_init_percent);
         sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RAND_SEED  %d", param_rand_seed);
+        sprintf(str, "RAND_SEED    %d", param_rand_seed);
         sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
 
         // - row 14: DEBUG
@@ -568,17 +568,17 @@ static int32_t display_select_params(int32_t curr_display, int32_t last_display)
     char cur_s2[100], ret_s2[100];
 
     // get new value strings for the params
-    sprintf(cur_s1, "%d", param_init_cond);
+    sprintf(cur_s1, "%d", param_init_percent);
     sprintf(cur_s2, "%d", param_rand_seed);
-    sdl_display_get_string(2, "INIT_COND", cur_s1, ret_s1, "RAND_SEED", cur_s2, ret_s2);
+    sdl_display_get_string(2, "INIT_PERCENT", cur_s1, ret_s1, "RAND_SEED", cur_s2, ret_s2);
 
     // scan returned string(s)
-    sscanf(ret_s1, "%d", &param_init_cond);
+    sscanf(ret_s1, "%d", &param_init_percent);
     sscanf(ret_s2, "%d", &param_rand_seed);
 
     // constrain values to their allowed range
-    if (param_init_cond < 0) param_init_cond = 0;
-    if (param_init_cond > 100) param_init_cond = 100;
+    if (param_init_percent < 0) param_init_percent = 0;
+    if (param_init_percent > 100) param_init_percent = 100;
 
     // re-init with new params
     sim_init(true);
