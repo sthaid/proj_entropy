@@ -1,8 +1,5 @@
-// xxx
-// - pan support ?
-// - int vs int32
-// - mouse wheel for zoom,   how to pinch
-
+// XXX
+// - how to pinch
 
 #include "util.h"
 #include "sim_gameoflife_help.h"
@@ -11,14 +8,15 @@
 // defines
 //
 
-#define DEFAULT_WIDTH         50
-#define DEFAULT_RUN_SPEED     4
-#define DEFAULT_PARAM_INIT    15
+#define DEFAULT_WIDTH           50
+#define DEFAULT_RUN_SPEED       4
+#define DEFAULT_PARAM_INIT_COND 12
+#define DEFAULT_PARAM_RAND_SEED 2 
 
-#define MAX_WIDTH             1000
+#define MAX_WIDTH 1000
 
-#define MIN_RUN_SPEED         1
-#define MAX_RUN_SPEED         9
+#define MIN_RUN_SPEED        1
+#define MAX_RUN_SPEED        9
 #define RUN_SPEED_SLEEP_TIME (4096 * (1 << (MAX_RUN_SPEED-run_speed)))
 
 #define SDL_EVENT_STOP               (SDL_EVENT_USER_START + 0)
@@ -32,6 +30,8 @@
 #define SDL_EVENT_BACK               (SDL_EVENT_USER_START + 13)
 #define SDL_EVENT_SIMPANE_ZOOM_IN    (SDL_EVENT_USER_START + 20)
 #define SDL_EVENT_SIMPANE_ZOOM_OUT   (SDL_EVENT_USER_START + 21)
+#define SDL_EVENT_MOUSE_PAN          (SDL_EVENT_USER_START + 22)
+#define SDL_EVENT_MOUSE_ZOOM         (SDL_EVENT_USER_START + 23)
 
 #define DISPLAY_NONE          0
 #define DISPLAY_TERMINATE     1
@@ -55,22 +55,25 @@ static gen_t  *next_gen;
 static bool    running;
 static int32_t gen_count;
 static int32_t width;
+static int32_t ctr_row;
+static int32_t ctr_col;
 static int32_t run_speed;
-static int32_t param_init;
+static int32_t param_init_cond;
+static int32_t param_rand_seed;
 
 // 
 // prototypes
 //
 
-static int32_t sim_init(void);
+static int32_t sim_init(bool reset);
 static void sim_compute_next_gen(void);
-static void set_curr_gen_cell_live_neightbors(int r, int c);
-static void sim_set_next_gen_cell_live(int r, int c);
-static void sim_set_next_gen_cell_dead(int r, int c);
+static void set_curr_gen_cell_live_neightbors(int32_t r, int32_t c);
+static void sim_set_next_gen_cell_live(int32_t r, int32_t c);
+static void sim_set_next_gen_cell_dead(int32_t r, int32_t c);
 
 static void display(void);
 static int32_t display_simulation(int32_t curr_display, int32_t last_display);
-static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start);
+static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int32_t r, int32_t c);
 static int32_t display_select_params(int32_t curr_display, int32_t last_display);
 static int32_t display_help(int32_t curr_display, int32_t last_display);
 
@@ -78,13 +81,12 @@ static int32_t display_help(int32_t curr_display, int32_t last_display);
 
 void sim_gameoflife(void) 
 {
-    width      = DEFAULT_WIDTH;
-    run_speed  = DEFAULT_RUN_SPEED;
-    param_init = DEFAULT_PARAM_INIT;
-    curr_gen   = malloc(sizeof(gen_t));
-    next_gen   = malloc(sizeof(gen_t));
+    param_init_cond = DEFAULT_PARAM_INIT_COND;
+    param_rand_seed = DEFAULT_PARAM_RAND_SEED;
+    curr_gen        = malloc(sizeof(gen_t));
+    next_gen        = malloc(sizeof(gen_t));
 
-    sim_init();
+    sim_init(true);
 
     display();
 
@@ -108,7 +110,7 @@ void sim_gameoflife(void)
 
 #define INIT_PATTERN(array) \
     do { \
-        int i; \
+        int32_t i; \
         for (i = 0; i < sizeof(array)/sizeof(rc_t); i++) { \
             (*curr_gen)[(r)+(array)[i].r][(c)+(array)[i].c] = LIVE_MASK; \
         } \
@@ -120,8 +122,8 @@ void sim_gameoflife(void)
 //
 
 typedef struct {
-    int r;
-    int c;
+    int32_t r;
+    int32_t c;
 } rc_t;
 
 //
@@ -144,17 +146,25 @@ rc_t lwss[]   = { {-1,0}, {-1,1}, {0,-2}, {0,-1}, {0,1}, {0,2}, {1,-2},
 
 // - - - - - - - - -  SIM - INIT - - - - - - - - - -
 
-static int32_t sim_init(void)
+static int32_t sim_init(bool reset)
 {
-    int r, c;
+    int32_t r, c;
+
+    if (reset) {
+        width     = DEFAULT_WIDTH;
+        run_speed = DEFAULT_RUN_SPEED;
+        ctr_row   = MAX_WIDTH/2;
+        ctr_col   = MAX_WIDTH/2;
+    }
+
     // xxx
     running   = false;
     gen_count = 0;
-    bzero(curr_gen, sizeof(gen_t));
-    bzero(next_gen, sizeof(gen_t));
 
     // xxx
-    if (param_init == 0) {
+    bzero(curr_gen, sizeof(gen_t));
+    bzero(next_gen, sizeof(gen_t));
+    if (param_init_cond == 0) {
         r = 485, c = 485;
         INIT_PATTERN(block);
         INIT_PATTERN(blinker);
@@ -165,7 +175,8 @@ static int32_t sim_init(void)
         INIT_PATTERN(lwss);
     } else {
         // xxx later
-        int tmp = param_init * 1024 / 100;
+        int32_t tmp = param_init_cond * 1024 / 100;
+        srandom(param_rand_seed);
         for (r = 1; r < MAX_WIDTH-1; r++) {
             for (c = 1; c < MAX_WIDTH-1; c++) {
                 if ((random() & 1023) < tmp) {
@@ -183,7 +194,6 @@ static int32_t sim_init(void)
     }
 
     // success
-    INFO("initialize complete\n");
     return 0;
 }
 
@@ -191,7 +201,7 @@ static int32_t sim_init(void)
 
 static void sim_compute_next_gen(void)
 {
-    int r, c;
+    int32_t r, c;
     unsigned char cell;
 
     // https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life
@@ -224,9 +234,9 @@ static void sim_compute_next_gen(void)
 
 // - - - - - - - - -  SIM - SUPPORT  - - - - - - - -
 
-static void set_curr_gen_cell_live_neightbors(int r, int c)
+static void set_curr_gen_cell_live_neightbors(int32_t r, int32_t c)
 {
-    int live_neighbors = 0;
+    int32_t live_neighbors = 0;
 
     if ((*curr_gen)[r-1][c-1] & LIVE_MASK) live_neighbors++;
     if ((*curr_gen)[r-1][c  ] & LIVE_MASK) live_neighbors++;
@@ -240,7 +250,7 @@ static void set_curr_gen_cell_live_neightbors(int r, int c)
     (*curr_gen)[r][c] = ((*curr_gen)[r][c] & LIVE_MASK) | live_neighbors;
 }
 
-static void sim_set_next_gen_cell_live(int r, int c)
+static void sim_set_next_gen_cell_live(int32_t r, int32_t c)
 {
     // fatal error if the next_gen cell is already live
     if ((*next_gen)[r][c] & LIVE_MASK) {
@@ -261,7 +271,7 @@ static void sim_set_next_gen_cell_live(int r, int c)
     (*next_gen)[r+1][c+1]++;
 }
 
-static void sim_set_next_gen_cell_dead(int r, int c)
+static void sim_set_next_gen_cell_dead(int32_t r, int32_t c)
 {
     // fatal error if the next_gen cell is already dead
     if (((*next_gen)[r][c] & LIVE_MASK) == 0) {
@@ -319,7 +329,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
     SDL_Rect      ctlpane, simpane;
     int32_t       next_display=-1;
     sdl_event_t * event;
-    int32_t       r, c, start, end;
+    int32_t       r, c, r_start, c_start;
     char          str[100];
 
     uint64_t time_now, time_of_last_compute=0;
@@ -356,12 +366,16 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
 
         // draw the current generation
         SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, SDL_ALPHA_OPAQUE); //xxx, should have a routine
-        start = MAX_WIDTH/2 - width/2;
-        end   = start + width - 1;
-        for (r = start; r <= end; r++) {
-            for (c = start; c <= end; c++) {
+        r_start = ctr_row - width/2;
+        c_start = ctr_col - width/2;
+        for (r = r_start; r <= r_start+width-1; r++) {
+            if (r < 0) continue;
+            if (r >= MAX_WIDTH) break;
+            for (c = c_start; c <= c_start+width-1; c++) {
+                if (c < 0) continue;
+                if (c >= MAX_WIDTH) break;
                 if ((*curr_gen)[r][c] & LIVE_MASK) {
-                    SDL_Rect *rect = rc_to_rect(&simpane, r, c, start);
+                    SDL_Rect *rect = rc_to_rect(&simpane, r-r_start, c-c_start);
                     SDL_RenderFillRect(sdl_renderer, rect);
                 }
             }
@@ -382,39 +396,50 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         } else {
             sdl_render_text_font0(&ctlpane,  2, 0,  "PAUSE",       SDL_EVENT_STOP);
         }
-        if (running) {
-            sdl_render_text_font0(&ctlpane,  2, 8,  "RESTART",     SDL_EVENT_RESTART);
-        } else {
-            sdl_render_text_font0(&ctlpane,  2, 8,  "RESET",     SDL_EVENT_RESET);
-        }
+        sdl_render_text_font0(&ctlpane,  2, 7,  "RESTART",     SDL_EVENT_RESTART);
+        sdl_render_text_font0(&ctlpane,  2, 16,  "RESET",     SDL_EVENT_RESET);
 
         // - row 4:  SLOW   FAST   n
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
-        sdl_render_text_font0(&ctlpane,  4, 8,  "FAST",      SDL_EVENT_FAST);
+        sdl_render_text_font0(&ctlpane,  4, 7,  "FAST",      SDL_EVENT_FAST);
         sprintf(str, "%d", run_speed);
         sdl_render_text_font0(&ctlpane,  4, 16, str,      SDL_EVENT_NONE);
 
         // - row 6:  ZOOM+  ZOOM-
         sdl_render_text_font0(&ctlpane,  6, 0,  "ZOOM+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&ctlpane,  6, 8,  "ZOOM-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_render_text_font0(&ctlpane,  6, 7,  "ZOOM-", SDL_EVENT_SIMPANE_ZOOM_OUT);
         sprintf(str, "%d", width);
         sdl_render_text_font0(&ctlpane,  6, 16, str,      SDL_EVENT_NONE);
 
         // - row 8:  RUNNING|PAUSED|RESET   nnnn
-        sprintf(str, "%-7s %d",
-                running ? "RUNNING" : gen_count > 0 ? "PAUSED" : "RESET",
-                gen_count);
+        if (running) {
+            sprintf(str, "RUNNING %d", gen_count);
+        } else if (gen_count > 0) {
+            sprintf(str, "PAUSED %d", gen_count);
+        } else {
+            sprintf(str, "RESET");
+        }
         sdl_render_text_font0(&ctlpane,  8, 0, str,      SDL_EVENT_NONE);
 
         // - row 10: PARAMS ...
         // - row 11: - INIT    n
         sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_SELECT_PARAMS);
-        sprintf(str, "INIT  %d", param_init);
+        sprintf(str, "INIT_COND  %d", param_init_cond);
         sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
+        sprintf(str, "RAND_SEED  %d", param_rand_seed);
+        sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
+
+        // - row 14: DEBUG
+        //sprintf(str, "%d %d", ctr_row, ctr_col);
+        //sdl_render_text_font0(&ctlpane, 14, 0, str, SDL_EVENT_NONE);
 
         // - row N:  HELP   BACK
         sdl_render_text_font0(&ctlpane, -1, 0,  "HELP",      SDL_EVENT_HELP);
         sdl_render_text_font0(&ctlpane, -1,-5,  "BACK",      SDL_EVENT_BACK);
+
+        // xxx
+        sdl_event_register(SDL_EVENT_MOUSE_PAN, SDL_EVENT_TYPE_MOUSE_MOTION, &simpane);
+        sdl_event_register(SDL_EVENT_MOUSE_ZOOM, SDL_EVENT_TYPE_MOUSE_WHEEL, &simpane);
 
         // present the display
         SDL_RenderPresent(sdl_renderer);
@@ -439,10 +464,10 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
             }
             break;
         case SDL_EVENT_RESET:
-            sim_init();
+            sim_init(true);
             break;
         case SDL_EVENT_RESTART:
-            sim_init();
+            sim_init(false);
             running = true;
             break;
         case SDL_EVENT_SELECT_PARAMS:
@@ -459,6 +484,40 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
             width -= 10;
             if (width < 10) width = 10;
             break;
+        case SDL_EVENT_MOUSE_ZOOM:
+            if (event->mouse_wheel.delta_y < 0) {
+                width += 10;
+                if (width > 500) width = 500;
+            } else if (event->mouse_wheel.delta_y > 0) {
+                width -= 10;
+                if (width < 10) width = 10;
+            }
+            break;
+        case SDL_EVENT_MOUSE_PAN: {
+            static double tmp_col, tmp_row;
+            double square_width = simpane.w / width;
+
+            tmp_col -= (event->mouse_motion.delta_x);
+            tmp_row -= (event->mouse_motion.delta_y);
+
+            while (tmp_col > square_width) {
+                tmp_col -= square_width;
+                ctr_col++;
+            } 
+            while (tmp_col < -square_width) {
+                tmp_col += square_width;
+                ctr_col--;
+            }
+
+            while (tmp_row > square_width) {
+                tmp_row -= square_width;
+                ctr_row++;
+            } 
+            while (tmp_row < -square_width) {
+                tmp_row += square_width;
+                ctr_row--;
+            }
+            break; }
         case SDL_EVENT_BACK: 
         case SDL_EVENT_QUIT:
             running = false;
@@ -471,14 +530,15 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
     return next_display;
 }
 
-static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start)
+// xxx name for r,c
+static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int32_t r, int32_t c)
 {
-    static int      sq_beg[MAX_WIDTH+1];
-    static int      width_save;
+    static int32_t      sq_beg[MAX_WIDTH+1];
+    static int32_t      width_save;
     static SDL_Rect simpane_save;
     static SDL_Rect rect;
 
-    int i;
+    int32_t i;
     double tmp;
 
     if (width != width_save || simpane->w != simpane_save.w) {
@@ -491,9 +551,6 @@ static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start)
         width_save = width;
         simpane_save = *simpane;
     }
-
-    r -= start;
-    c -= start;
 
     rect.x = sq_beg[c] + simpane->x;
     rect.y = sq_beg[r] + simpane->y;
@@ -508,19 +565,23 @@ static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int r, int c, int start)
 static int32_t display_select_params(int32_t curr_display, int32_t last_display)
 {
     char cur_s1[100], ret_s1[100];
+    char cur_s2[100], ret_s2[100];
 
     // get new value strings for the params
-    sprintf(cur_s1, "%d", param_init);
-    sdl_display_get_string(1, "INIT", cur_s1, ret_s1);
+    sprintf(cur_s1, "%d", param_init_cond);
+    sprintf(cur_s2, "%d", param_rand_seed);
+    sdl_display_get_string(2, "INIT_COND", cur_s1, ret_s1, "RAND_SEED", cur_s2, ret_s2);
 
     // scan returned string(s)
-    if (sscanf(ret_s1, "%d", &param_init) == 1) {
-        if (param_init < 0) param_init = 0;
-        if (param_init > 100) param_init = 100;
-    }
+    sscanf(ret_s1, "%d", &param_init_cond);
+    sscanf(ret_s2, "%d", &param_rand_seed);
+
+    // constrain values to their allowed range
+    if (param_init_cond < 0) param_init_cond = 0;
+    if (param_init_cond > 100) param_init_cond = 100;
 
     // re-init with new params
-    sim_init();
+    sim_init(true);
 
     // return next_display
     return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;

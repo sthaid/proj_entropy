@@ -5,7 +5,7 @@
 // defines
 //
 
-#define DEFAULT_WIDTH   1280
+#define DEFAULT_WIDTH   1600
 #define DEFAULT_HEIGHT  800
 #define MIN_WIDTH       600
 #define MAX_WIDTH       4096
