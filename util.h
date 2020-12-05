@@ -28,6 +28,14 @@
 #define bzero(ptr,len) memset(ptr,0,len)
 #endif
 
+#define SWAP(a,b) \
+    do { \
+        typeof(a) temp;  \
+        temp = (a);  \
+        (a) = (b);  \
+        (b) = temp;  \
+    } while (0)
+
 // -----------------  SIMULATIONS  --------------------------------------------------
 
 void sim_container(void);
@@ -211,32 +219,30 @@ int config_write(char * filename, config_t * config);
 
 // -----------------  LOGGING  -------------------------------------------------------
 
-#define ENABLE_LOGGING
 //#define ENABLE_LOGGING_AT_DEBUG_LEVEL
 
-#ifdef ENABLE_LOGGING
-    #define INFO(fmt, args...) \
-        do { \
-            logmsg("INFO", __func__, fmt, ## args); \
-        } while (0)
-    #define WARN(fmt, args...) \
-        do { \
-            logmsg("WARN", __func__, fmt, ## args); \
-        } while (0)
-    #define ERROR(fmt, args...) \
-        do { \
-            logmsg("ERROR", __func__, fmt, ## args); \
-        } while (0)
-    #define PRINTF(fmt, args...) \
-        do { \
-            printmsg(fmt, ## args); \
-        } while (0)
-#else
-    #define INFO(fmt, args...)
-    #define WARN(fmt, args...)
-    #define ERROR(fmt, args...)
-    #define PRINTF(fmt, args...)
-#endif
+#define INFO(fmt, args...) \
+    do { \
+        logmsg("INFO", __func__, fmt, ## args); \
+    } while (0)
+#define WARN(fmt, args...) \
+    do { \
+        logmsg("WARN", __func__, fmt, ## args); \
+    } while (0)
+#define ERROR(fmt, args...) \
+    do { \
+        logmsg("ERROR", __func__, fmt, ## args); \
+    } while (0)
+#define FATAL(fmt, args...) \
+    do { \
+        logmsg("FATAL", __func__, fmt, ## args); \
+        exit(1); \
+    } while (0)
+
+#define PRINTF(fmt, args...) \
+    do { \
+        printmsg(fmt, ## args); \
+    } while (0)
 
 #ifdef ENABLE_LOGGING_AT_DEBUG_LEVEL
     #define DEBUG(fmt, args...) \
@@ -247,11 +253,6 @@ int config_write(char * filename, config_t * config);
     #define DEBUG(fmt, args...) 
 #endif
 
-#define FATAL(fmt, args...) \
-    do { \
-        logmsg("FATAL", __func__, fmt, ## args); \
-        exit(1); \
-    } while (0)
 
 #define MAX_LOGMSG_FILE_SIZE 0x100000
 

@@ -387,7 +387,6 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         } else {
             sdl_render_text_font0(&ctlpane,  2, 8,  "RESET",     SDL_EVENT_RESET);
         }
-        sdl_render_text_font0(&ctlpane,  2, 16, "PARAMS",    SDL_EVENT_SELECT_PARAMS);
 
         // - row 4:  SLOW   FAST   n
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW",      SDL_EVENT_SLOW);
@@ -409,7 +408,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
 
         // - row 10: PARAMS ...
         // - row 11: - INIT    n
-        sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_SELECT_PARAMS);
         sprintf(str, "INIT  %d", param_init);
         sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
 
