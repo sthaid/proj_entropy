@@ -184,15 +184,14 @@ sdl_event_t * sdl_poll_event(void)
         // - updates sdl_win_width, sdl_win_height, sdl_win_minimized
         switch (ev.type) {
         case SDL_MULTIGESTURE:
-            // XXX
-            INFO("MULTIGESTURE: touchId=%ld x=%f y=%f dTheta=%f dDist=%f numFingers=%d\n",
+            DEBUG("MULTIGESTURE: touchId=%ld x=%f y=%f dTheta=%f dDist=%f numFingers=%d\n",
                  ev.mgesture.touchId,
                  ev.mgesture.x,
                  ev.mgesture.y,
                  ev.mgesture.dTheta,
                  ev.mgesture.dDist,
                  ev.mgesture.numFingers);
-
+            // not used
             break;
         case SDL_MOUSEBUTTONDOWN: {
             DEBUG("MOUSE DOWN which=%d button=%s state=%s x=%d y=%d\n",
