@@ -9,7 +9,6 @@
 
 #define DEFAULT_WIDTH              100
 #define DEFAULT_RUN_SPEED          5
-#define DEFAULT_PARAM_INIT         0 
 
 #define MAX_WIDTH 1000
 
@@ -19,23 +18,23 @@
 
 #define SDL_EVENT_STOP               (SDL_EVENT_USER_START + 0)
 #define SDL_EVENT_RUN                (SDL_EVENT_USER_START + 1)
-#define SDL_EVENT_SLOW               (SDL_EVENT_USER_START + 2)
-#define SDL_EVENT_FAST               (SDL_EVENT_USER_START + 3)
-#define SDL_EVENT_RESET              (SDL_EVENT_USER_START + 9)
-#define SDL_EVENT_RESTART            (SDL_EVENT_USER_START + 10)
-#define SDL_EVENT_SELECT_PARAMS      (SDL_EVENT_USER_START + 11)
+#define SDL_EVENT_RESTART            (SDL_EVENT_USER_START + 2)
+#define SDL_EVENT_RESET              (SDL_EVENT_USER_START + 3)
+#define SDL_EVENT_SLOW               (SDL_EVENT_USER_START + 4)
+#define SDL_EVENT_FAST               (SDL_EVENT_USER_START + 5)
+#define SDL_EVENT_ZOOM_IN            (SDL_EVENT_USER_START + 6)
+#define SDL_EVENT_ZOOM_OUT           (SDL_EVENT_USER_START + 7)
+#define SDL_EVENT_SELECT_PLUS        (SDL_EVENT_USER_START + 8)
+#define SDL_EVENT_SELECT_MINUS       (SDL_EVENT_USER_START + 9)
+#define SDL_EVENT_MOUSE_PAN          (SDL_EVENT_USER_START + 10)
+#define SDL_EVENT_MOUSE_ZOOM         (SDL_EVENT_USER_START + 11)
 #define SDL_EVENT_HELP               (SDL_EVENT_USER_START + 12)
 #define SDL_EVENT_BACK               (SDL_EVENT_USER_START + 13)
-#define SDL_EVENT_SIMPANE_ZOOM_IN    (SDL_EVENT_USER_START + 20)
-#define SDL_EVENT_SIMPANE_ZOOM_OUT   (SDL_EVENT_USER_START + 21)
-#define SDL_EVENT_MOUSE_PAN          (SDL_EVENT_USER_START + 22)
-#define SDL_EVENT_MOUSE_ZOOM         (SDL_EVENT_USER_START + 23)
 
 #define DISPLAY_NONE          0
-#define DISPLAY_TERMINATE     1
-#define DISPLAY_SIMULATION    2
-#define DISPLAY_SELECT_PARAMS 3
-#define DISPLAY_HELP          4
+#define DISPLAY_SIMULATION    1
+#define DISPLAY_HELP          2
+#define DISPLAY_TERMINATE     3
 
 //
 // typedefs
@@ -50,19 +49,22 @@ typedef unsigned char (gen_t)[MAX_WIDTH][MAX_WIDTH];
 static gen_t  *curr_gen;
 static gen_t  *next_gen;
 
+static char   *display_title;
+static int     selection;
+
 static bool    running;
 static int32_t gen_count;
+
 static int32_t width;
+static int32_t run_speed;
 static int32_t ctr_row;
 static int32_t ctr_col;
-static int32_t run_speed;
-static int32_t param_init;
 
 // 
 // prototypes
 //
 
-static void sim_init(void);
+static void sim_init(bool display_reset);
 static void sim_compute_next_gen(void);
 static void set_curr_gen_cell_live_neighbor_count(int32_t r, int32_t c);
 static void sim_set_next_gen_cell_live(int32_t r, int32_t c);
@@ -74,20 +76,16 @@ static int32_t get_next_gen_cell_live_neighbor_count(int32_t r, int32_t c);
 static void display(void);
 static int32_t display_simulation(int32_t curr_display, int32_t last_display);
 static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int32_t r, int32_t c);
-static void display_sim_reset(void);
-static int32_t display_select_params(int32_t curr_display, int32_t last_display);
 static int32_t display_help(int32_t curr_display, int32_t last_display);
 
 // -----------------  MAIN  -----------------------------------------------------
 
 void sim_gameoflife(void) 
 {
-    curr_gen   = malloc(sizeof(gen_t));
-    next_gen   = malloc(sizeof(gen_t));
-    param_init = DEFAULT_PARAM_INIT;
+    curr_gen = malloc(sizeof(gen_t));
+    next_gen = malloc(sizeof(gen_t));
 
-    display_sim_reset();
-    sim_init();
+    sim_init(true);
 
     display();
 
@@ -228,22 +226,30 @@ rc_t inf_growth3[] = {
 
 // - - - - - - - - -  SIM - INIT - - - - - - - - - -
 
-static void sim_init(void)
+static void sim_init(bool display_reset)
 {
+    // if caller is requesting a display_reset then reset the 
+    // display format to default
+    if (display_reset) {
+        width     = DEFAULT_WIDTH;
+        run_speed = DEFAULT_RUN_SPEED;
+        ctr_row   = MAX_WIDTH/2;
+        ctr_col   = MAX_WIDTH/2;
+    }
+
     // set to not running, and clear generation count
     running   = false;
     gen_count = 0;
 
-    // init current generation (curr_gen) array;
-    // - when param_init is 0 then cell test patterns from the Wikipedia
-    //   article are used
-    // - otherwise, randomly set param_init fraction of the cells to live
+    // init curr_gen based on selection
+    #define MAX_SELECT 9   // update this when adding more choices
+
     bzero(curr_gen, sizeof(gen_t));
     bzero(next_gen, sizeof(gen_t));
 
-// XXX title, and select without using params
-    switch (param_init) {
+    switch (selection) {
     case 0:
+        display_title = "EXAMPLES";
         INIT_PATTERN(-15, -15, block);
         INIT_PATTERN(-15,   0, blinker);
         INIT_PATTERN(-15,  15, lwss);
@@ -255,35 +261,42 @@ static void sim_init(void)
         INIT_PATTERN( 15,  15, hwss);
         break;
     case 1:
+        display_title = "R_PENTOMINO";
         INIT_PATTERN(0, 0, r_pentomino);
         break;
     case 2:
+        display_title = "DIEHARD";
         INIT_PATTERN(0, 0, diehard);
         break;
     case 3:
+        display_title = "ACORN";
         INIT_PATTERN(0, 0, acorn);
         break;
     case 4:
+        display_title = "GOSPER_GLIDER_GUN";
         INIT_PATTERN(0, 0, gosper_glider_gun);
         break;
     case 5:
+        display_title = "SIMKIN_GLIDER_GUN";
         INIT_PATTERN(0, 0, simkin_glider_gun);
         break;
     case 6:
+        display_title = "INF_GROWTH_1";
         INIT_PATTERN(0, 0, inf_growth1);
         break;
     case 7:
+        display_title = "INF_GROWTH_2";
         INIT_PATTERN(0, 0, inf_growth2);
         break;
     case 8:
+        display_title = "INF_GROWTH_3";
         INIT_PATTERN(0, 0, inf_growth3);
         break;
     default:
         break;
     }
 #if 0
-    // xxx tbd
-    else {
+    // XXX put this  back in
         int32_t tmp = param_init * 1024 / 100;
         srandom(param_rand_seed);
         for (r = 1; r < MAX_WIDTH-1; r++) {
@@ -293,7 +306,6 @@ static void sim_init(void)
                 }
             }
         }
-    }
 #endif
 
     // set each curr_gen cell's live neighbor count;
@@ -450,9 +462,6 @@ static void display(void)
         case DISPLAY_SIMULATION:
             next_display = display_simulation(curr_display, last_display);
             break;
-        case DISPLAY_SELECT_PARAMS:
-            next_display = display_select_params(curr_display, last_display);
-            break;
         case DISPLAY_HELP:
             next_display = display_help(curr_display, last_display);
             break;
@@ -526,6 +535,11 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
             }
         }
 
+        // display_title
+        c = SDL_PANE_COLS(&simpane,0)/2 - strlen(display_title)/2;
+        if (c < 0) c = 0;
+        sdl_render_text_font0(&simpane, 0, c, display_title, SDL_EVENT_NONE);
+
         // draw simpane border
         sdl_render_rect(&simpane, 3, sdl_pixel_rgba[GREEN]);
         
@@ -545,7 +559,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         if (gen_count != 0) {
             sdl_render_text_font0(&ctlpane,  2, 7,  "RESTART", SDL_EVENT_RESTART);
         }
-        sdl_render_text_font0(&ctlpane,  2, 16,  "RESET", SDL_EVENT_RESET);
+        sdl_render_text_font0(&ctlpane, 2, 16,  "RESET", SDL_EVENT_RESET);
 
         // - row 4:  SLOW   FAST   n
         sdl_render_text_font0(&ctlpane,  4, 0,  "SLOW", SDL_EVENT_SLOW);
@@ -554,12 +568,16 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         sdl_render_text_font0(&ctlpane,  4, 16, str, SDL_EVENT_NONE);
 
         // - row 6:  ZOOM+  ZOOM-
-        sdl_render_text_font0(&ctlpane,  6, 0,  "ZOOM+", SDL_EVENT_SIMPANE_ZOOM_IN);
-        sdl_render_text_font0(&ctlpane,  6, 7,  "ZOOM-", SDL_EVENT_SIMPANE_ZOOM_OUT);
+        sdl_render_text_font0(&ctlpane,  6, 0,  "ZOOM+", SDL_EVENT_ZOOM_IN);
+        sdl_render_text_font0(&ctlpane,  6, 7,  "ZOOM-", SDL_EVENT_ZOOM_OUT);
         sprintf(str, "%d", width);
         sdl_render_text_font0(&ctlpane,  6, 16, str, SDL_EVENT_NONE);
 
-        // - row 8:  RUNNING|PAUSED|RESET   nnnn     rrr,ccc
+        // - row 8:  SLCT+  SLCT-
+        sdl_render_text_font0(&ctlpane, 8, 0, "SLCT+", SDL_EVENT_SELECT_PLUS);
+        sdl_render_text_font0(&ctlpane, 8, 7, "SLCT-", SDL_EVENT_SELECT_MINUS);
+
+        // - row 10:  RUNNING|PAUSED|RESET   nnnn     rrr,ccc
         if (running) {
             sprintf(str, "RUNNING %d", gen_count);
         } else if (gen_count > 0) {
@@ -567,15 +585,9 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         } else {
             sprintf(str, "RESET");
         }
-        sdl_render_text_font0(&ctlpane,  8, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane, 10, 0, str, SDL_EVENT_NONE);
         sprintf(str, "%d,%d", ctr_row-MAX_WIDTH/2, ctr_col-MAX_WIDTH/2);
-        sdl_render_text_font0(&ctlpane, 8, 16, str, SDL_EVENT_NONE);
-
-        // - row 10: PARAMS ...
-        // - row 11: - INIT   n
-        sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_SELECT_PARAMS);
-        sprintf(str, "INIT%d", param_init);
-        sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
+        sdl_render_text_font0(&ctlpane, 10, 16, str, SDL_EVENT_NONE);
 
         // - row N:  HELP   BACK
         sdl_render_text_font0(&ctlpane, -1, 0, "HELP", SDL_EVENT_HELP);
@@ -597,6 +609,14 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         case SDL_EVENT_STOP:
             running = false;
             break;
+        case SDL_EVENT_RESET:
+            sim_init(true);
+            break;
+        case SDL_EVENT_RESTART:
+            sim_init(false);
+            running = true;
+            break;
+
         case SDL_EVENT_SLOW:
             if (run_speed > MIN_RUN_SPEED) {
                 run_speed--;
@@ -607,25 +627,12 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
                 run_speed++;
             }
             break;
-        case SDL_EVENT_RESET:
-            display_sim_reset();
-            sim_init();
-            break;
-        case SDL_EVENT_RESTART:
-            sim_init();
-            running = true;
-            break;
-        case SDL_EVENT_SELECT_PARAMS:
-            next_display = DISPLAY_SELECT_PARAMS;
-            break; 
-        case SDL_EVENT_HELP: 
-            next_display = DISPLAY_HELP;
-            break;
-        case SDL_EVENT_SIMPANE_ZOOM_OUT:
+
+        case SDL_EVENT_ZOOM_OUT:
             width += 10;
             if (width > 500) width = 500;
             break;
-        case SDL_EVENT_SIMPANE_ZOOM_IN:
+        case SDL_EVENT_ZOOM_IN:
             width -= 10;
             if (width < 10) width = 10;
             break;
@@ -638,6 +645,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
                 if (width < 10) width = 10;
             }
             break;
+
         case SDL_EVENT_MOUSE_PAN: {
             static double tmp_col, tmp_row;
             double square_width = simpane.w / width;
@@ -662,6 +670,19 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
                 ctr_row--;
             }
             break; }
+
+        case SDL_EVENT_SELECT_PLUS:
+        case SDL_EVENT_SELECT_MINUS:
+            selection += (event->event == SDL_EVENT_SELECT_PLUS ? 1 : -1);
+            if (selection < 0) selection = MAX_SELECT-1;
+            if (selection > MAX_SELECT-1) selection = 0;
+            sim_init(true);
+            break;
+
+        case SDL_EVENT_HELP: 
+            next_display = DISPLAY_HELP;
+            break;
+
         case SDL_EVENT_BACK: 
         case SDL_EVENT_QUIT:
             running = false;
@@ -703,41 +724,6 @@ static SDL_Rect *rc_to_rect(SDL_Rect *simpane, int32_t r, int32_t c)
     rect.h = sq_beg[r+1] - sq_beg[r] - 1;
 
     return &rect;
-}
-
-static void display_sim_reset(void)
-{
-    width     = DEFAULT_WIDTH;
-    run_speed = DEFAULT_RUN_SPEED;
-    ctr_row   = MAX_WIDTH/2;
-    ctr_col   = MAX_WIDTH/2;
-}
-
-// - - - - - - - - -  DISPLAY : SELECT_PARAMS  - - - - - - - - - - - - - - - -
-
-static int32_t display_select_params(int32_t curr_display, int32_t last_display)
-{
-    char cur_s1[100], ret_s1[100];
-
-    // get new value strings for the params
-    sprintf(cur_s1, "%d", param_init);
-    sdl_display_get_string(1, "INIT", cur_s1, ret_s1);
-
-    // scan returned string(s)
-    sscanf(ret_s1, "%d", &param_init);
-
-#if 0
-    // xxx constrain values to their allowed range
-    if (param_init < 0) param_init = 0;
-    if (param_init > 100) param_init = 100;
-#endif
-
-    // re-init with the new params
-    display_sim_reset();
-    sim_init();
-
-    // return next_display
-    return sdl_quit ? DISPLAY_TERMINATE : DISPLAY_SIMULATION;
 }
 
 // - - - - - - - - -  DISPLAY : HELP  - - - - - - - - - - - - - - - - - - - -
