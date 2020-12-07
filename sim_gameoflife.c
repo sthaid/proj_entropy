@@ -9,8 +9,7 @@
 
 #define DEFAULT_WIDTH              100
 #define DEFAULT_RUN_SPEED          5
-#define DEFAULT_PARAM_INIT_PERCENT 12
-#define DEFAULT_PARAM_RAND_SEED    1 
+#define DEFAULT_PARAM_INIT         0 
 
 #define MAX_WIDTH 1000
 
@@ -57,8 +56,7 @@ static int32_t width;
 static int32_t ctr_row;
 static int32_t ctr_col;
 static int32_t run_speed;
-static int32_t param_init_percent;
-static int32_t param_rand_seed;
+static int32_t param_init;
 
 // 
 // prototypes
@@ -84,10 +82,9 @@ static int32_t display_help(int32_t curr_display, int32_t last_display);
 
 void sim_gameoflife(void) 
 {
-    curr_gen           = malloc(sizeof(gen_t));
-    next_gen           = malloc(sizeof(gen_t));
-    param_init_percent = DEFAULT_PARAM_INIT_PERCENT;
-    param_rand_seed    = DEFAULT_PARAM_RAND_SEED;
+    curr_gen   = malloc(sizeof(gen_t));
+    next_gen   = malloc(sizeof(gen_t));
+    param_init = DEFAULT_PARAM_INIT;
 
     display_sim_reset();
     sim_init();
@@ -124,13 +121,14 @@ void sim_gameoflife(void)
 #define LIVE_WITH_3_LIVE_NEIGHBORS  (LIVE_MASK | 3)
 #define DEAD_WITH_3_LIVE_NEIGHBORS  (3)
 
-#define INIT_PATTERN(array) \
+#define INIT_PATTERN(_r,_c,_array) \
     do { \
-        int32_t i; \
-        for (i = 0; i < sizeof(array)/sizeof(rc_t); i++) { \
-            (*curr_gen)[(r)+(array)[i].r][(c)+(array)[i].c] = LIVE_MASK; \
+        int32_t i, r, c; \
+        r = (_r) + MAX_WIDTH/2; \
+        c = (_c) + MAX_WIDTH/2; \
+        for (i = 0; i < sizeof(_array)/sizeof(rc_t); i++) { \
+            (*curr_gen)[(r)+(_array)[i].r][(c)+(_array)[i].c] = LIVE_MASK; \
         } \
-        c += 15; if (c > 515) { r += 15; c = 485; } \
     } while (0)
 
 //
@@ -148,15 +146,27 @@ typedef struct {
 
 // still lifes
 rc_t block[]   = { {0,0}, {0,1}, {1,0}, {1,1} };
+
 // oscillations
 rc_t blinker[] = { {0,-1}, {0,0}, {0,1} };
 rc_t toad[]    = { {0,-1}, {0,0}, {0,1}, {1,0}, {1,1}, {1,2} };
 rc_t beacon[]  = { {-1,-1}, {-1,0}, {0,-1}, {0,0}, {1,1}, {1,2}, {2,1}, {2,2} };
 rc_t penta_decathlon[] = { {5,0}, {4,-1}, {4,0}, {4,1}, {3,-2}, {3,-1}, {3,0}, {3,1}, {3,2}, 
                            {-6,0}, {-5,-1}, {-5,0}, {-5,1}, {-4,-2}, {-4,-1}, {-4,0}, {-4,1}, {-4,2} };
+rc_t pulsar[] = {
+            {-6,-4}, {-6,-3}, {-6,-2}, {-6,2}, {-6,3}, {-6,4},
+            {-4,-6}, {-4,-1}, {-4,1}, {-4,6},
+            {-3,-6}, {-3,-1}, {-3,1}, {-3,6},
+            {-2,-6}, {-2,-1}, {-2,1}, {-2,6},
+            {-1,-4}, {-1,-3}, {-1,-2}, {-1,2}, {-1,3}, {-1,4},
+            {1,-4}, {1,-3}, {1,-2}, {1,2}, {1,3}, {1,4},
+            {2,-6}, {2,-1}, {2,1}, {2,6},
+            {3,-6}, {3,-1}, {3,1}, {3,6},
+            {4,-6}, {4,-1}, {4,1}, {4,6},
+            {6,-4}, {6,-3}, {6,-2}, {6,2}, {6,3}, {6,4} };
+
 // spaceships
 rc_t glider[] = { {-1,-1}, {-1,1}, {0,0}, {0,1}, {1,0} };
-
 rc_t lwss[]   = { {-1,0}, {-1,1}, {0,-2}, {0,-1}, {0,1}, {0,2}, {1,-2}, 
                   {1,-1}, {1,0}, {1,1}, {2,-1}, {2,0} };
 rc_t mwss[]   = { {-2,0}, {-1,-2}, {-1,2}, {0,3}, {1,-2}, {1,3}, 
@@ -164,35 +174,117 @@ rc_t mwss[]   = { {-2,0}, {-1,-2}, {-1,2}, {0,3}, {1,-2}, {1,3},
 rc_t hwss[]   = { {-2,-2}, {-2,-1}, {-2,0}, {-2,1}, {-2,2}, {-2,3},
                   {-1,-3}, {-1,3}, {0,3}, {1,-3}, {1,2}, {2,-1}, {2,0} };
 
+//  Methuselahs  (evolve for long periods before stabilizing)
+rc_t r_pentomino[] = { {-1,0}, {-1,1}, {0,-1}, {0,0}, {1,0} };
+rc_t diehard[] = { {-1,2}, {0,-4}, {0,-3}, {1,-3}, {1,1}, {1,2}, {1,3} };
+rc_t acorn[] = { {-1,-2}, {0,0}, {1,-3}, {1,-2}, {1,1}, {1,2}, {1,3} };
+
+// glider guns
+rc_t gosper_glider_gun[] = {
+        {-5,7},
+        {-4,5}, {-4,7},
+        {-3,-5}, {-3,-4}, {-3,3}, {-3,4}, {-3,17}, {-3,18},
+        {-2,-6}, {-2,-2}, {-2,3}, {-2,4}, {-2,17}, {-2,18},
+        {-1,-17}, {-1,-16}, {-1,-7}, {-1,-1}, {-1,3}, {-1,4},
+        {0,-17}, {0,-16}, {0,-7}, {0,-3}, {0,-1}, {0,0}, {0,5}, {0,7},
+        {1,-7}, {1,-1}, {1,7},
+        {2,-6}, {2,-2},
+        {3,-5}, {3,-4} };
+rc_t simkin_glider_gun[] = {
+        {-10,-15}, {-10,-14}, {-10,-8}, {-10,-7},
+        {-9,-15}, {-9,-14}, {-9,-8}, {-9,-7},
+        {-7,-11}, {-7,-10},
+        {-6,-11}, {-6,-10},
+        {-1,7}, {-1,8}, {-1,10}, {-1,11},
+        {0,6}, {0,12},
+        {1,6}, {1,13}, {1,16}, {1,17},
+        {2,6}, {2,7}, {2,8}, {2,12}, {2,16}, {2,17},
+        {3,11},
+        {7,5}, {7,6},
+        {8,5},
+        {9,6}, {9,7}, {9,8},
+        {10,8} };
+
+// infinite growth
+rc_t inf_growth1[] = {
+        {-3,2},
+        {-2,0}, {-2,2}, {-2,3},
+        {-1,0 }, {-1,2},
+        {0,0},
+        {1,-2},
+        {2,-4}, {2,-2} };
+rc_t inf_growth2[] = {
+        {-2,-2}, {-2,-1}, {-2,0}, {-2,2},
+        {-1,-2},
+        {0,1}, {0,2},
+        {1,-1}, {1,0}, {1,2},
+        {2,-2}, {2,0}, {2,2} };
+rc_t inf_growth3[] = {
+        {0,-17}, {0,-16}, {0,-15}, {0,-14}, {0,-13}, {0,-12}, {0,-11}, {0,-10},
+        {0,-8}, {0,-7}, {0,-6}, {0,-5}, {0,-4},
+        {0,0}, {0,1}, {0,2},
+        {0,9}, {0,10}, {0,11}, {0,12}, {0,13}, {0,14}, {0,15},
+        {0,17}, {0,18}, {0,19}, {0,20}, {0,21} };
+
 // - - - - - - - - -  SIM - INIT - - - - - - - - - -
 
 static void sim_init(void)
 {
-    int32_t r, c;
-
     // set to not running, and clear generation count
     running   = false;
     gen_count = 0;
 
     // init current generation (curr_gen) array;
-    // - when param_init_percent is 0 then cell test patterns from the Wikipedia
+    // - when param_init is 0 then cell test patterns from the Wikipedia
     //   article are used
-    // - otherwise, randomly set param_init_percent fraction of the cells to live
+    // - otherwise, randomly set param_init fraction of the cells to live
     bzero(curr_gen, sizeof(gen_t));
     bzero(next_gen, sizeof(gen_t));
-    if (param_init_percent == 0) {
-        r = 485, c = 485;
-        INIT_PATTERN(block);
-        INIT_PATTERN(blinker);
-        INIT_PATTERN(lwss);
-        INIT_PATTERN(toad);
-        INIT_PATTERN(beacon);
-        INIT_PATTERN(mwss);
-        INIT_PATTERN(penta_decathlon);
-        INIT_PATTERN(glider);
-        INIT_PATTERN(hwss);
-    } else {
-        int32_t tmp = param_init_percent * 1024 / 100;
+
+// XXX title, and select without using params
+    switch (param_init) {
+    case 0:
+        INIT_PATTERN(-15, -15, block);
+        INIT_PATTERN(-15,   0, blinker);
+        INIT_PATTERN(-15,  15, lwss);
+        INIT_PATTERN(  0, -15, toad);
+        INIT_PATTERN(  0,   0, beacon);
+        INIT_PATTERN(  0,  15, mwss);
+        INIT_PATTERN( 15, -15, penta_decathlon);
+        INIT_PATTERN( 15,   0, pulsar);
+        INIT_PATTERN( 15,  15, hwss);
+        break;
+    case 1:
+        INIT_PATTERN(0, 0, r_pentomino);
+        break;
+    case 2:
+        INIT_PATTERN(0, 0, diehard);
+        break;
+    case 3:
+        INIT_PATTERN(0, 0, acorn);
+        break;
+    case 4:
+        INIT_PATTERN(0, 0, gosper_glider_gun);
+        break;
+    case 5:
+        INIT_PATTERN(0, 0, simkin_glider_gun);
+        break;
+    case 6:
+        INIT_PATTERN(0, 0, inf_growth1);
+        break;
+    case 7:
+        INIT_PATTERN(0, 0, inf_growth2);
+        break;
+    case 8:
+        INIT_PATTERN(0, 0, inf_growth3);
+        break;
+    default:
+        break;
+    }
+#if 0
+    // xxx tbd
+    else {
+        int32_t tmp = param_init * 1024 / 100;
         srandom(param_rand_seed);
         for (r = 1; r < MAX_WIDTH-1; r++) {
             for (c = 1; c < MAX_WIDTH-1; c++) {
@@ -202,6 +294,7 @@ static void sim_init(void)
             }
         }
     }
+#endif
 
     // set each curr_gen cell's live neighbor count;
     //
@@ -209,6 +302,7 @@ static void sim_init(void)
     // needs to be initialized with the live neighbor count.
     // Code in set_curr_gen_cell_live_neighbor_count checks for
     // the r,c being on the perimeter.
+    int32_t r,c;
     for (r = 0; r < MAX_WIDTH; r++) {
         for (c = 0; c < MAX_WIDTH; c++) {
             set_curr_gen_cell_live_neighbor_count(r, c);
@@ -478,13 +572,10 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         sdl_render_text_font0(&ctlpane, 8, 16, str, SDL_EVENT_NONE);
 
         // - row 10: PARAMS ...
-        // - row 11: - INIT_PERCENT  n
-        // - row 12: - RAND_SEED     n
+        // - row 11: - INIT   n
         sdl_render_text_font0(&ctlpane, 10, 0, "PARAMS ...", SDL_EVENT_SELECT_PARAMS);
-        sprintf(str, "INIT_PERCENT %d", param_init_percent);
+        sprintf(str, "INIT%d", param_init);
         sdl_render_text_font0(&ctlpane, 11, 0, str, SDL_EVENT_NONE);
-        sprintf(str, "RAND_SEED    %d", param_rand_seed);
-        sdl_render_text_font0(&ctlpane, 12, 0, str, SDL_EVENT_NONE);
 
         // - row N:  HELP   BACK
         sdl_render_text_font0(&ctlpane, -1, 0, "HELP", SDL_EVENT_HELP);
@@ -627,20 +718,19 @@ static void display_sim_reset(void)
 static int32_t display_select_params(int32_t curr_display, int32_t last_display)
 {
     char cur_s1[100], ret_s1[100];
-    char cur_s2[100], ret_s2[100];
 
     // get new value strings for the params
-    sprintf(cur_s1, "%d", param_init_percent);
-    sprintf(cur_s2, "%d", param_rand_seed);
-    sdl_display_get_string(2, "INIT_PERCENT", cur_s1, ret_s1, "RAND_SEED", cur_s2, ret_s2);
+    sprintf(cur_s1, "%d", param_init);
+    sdl_display_get_string(1, "INIT", cur_s1, ret_s1);
 
     // scan returned string(s)
-    sscanf(ret_s1, "%d", &param_init_percent);
-    sscanf(ret_s2, "%d", &param_rand_seed);
+    sscanf(ret_s1, "%d", &param_init);
 
-    // constrain values to their allowed range
-    if (param_init_percent < 0) param_init_percent = 0;
-    if (param_init_percent > 100) param_init_percent = 100;
+#if 0
+    // xxx constrain values to their allowed range
+    if (param_init < 0) param_init = 0;
+    if (param_init > 100) param_init = 100;
+#endif
 
     // re-init with the new params
     display_sim_reset();
