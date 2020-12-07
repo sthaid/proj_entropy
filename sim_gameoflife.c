@@ -499,7 +499,7 @@ static int32_t display_simulation(int32_t curr_display, int32_t last_display)
         if (running && time_now - time_of_last_compute > RUN_SPEED_SLEEP_TIME) {
             //uint64_t start_us = microsec_timer();
             sim_compute_next_gen();
-            //if (gen_count < 100) INFO("duration = %ld\n", microsec_timer() - start_us);
+            //if (gen_count < 100) INFO("duration = %d\n", (int)(microsec_timer() - start_us));
             gen_count++;
             time_of_last_compute = time_now;
         }
