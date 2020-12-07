@@ -20,6 +20,21 @@ void sdl_init(uint32_t w, uint32_t h)
     char   *font_path;
     int32_t font0_ptsize, font1_ptsize;
 
+#ifndef ANDROID
+    // change working directory to the directory where the 
+    // program is being run from
+    char tmp[300], *progdir;
+    int rc;
+    if (readlink("/proc/self/exe", tmp, sizeof(tmp)) < 0) {
+        FATAL("readlink, %s\n", strerror(errno));
+    }
+    progdir = dirname(tmp);
+    rc = chdir(progdir);
+    if (rc != 0) {
+        FATAL("failed chdir to %s, %s\n", progdir, strerror(errno));
+    }
+#endif
+
     // initialize Simple DirectMedia Layer  (SDL)
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
         FATAL("SDL_Init failed\n");
