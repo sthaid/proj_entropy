@@ -242,7 +242,7 @@ static void sim_init(bool display_reset)
     gen_count = 0;
 
     // init curr_gen based on selection
-    #define MAX_SELECT 9   // update this when adding more choices
+    #define MAX_SELECT 12  // update this when adding selections
 
     bzero(curr_gen, sizeof(gen_t));
     bzero(next_gen, sizeof(gen_t));
@@ -250,18 +250,18 @@ static void sim_init(bool display_reset)
     switch (selection) {
     case 0:
         display_title = "EXAMPLES";
-        INIT_PATTERN(-15, -15, block);
-        INIT_PATTERN(-15,   0, blinker);
-        INIT_PATTERN(-15,  15, lwss);
-        INIT_PATTERN(  0, -15, toad);
+        INIT_PATTERN(-25, -25, block);
+        INIT_PATTERN(-25,   0, blinker);
+        INIT_PATTERN(-25,  25, lwss);
+        INIT_PATTERN(  0, -25, toad);
         INIT_PATTERN(  0,   0, beacon);
-        INIT_PATTERN(  0,  15, mwss);
-        INIT_PATTERN( 15, -15, penta_decathlon);
-        INIT_PATTERN( 15,   0, pulsar);
-        INIT_PATTERN( 15,  15, hwss);
+        INIT_PATTERN(  0,  25, mwss);
+        INIT_PATTERN( 25, -25, penta_decathlon);
+        INIT_PATTERN( 25,   0, pulsar);
+        INIT_PATTERN( 25,  25, hwss);
         break;
     case 1:
-        display_title = "R_PENTOMINO";
+        display_title = "R PENTOMINO";
         INIT_PATTERN(0, 0, r_pentomino);
         break;
     case 2:
@@ -273,40 +273,41 @@ static void sim_init(bool display_reset)
         INIT_PATTERN(0, 0, acorn);
         break;
     case 4:
-        display_title = "GOSPER_GLIDER_GUN";
+        display_title = "GOSPER GLIDER GUN";
         INIT_PATTERN(0, 0, gosper_glider_gun);
         break;
     case 5:
-        display_title = "SIMKIN_GLIDER_GUN";
+        display_title = "SIMKIN GLIDER GUN";
         INIT_PATTERN(0, 0, simkin_glider_gun);
         break;
     case 6:
-        display_title = "INF_GROWTH_1";
+        display_title = "INFINITE GROWTH 1";
         INIT_PATTERN(0, 0, inf_growth1);
         break;
     case 7:
-        display_title = "INF_GROWTH_2";
+        display_title = "INFINITE GROWTH 2";
         INIT_PATTERN(0, 0, inf_growth2);
         break;
     case 8:
-        display_title = "INF_GROWTH_3";
+        display_title = "INFINITE GROWTH 3";
         INIT_PATTERN(0, 0, inf_growth3);
         break;
-    default:
-        break;
-    }
-#if 0
-    // XXX put this  back in
-        int32_t tmp = param_init * 1024 / 100;
-        srandom(param_rand_seed);
+    case 9: case 10: case 11: {
+        int32_t r, c, percent = (selection - 8) * 5;
+        static char title[100];
+        sprintf(title, "RANDOM %d%%", percent);
+        display_title = title;
         for (r = 1; r < MAX_WIDTH-1; r++) {
             for (c = 1; c < MAX_WIDTH-1; c++) {
-                if ((random() & 1023) < tmp) {
+                if ((random() & 1023) < (percent*1024/100)) {
                     (*curr_gen)[r][c] = LIVE_MASK;
                 }
             }
         }
-#endif
+        break; }        
+    default:
+        break;
+    }
 
     // set each curr_gen cell's live neighbor count;
     //
