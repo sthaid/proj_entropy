@@ -1,7 +1,7 @@
 // Note max line length is 44 chars.
 
 static char about[] = "\
-Simulations in Physics.\n\
+Simulations in Math and Physics.\n\
 \n\
 Source Code: https://github.com/sthaid/\n\
              proj_entropy.git\n\
