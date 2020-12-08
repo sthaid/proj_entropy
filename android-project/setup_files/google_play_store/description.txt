@@ -1,8 +1,9 @@
-The purpose of this App is to gain a better understanding of Physics through computer simulations. Includes simulations of:
+The purpose of this App is to gain a better understanding of Math and Science through computer simulations. Includes simulations of:
 - Expanding Gas in a Container
 - Gravity
 - Expanding Universe
 - Random Walk
+- Conway's Game of Life
 
 Expanding Gas in a Container simulation - observe:
 - increase in entropy when the gas is released
@@ -21,4 +22,4 @@ Expanding Universe simulation - observe:
 - much of the universe lies beyond what can be seen from our vantage point
 - as the universe ages the size of the observable universe shrinks
 
-The source code is available at https://github.com/sthaid/proj_entropy.git. This App is coded in C, and utilizes the Simple DirectMedia Layer cross-platform development library. The Random Walk simulation is a good template to use for new simulations. Suggestions for new simulations are: Elastic Collisions, and Bacterial Life.
+The source code is available at https://github.com/sthaid/proj_entropy.git. This App is coded in C, and utilizes the Simple DirectMedia Layer cross-platform development library. 
