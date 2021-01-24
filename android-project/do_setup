@@ -73,7 +73,7 @@ echo
 echo "Creating launcher icons"
 cd $TOP/setup_files
 RES_PATH=$BUILD/app/src/main/res
-gcc -Wall -g `sdl2-config --cflags` -lSDL2 -lSDL2_ttf -lpng -o create_ic_launcher create_ic_launcher.c
+gcc -Wall -g `sdl2-config --cflags` -o create_ic_launcher create_ic_launcher.c -lSDL2 -lSDL2_ttf -lpng
 ./create_ic_launcher  $RES_PATH/mipmap-mdpi/ic_launcher.png      48
 ./create_ic_launcher  $RES_PATH/mipmap-hdpi/ic_launcher.png      72
 ./create_ic_launcher  $RES_PATH/mipmap-xhdpi/ic_launcher.png     96
