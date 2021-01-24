@@ -27,7 +27,7 @@ all: $(TARGETS)
 
 entropy: $(OBJS) 
 	echo "char *version = \"`git log -1 --format=%h`\";" > version.c
-	$(CC) -pthread -lrt -lSDL2 -lSDL2_ttf -lm -lpng -o $@ $(OBJS) version.c
+	$(CC) -pthread -o $@ $(OBJS) version.c -lrt -lSDL2 -lSDL2_ttf -lm -lpng
 
 #
 # clean rule
